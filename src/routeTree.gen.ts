@@ -9,38 +9,79 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SwapRouteImport } from './routes/swap'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SwapOrderIdRouteImport } from './routes/swap.$orderId'
+import { Route as ApiPublicHooksSwapTickRouteImport } from './routes/api/public/hooks/swap-tick'
 
+const SwapRoute = SwapRouteImport.update({
+  id: '/swap',
+  path: '/swap',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SwapOrderIdRoute = SwapOrderIdRouteImport.update({
+  id: '/$orderId',
+  path: '/$orderId',
+  getParentRoute: () => SwapRoute,
+} as any)
+const ApiPublicHooksSwapTickRoute = ApiPublicHooksSwapTickRouteImport.update({
+  id: '/api/public/hooks/swap-tick',
+  path: '/api/public/hooks/swap-tick',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/swap': typeof SwapRouteWithChildren
+  '/swap/$orderId': typeof SwapOrderIdRoute
+  '/api/public/hooks/swap-tick': typeof ApiPublicHooksSwapTickRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/swap': typeof SwapRouteWithChildren
+  '/swap/$orderId': typeof SwapOrderIdRoute
+  '/api/public/hooks/swap-tick': typeof ApiPublicHooksSwapTickRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/swap': typeof SwapRouteWithChildren
+  '/swap/$orderId': typeof SwapOrderIdRoute
+  '/api/public/hooks/swap-tick': typeof ApiPublicHooksSwapTickRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/swap' | '/swap/$orderId' | '/api/public/hooks/swap-tick'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/swap' | '/swap/$orderId' | '/api/public/hooks/swap-tick'
+  id:
+    | '__root__'
+    | '/'
+    | '/swap'
+    | '/swap/$orderId'
+    | '/api/public/hooks/swap-tick'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SwapRoute: typeof SwapRouteWithChildren
+  ApiPublicHooksSwapTickRoute: typeof ApiPublicHooksSwapTickRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/swap': {
+      id: '/swap'
+      path: '/swap'
+      fullPath: '/swap'
+      preLoaderRoute: typeof SwapRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +89,37 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/swap/$orderId': {
+      id: '/swap/$orderId'
+      path: '/$orderId'
+      fullPath: '/swap/$orderId'
+      preLoaderRoute: typeof SwapOrderIdRouteImport
+      parentRoute: typeof SwapRoute
+    }
+    '/api/public/hooks/swap-tick': {
+      id: '/api/public/hooks/swap-tick'
+      path: '/api/public/hooks/swap-tick'
+      fullPath: '/api/public/hooks/swap-tick'
+      preLoaderRoute: typeof ApiPublicHooksSwapTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
+interface SwapRouteChildren {
+  SwapOrderIdRoute: typeof SwapOrderIdRoute
+}
+
+const SwapRouteChildren: SwapRouteChildren = {
+  SwapOrderIdRoute: SwapOrderIdRoute,
+}
+
+const SwapRouteWithChildren = SwapRoute._addFileChildren(SwapRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SwapRoute: SwapRouteWithChildren,
+  ApiPublicHooksSwapTickRoute: ApiPublicHooksSwapTickRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
