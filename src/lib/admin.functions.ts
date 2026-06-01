@@ -64,13 +64,13 @@ export const adminRetryOrder = createServerFn({ method: "POST" })
     if (error || !order) throw new Error("Order not found");
 
     // Drop back to the previous unblocked state
-    let next: string = order.status;
-    if (order.status === "failed") next = "confirmed";
+    const next = order.status === "failed" ? "confirmed" : order.status;
 
     await supabaseAdmin
       .from("orders")
       .update({ status: next, error_message: null })
       .eq("id", order.id);
+
 
     await supabaseAdmin.from("admin_audit").insert({
       actor_user_id: context.userId,
