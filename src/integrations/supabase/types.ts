@@ -14,16 +14,241 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      admin_audit: {
+        Row: {
+          action: string
+          actor_user_id: string
+          created_at: string
+          details: Json | null
+          id: string
+          order_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_user_id: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          order_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          order_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_audit_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deposits: {
+        Row: {
+          amount_usd: number
+          block_number: number
+          chain: string
+          confirmations: number
+          detected_at: string
+          from_address: string
+          id: string
+          log_index: number
+          order_id: string | null
+          to_address: string
+          token: string
+          tx_hash: string
+        }
+        Insert: {
+          amount_usd: number
+          block_number: number
+          chain: string
+          confirmations?: number
+          detected_at?: string
+          from_address: string
+          id?: string
+          log_index?: number
+          order_id?: string | null
+          to_address: string
+          token: string
+          tx_hash: string
+        }
+        Update: {
+          amount_usd?: number
+          block_number?: number
+          chain?: string
+          confirmations?: number
+          detected_at?: string
+          from_address?: string
+          id?: string
+          log_index?: number
+          order_id?: string | null
+          to_address?: string
+          token?: string
+          tx_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deposits_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hd_address_counter: {
+        Row: {
+          id: number
+          next_index: number
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          next_index?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          next_index?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      orders: {
+        Row: {
+          bitmart_avg_price: number | null
+          bitmart_filled_txc: number | null
+          bitmart_order_id: string | null
+          bitmart_spot_price: number
+          created_at: string
+          deposit_address: string
+          deposit_index: number
+          dest_txc_address: string
+          error_message: string | null
+          expires_at: string
+          id: string
+          paid_amount_usd: number | null
+          paid_tx_hash: string | null
+          premium_bps: number
+          public_id: string
+          quoted_txc_out: number
+          quoted_txc_per_usd: number
+          source_amount_usd: number
+          source_chain: string
+          source_token: string
+          status: Database["public"]["Enums"]["order_status"]
+          txc_tx_hash: string | null
+          updated_at: string
+          withdrawal_id: string | null
+        }
+        Insert: {
+          bitmart_avg_price?: number | null
+          bitmart_filled_txc?: number | null
+          bitmart_order_id?: string | null
+          bitmart_spot_price: number
+          created_at?: string
+          deposit_address: string
+          deposit_index: number
+          dest_txc_address: string
+          error_message?: string | null
+          expires_at?: string
+          id?: string
+          paid_amount_usd?: number | null
+          paid_tx_hash?: string | null
+          premium_bps?: number
+          public_id?: string
+          quoted_txc_out: number
+          quoted_txc_per_usd: number
+          source_amount_usd: number
+          source_chain: string
+          source_token: string
+          status?: Database["public"]["Enums"]["order_status"]
+          txc_tx_hash?: string | null
+          updated_at?: string
+          withdrawal_id?: string | null
+        }
+        Update: {
+          bitmart_avg_price?: number | null
+          bitmart_filled_txc?: number | null
+          bitmart_order_id?: string | null
+          bitmart_spot_price?: number
+          created_at?: string
+          deposit_address?: string
+          deposit_index?: number
+          dest_txc_address?: string
+          error_message?: string | null
+          expires_at?: string
+          id?: string
+          paid_amount_usd?: number | null
+          paid_tx_hash?: string | null
+          premium_bps?: number
+          public_id?: string
+          quoted_txc_out?: number
+          quoted_txc_per_usd?: number
+          source_amount_usd?: number
+          source_chain?: string
+          source_token?: string
+          status?: Database["public"]["Enums"]["order_status"]
+          txc_tx_hash?: string | null
+          updated_at?: string
+          withdrawal_id?: string | null
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      next_hd_index: { Args: never; Returns: number }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin"
+      order_status:
+        | "awaiting_payment"
+        | "payment_detected"
+        | "confirmed"
+        | "buying_on_bitmart"
+        | "bought"
+        | "withdrawing"
+        | "completed"
+        | "expired"
+        | "failed"
+        | "refunded"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +375,20 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin"],
+      order_status: [
+        "awaiting_payment",
+        "payment_detected",
+        "confirmed",
+        "buying_on_bitmart",
+        "bought",
+        "withdrawing",
+        "completed",
+        "expired",
+        "failed",
+        "refunded",
+      ],
+    },
   },
 } as const
