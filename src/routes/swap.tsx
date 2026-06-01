@@ -80,7 +80,7 @@ function SwapPage() {
   const tokenOptions = chainOpt?.tokens ?? ["USDC"];
   // Auto-correct token if not available on selected chain
   if (chainOpt && !tokenOptions.includes(token)) {
-    setToken(tokenOptions[0]);
+    setToken(tokenOptions[0] as string);
   }
 
   const formValid = usdAmount >= 10 && dest.trim().length >= 20 && quote?.ok === true;
