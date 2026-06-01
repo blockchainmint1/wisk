@@ -79,7 +79,7 @@ function SwapPage() {
   const chainOpt = chains?.find((c) => c.key === chain);
   const tokenOptions = chainOpt?.tokens ?? ["USDC"];
   // Auto-correct token if not available on selected chain
-  if (chainOpt && !tokenOptions.includes(token)) {
+  if (chainOpt && !(tokenOptions as string[]).includes(token)) {
     setToken(tokenOptions[0] as string);
   }
 
