@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getTxcSpotPrice } from "./bitmart.server";
 import { CHAINS, PREMIUM_BPS, getChain, getToken, type ChainKey } from "./chains";
 import { deriveDepositAddress } from "./hd.server";
+import { notifyOrderEvent } from "./telegram.server";
 
 const CreateInput = z.object({
   sourceChain: z.enum(["ethereum", "base", "arbitrum", "polygon", "bsc"]),
