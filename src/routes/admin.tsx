@@ -402,7 +402,10 @@ function OrderDetail({ publicId }: { publicId: string }) {
 
   const { order, deposits, events, audit, bitmartLive, hotBalance } = q.data;
   const asset = order.dest_asset ?? "TXC";
-  const explorer = (txid: string) => `https://explorer.texitcoin.org/tx/${txid}`;
+  const explorer = (txid: string) =>
+    asset === "ISK$"
+      ? `https://mempool.iskandercoin.com/tx/${txid}`
+      : `https://explorer.texitcoin.org/tx/${txid}`;
 
   return (
     <div className="p-5 space-y-5">
