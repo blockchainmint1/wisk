@@ -184,6 +184,80 @@ export const adminRetryOrder = createServerFn({ method: "POST" })
     return { ok: true, status: next };
   });
 
+/**
+ * Force an order back into the `confirmed` queue so the swap-tick payout
+ * loop will (re)try sending the customer their native asset. Works from
+ * any non-terminal state — useful when an order is wedged in
+ * `buying_on_bitmart` (legacy flow), `payment_detected`, or similar.
+ */
+export const adminForceComplete = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ publicId: z.string().min(3).max(40) }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { data: order, error } = await supabaseAdmin
+      .from("orders")
+      .select("id,status")
+      .eq("public_id", data.publicId)
+      .maybeSingle();
+    if (error || !order) throw new Error("Order not found");
+    if (order.status === "completed") {
+      return { ok: true as const, status: order.status, note: "already completed" };
+    }
+    await supabaseAdmin
+      .from("orders")
+      .update({ status: "confirmed", error_message: null })
+      .eq("id", order.id);
+    await audit(
+      context.userId,
+      "force_complete",
+      { from: order.status, to: "confirmed" },
+      order.id,
+    );
+    return { ok: true as const, status: "confirmed" as const };
+  });
+
+/**
+ * Mark an order as `failed` with an optional admin reason. Use when an
+ * order cannot be settled (bad destination, dust deposit, etc.) and we
+ * need to stop the swap-tick from retrying.
+ */
+export const adminForceFail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        publicId: z.string().min(3).max(40),
+        reason: z.string().trim().max(280).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { data: order, error } = await supabaseAdmin
+      .from("orders")
+      .select("id,status")
+      .eq("public_id", data.publicId)
+      .maybeSingle();
+    if (error || !order) throw new Error("Order not found");
+    const reason = data.reason?.trim() || "Manually failed by admin";
+    await supabaseAdmin
+      .from("orders")
+      .update({ status: "failed", error_message: reason })
+      .eq("id", order.id);
+    await audit(
+      context.userId,
+      "force_fail",
+      { from: order.status, reason },
+      order.id,
+    );
+    return { ok: true as const, status: "failed" as const };
+  });
+
+
+
 // ===== Bitmart balances =====
 const WATCHED_CURRENCIES = ["TXC", "ISK$", "USDT"] as const;
 export const adminBitmartBalances = createServerFn({ method: "POST" })
