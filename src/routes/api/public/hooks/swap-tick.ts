@@ -19,6 +19,7 @@ import {
   weiToUsd,
 } from "@/lib/evm-scan.server";
 import { getChain, getToken, type ChainKey } from "@/lib/chains";
+import { getDestination } from "@/lib/destinations";
 import { notifyOrderEvent } from "@/lib/telegram.server";
 
 async function notifyById(
@@ -28,7 +29,7 @@ async function notifyById(
   const { data } = await supabaseAdmin
     .from("orders")
     .select(
-      "public_id,source_chain,source_token,source_amount_usd,paid_amount_usd,dest_txc_address,quoted_txc_out,bitmart_filled_txc,bitmart_avg_price,paid_tx_hash,txc_tx_hash,error_message",
+      "public_id,source_chain,source_token,source_amount_usd,paid_amount_usd,dest_asset,dest_txc_address,quoted_txc_out,bitmart_filled_txc,bitmart_avg_price,paid_tx_hash,txc_tx_hash,error_message",
     )
     .eq("id", orderId)
     .maybeSingle();
@@ -185,10 +186,18 @@ async function watchDeposits() {
 async function buyOnBitmart() {
   const { data: orders } = await supabaseAdmin
     .from("orders")
-    .select("id,public_id,paid_amount_usd,quoted_txc_out")
+    .select("id,public_id,paid_amount_usd,quoted_txc_out,dest_asset")
     .eq("status", "confirmed")
     .limit(10)
-    .returns<Array<{ id: string; public_id: string; paid_amount_usd: number | null; quoted_txc_out: number }>>();
+    .returns<
+      Array<{
+        id: string;
+        public_id: string;
+        paid_amount_usd: number | null;
+        quoted_txc_out: number;
+        dest_asset: string;
+      }>
+    >();
   if (!orders?.length) return { bought: 0 };
 
   let bought = 0;
@@ -199,13 +208,17 @@ async function buyOnBitmart() {
         await failOrder(o.id, "Missing paid amount");
         continue;
       }
+      const dest = getDestination(o.dest_asset);
       // We retain the 5% premium; spend (notional / 1.05) on the spot buy.
       const buyNotional = +(notional / 1.05).toFixed(2);
       await supabaseAdmin
         .from("orders")
         .update({ status: "buying_on_bitmart" })
         .eq("id", o.id);
-      const { order_id } = await submitMarketBuy(buyNotional);
+      const { order_id } = await submitMarketBuy({
+        symbol: dest.bitmartSymbol,
+        notionalUsdt: buyNotional,
+      });
       await supabaseAdmin
         .from("orders")
         .update({ bitmart_order_id: order_id })
@@ -257,16 +270,26 @@ async function pollBitmartFills() {
 async function withdrawTxc() {
   const { data: orders } = await supabaseAdmin
     .from("orders")
-    .select("id,bitmart_filled_txc,dest_txc_address")
+    .select("id,bitmart_filled_txc,dest_txc_address,dest_asset")
     .eq("status", "bought")
-    .returns<Array<{ id: string; bitmart_filled_txc: number; dest_txc_address: string }>>();
+    .returns<
+      Array<{
+        id: string;
+        bitmart_filled_txc: number;
+        dest_txc_address: string;
+        dest_asset: string;
+      }>
+    >();
   if (!orders?.length) return { withdrawing: 0 };
 
   let withdrawing = 0;
   for (const o of orders) {
     try {
+      const dest = getDestination(o.dest_asset);
       await supabaseAdmin.from("orders").update({ status: "withdrawing" }).eq("id", o.id);
       const { withdraw_id } = await submitWithdrawal({
+        currency: dest.bitmartCurrency,
+        network: dest.bitmartNetwork,
         amount: o.bitmart_filled_txc,
         address: o.dest_txc_address,
       });

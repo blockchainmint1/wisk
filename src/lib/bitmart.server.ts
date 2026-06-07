@@ -4,8 +4,10 @@ import { createHmac } from "crypto";
 
 const BASE = "https://api-cloud.bitmart.com";
 
+// Default destination symbol/network — kept for back-compat with any caller
+// that still uses TXC implicitly. Prefer passing symbol/network explicitly.
 export const TXC_SYMBOL = "TXC_USDT";
-export const TXC_NETWORK = "TXC"; // withdrawal network code
+export const TXC_NETWORK = "TXC";
 
 function creds() {
   const key = process.env.BITMART_API_KEY?.trim();
@@ -56,11 +58,12 @@ async function signedRequest<T = unknown>(opts: {
 }
 
 // ===== Public: spot ticker =====
-export async function getTxcSpotPrice(): Promise<number> {
-  // v3 ticker endpoint: GET /spot/quotation/v3/ticker?symbol=TXC_USDT
-  const res = await fetch(`${BASE}/spot/quotation/v3/ticker?symbol=${TXC_SYMBOL}`, {
-    headers: { "Content-Type": "application/json" },
-  });
+export async function getSpotPrice(symbol: string = TXC_SYMBOL): Promise<number> {
+  // v3 ticker endpoint: GET /spot/quotation/v3/ticker?symbol=XXX_USDT
+  const res = await fetch(
+    `${BASE}/spot/quotation/v3/ticker?symbol=${encodeURIComponent(symbol)}`,
+    { headers: { "Content-Type": "application/json" } },
+  );
   if (!res.ok) throw new Error(`Bitmart ticker HTTP ${res.status}`);
   const json = (await res.json()) as {
     code?: number;
@@ -75,17 +78,23 @@ export async function getTxcSpotPrice(): Promise<number> {
   return last;
 }
 
+// Back-compat alias.
+export const getTxcSpotPrice = () => getSpotPrice(TXC_SYMBOL);
+
 // ===== Trading =====
-export async function submitMarketBuy(notionalUsdt: number): Promise<{ order_id: string }> {
+export async function submitMarketBuy(opts: {
+  symbol?: string;
+  notionalUsdt: number;
+}): Promise<{ order_id: string }> {
   // notional = USDT amount to spend on market buy
   return signedRequest<{ order_id: string }>({
     method: "POST",
     path: "/spot/v2/submit_order",
     body: {
-      symbol: TXC_SYMBOL,
+      symbol: opts.symbol ?? TXC_SYMBOL,
       side: "buy",
       type: "market",
-      notional: notionalUsdt.toFixed(2),
+      notional: opts.notionalUsdt.toFixed(2),
     },
   });
 }
@@ -107,6 +116,8 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail> {
 
 // ===== Withdrawal =====
 export async function submitWithdrawal(opts: {
+  currency?: string;
+  network?: string;
   amount: number;
   address: string;
 }): Promise<{ withdraw_id: string }> {
@@ -114,12 +125,12 @@ export async function submitWithdrawal(opts: {
     method: "POST",
     path: "/account/v1/withdraw/apply",
     body: {
-      currency: "TXC",
+      currency: opts.currency ?? "TXC",
       amount: opts.amount.toFixed(8),
       destination: "To Digital Address",
       address: opts.address,
       address_memo: "",
-      chain: TXC_NETWORK,
+      chain: opts.network ?? TXC_NETWORK,
     },
   });
 }

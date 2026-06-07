@@ -32,15 +32,17 @@ export const Route = createFileRoute("/swap/$orderId")({
   ),
 });
 
-const STEPS = [
-  { key: "awaiting_payment", label: "Awaiting Payment", detail: "Send the exact amount to the deposit address" },
-  { key: "payment_detected", label: "Payment Detected", detail: "Waiting for chain confirmations" },
-  { key: "confirmed", label: "Payment Confirmed", detail: "Queuing market buy" },
-  { key: "buying_on_bitmart", label: "Buying TXC on Bitmart", detail: "Sourcing liquidity from spot market" },
-  { key: "bought", label: "TXC Acquired", detail: "Preparing native withdrawal" },
-  { key: "withdrawing", label: "Withdrawing TXC", detail: "Broadcasting to TEXITcoin network" },
-  { key: "completed", label: "Completed", detail: "Funds delivered to your TXC address" },
-] as const;
+function makeSteps(asset: string) {
+  return [
+    { key: "awaiting_payment", label: "Awaiting Payment", detail: "Send the exact amount to the deposit address" },
+    { key: "payment_detected", label: "Payment Detected", detail: "Waiting for chain confirmations" },
+    { key: "confirmed", label: "Payment Confirmed", detail: "Queuing market buy" },
+    { key: "buying_on_bitmart", label: `Buying ${asset} on Bitmart`, detail: "Sourcing liquidity from spot market" },
+    { key: "bought", label: `${asset} Acquired`, detail: "Preparing native withdrawal" },
+    { key: "withdrawing", label: `Withdrawing ${asset}`, detail: "Broadcasting to network" },
+    { key: "completed", label: "Completed", detail: `Funds delivered to your ${asset} address` },
+  ] as const;
+}
 
 function OrderPage() {
   const { orderId } = Route.useParams();
@@ -76,9 +78,11 @@ function OrderPage() {
     );
   }
 
+  const destAsset = order.dest_asset || "TXC";
+  const steps = makeSteps(destAsset);
   const stepIdx = Math.max(
     0,
-    STEPS.findIndex((s) => s.key === order.status),
+    steps.findIndex((s) => s.key === order.status),
   );
   const failed = order.status === "failed" || order.status === "expired";
 
@@ -100,7 +104,7 @@ function OrderPage() {
           {/* Steps */}
           <div className="md:col-span-3">
             <div className="relative space-y-10 pl-8 border-l border-border">
-              {STEPS.map((s, i) => {
+              {steps.map((s, i) => {
                 const done = i < stepIdx && !failed;
                 const active = i === stepIdx && !failed;
                 return (
@@ -139,7 +143,7 @@ function OrderPage() {
               <KV label="Sending" value={`$${Number(order.source_amount_usd).toFixed(2)}`} />
               <KV
                 label="Quote"
-                value={`${Number(order.quoted_txc_out).toFixed(4)} TXC @ $${Number(order.bitmart_spot_price).toFixed(6)}`}
+                value={`${Number(order.quoted_txc_out).toFixed(4)} ${destAsset} @ $${Number(order.bitmart_spot_price).toFixed(6)}`}
               />
               {order.paid_tx_hash ? (
                 <KV
@@ -158,7 +162,7 @@ function OrderPage() {
               ) : null}
               {order.txc_tx_hash ? (
                 <KV
-                  label="TXC Tx"
+                  label={`${destAsset} Tx`}
                   value={
                     <span className="text-success break-all">{order.txc_tx_hash}</span>
                   }

@@ -168,6 +168,7 @@ export type Database = {
           created_at: string
           deposit_address: string
           deposit_index: number
+          dest_asset: string
           dest_txc_address: string
           error_message: string | null
           expires_at: string
@@ -194,6 +195,7 @@ export type Database = {
           created_at?: string
           deposit_address: string
           deposit_index: number
+          dest_asset?: string
           dest_txc_address: string
           error_message?: string | null
           expires_at?: string
@@ -220,6 +222,7 @@ export type Database = {
           created_at?: string
           deposit_address?: string
           deposit_index?: number
+          dest_asset?: string
           dest_txc_address?: string
           error_message?: string | null
           expires_at?: string
