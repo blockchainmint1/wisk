@@ -253,7 +253,7 @@ function SwapPage() {
                 disabled={!formValid || mutation.isPending}
                 className="w-full bg-accent hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed text-accent-foreground font-mono font-bold py-5 rounded-lg transition-all shadow-[0_0_20px_hsl(0_84%_50%/0.3)] uppercase tracking-widest"
               >
-                {mutation.isPending ? "Creating Order…" : "Get Deposit Address"}
+                {mutation.isPending ? "Creating Order…" : "Get Payment Address"}
               </button>
 
               <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest text-center">
