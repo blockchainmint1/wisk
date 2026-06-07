@@ -1,10 +1,15 @@
 // Fulfillment cron tick — called by pg_cron every minute.
-// 1) Watch awaiting orders for deposit confirmation
-// 2) Buy TXC/ISK$ on Bitmart for confirmed orders
-// 3a) TXC orders: send locally from our hot wallet (cheaper than Bitmart withdraw)
-// 3b) ISK$ orders: still go through Bitmart withdrawal (local signing TBD)
-// Auth: pg_cron uses Supabase publishable key in `apikey` header. Route lives
-// under /api/public/* which bypasses Lovable's site auth.
+// Customer flow (TXC):
+//   awaiting_payment → payment_detected → confirmed → sending → completed
+//   TXC is sent locally from our hot wallet using the quoted amount.
+//   Bitmart is NEVER on the critical path for TXC orders.
+// Treasury replenishment (background, decoupled):
+//   For completed TXC orders, submit a market buy on Bitmart to refill our
+//   wallet. The bitmart_order_id / bitmart_filled_txc columns track this but
+//   never gate customer payout.
+// ISK$ flow still goes through Bitmart buy → withdraw until local signing.
+// Auth: route lives under /api/public/* which bypasses Lovable's site auth.
+
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
