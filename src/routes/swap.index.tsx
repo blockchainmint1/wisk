@@ -72,7 +72,7 @@ function SwapPage() {
       return createFn({
         data: {
           sourceChain: chain as "ethereum" | "base" | "arbitrum" | "polygon" | "bsc",
-          sourceToken: token as "USDC" | "USDT" | "DAI",
+          sourceToken: token,
           usdAmount,
           destAsset,
           destAddress: dest.trim(),
@@ -95,10 +95,11 @@ function SwapPage() {
   });
 
   const chainOpt = chains?.find((c) => c.key === chain);
-  const tokenOptions = chainOpt?.tokens ?? ["USDC"];
-  if (chainOpt && !(tokenOptions as string[]).includes(token)) {
-    setToken(tokenOptions[0] as string);
+  const tokenOptions = chainOpt?.tokens ?? [{ symbol: "USDC", isNative: false }];
+  if (chainOpt && !tokenOptions.some((t) => t.symbol === token)) {
+    setToken(tokenOptions[0].symbol);
   }
+  const selectedTokenIsNative = tokenOptions.find((t) => t.symbol === token)?.isNative === true;
 
   const formValid = usdAmount >= 10 && addressValid && quote?.ok === true;
 
