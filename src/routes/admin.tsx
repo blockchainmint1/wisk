@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   adminAuditLog,
   adminBitmartBalances,
+  adminBulkReplenish,
   adminGetSettings,
   adminInviteAdmin,
   adminListAdmins,
@@ -15,6 +16,7 @@ import {
   adminRetryOrder,
   adminRevokeAdmin,
   adminTelegramTest,
+  adminTreasuryDebt,
   adminUpdateSettings,
   adminWalletScan,
 } from "@/lib/admin.functions";
