@@ -110,26 +110,66 @@ async function watchDeposits() {
       const chain = getChain(chainKey);
       const currentBlock = await getBlockNumber(chainKey);
       const fromBlock = chainStartScanBlock(chainKey, currentBlock);
-      const tokenAddresses = Array.from(new Set(group.map((o) => getToken(chainKey, o.source_token).address)));
+
+      // Split orders by source token kind. ERC-20 orders share a batched
+      // contract-address filter; native (ETH) orders each scan external txs.
+      const erc20Orders = group.filter((o) => !isNativeToken(getToken(chainKey, o.source_token)));
+      const nativeOrders = group.filter((o) => isNativeToken(getToken(chainKey, o.source_token)));
+      const tokenAddresses = Array.from(
+        new Set(erc20Orders.map((o) => getToken(chainKey, o.source_token).address)),
+      );
 
       for (const order of group) {
+        const orderToken = getToken(chainKey, order.source_token);
+        const orderIsNative = isNativeToken(orderToken);
         const transfers = await scanIncomingTransfers({
           chain: chainKey,
           toAddress: order.deposit_address,
-          tokenAddresses,
+          tokenAddresses: orderIsNative ? [] : tokenAddresses,
           fromBlock,
           toBlock: currentBlock,
+          includeNative: orderIsNative,
         });
         if (!transfers.length) continue;
 
+        // For native orders we need a live spot to convert wei → USD.
+        let nativeSpot = 0;
+        if (orderIsNative && orderToken.bitmartSymbol) {
+          try {
+            nativeSpot = await getSpotPrice(orderToken.bitmartSymbol);
+          } catch (e) {
+            console.error(`[watch] spot lookup failed`, e);
+            continue;
+          }
+        }
+
         for (const t of transfers) {
-          const token = getToken(chainKey, order.source_token);
-          if (t.token !== token.address.toLowerCase()) continue;
-          const usd = weiToUsd(t.amountWei, token.decimals);
+          let usd: number;
+          if (orderIsNative) {
+            if (t.token !== "native") continue;
+            const nativeAmt = Number(t.amountWei) / 1e18;
+            usd = nativeAmt * nativeSpot;
+          } else {
+            if (t.token !== orderToken.address.toLowerCase()) continue;
+            usd = weiToUsd(t.amountWei, orderToken.decimals);
+          }
           const confirmations = currentBlock - t.blockNumber + 1;
 
           await supabaseAdmin.from("deposits").upsert(
             {
+              order_id: order.id,
+              chain: chainKey,
+              tx_hash: t.txHash,
+              log_index: t.logIndex,
+              token: t.token,
+              from_address: t.from,
+              to_address: t.to,
+              amount_usd: usd,
+              block_number: t.blockNumber,
+              confirmations,
+            },
+            { onConflict: "chain,tx_hash,log_index" },
+          );
               order_id: order.id,
               chain: chainKey,
               tx_hash: t.txHash,
