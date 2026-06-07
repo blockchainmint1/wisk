@@ -366,8 +366,19 @@ type OrderRowData = {
   error_message: string | null;
 };
 
-function OrderRow({ order: o, onRetry }: { order: OrderRowData; onRetry: () => void }) {
+function OrderRow({
+  order: o,
+  onRetry,
+  onForceComplete,
+  onForceFail,
+}: {
+  order: OrderRowData;
+  onRetry: () => void;
+  onForceComplete: () => void;
+  onForceFail: () => void;
+}) {
   const [open, setOpen] = useState(false);
+  const terminal = o.status === "completed" || o.status === "failed" || o.status === "expired" || o.status === "refunded";
   return (
     <>
       <tr className="border-t border-border hover:bg-secondary/20 cursor-pointer" onClick={() => setOpen((v) => !v)}>
@@ -389,14 +400,34 @@ function OrderRow({ order: o, onRetry }: { order: OrderRowData; onRetry: () => v
         <td className="p-3 truncate max-w-[14ch]">{o.dest_address}</td>
         <td className="p-3">{new Date(o.created_at).toLocaleString()}</td>
         <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
-          {o.status === "failed" ? (
-            <button
-              onClick={onRetry}
-              className="border border-border px-2 py-1 rounded hover:bg-foreground hover:text-background"
-            >
-              Retry
-            </button>
-          ) : null}
+          <div className="flex justify-end gap-1 flex-wrap">
+            {o.status === "failed" ? (
+              <button
+                onClick={onRetry}
+                className="border border-border px-2 py-1 rounded hover:bg-foreground hover:text-background"
+              >
+                Retry
+              </button>
+            ) : null}
+            {!terminal ? (
+              <>
+                <button
+                  onClick={onForceComplete}
+                  title="Reset to confirmed so the payout job sends the native asset"
+                  className="border border-success/50 text-success px-2 py-1 rounded hover:bg-success hover:text-background"
+                >
+                  Force payout
+                </button>
+                <button
+                  onClick={onForceFail}
+                  title="Mark this order as failed (stops the swap-tick from retrying)"
+                  className="border border-accent/50 text-accent px-2 py-1 rounded hover:bg-accent hover:text-accent-foreground"
+                >
+                  Force fail
+                </button>
+              </>
+            ) : null}
+          </div>
         </td>
       </tr>
       {open ? (
