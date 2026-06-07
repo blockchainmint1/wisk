@@ -197,7 +197,6 @@ async function scanChain(
       linkedOrderId: null,
     });
   });
-  }
 
   return {
     blockNumber,
