@@ -8,17 +8,21 @@ import {
   adminAuditLog,
   adminBitmartBalances,
   adminBulkReplenish,
+  adminCreateCustomToken,
+  adminDeleteCustomToken,
   adminForceComplete,
   adminForceFail,
   adminGetSettings,
   adminInviteAdmin,
   adminListAdmins,
+  adminListCustomTokens,
   adminListOrders,
   adminOrderDetail,
   adminRetryOrder,
   adminRevokeAdmin,
   adminTelegramTest,
   adminTreasuryDebt,
+  adminUpdateCustomToken,
   adminUpdateSettings,
   adminWalletScan,
 } from "@/lib/admin.functions";
@@ -33,7 +37,7 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-type Tab = "orders" | "treasury" | "wallet" | "settings" | "admins" | "audit";
+type Tab = "orders" | "treasury" | "wallet" | "tokens" | "settings" | "admins" | "audit";
 
 function AdminPage() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -146,6 +150,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
     { id: "orders", label: "Orders" },
     { id: "treasury", label: "Treasury" },
     { id: "wallet", label: "Wallet" },
+    { id: "tokens", label: "Tokens" },
     { id: "settings", label: "Settings" },
     { id: "admins", label: "Admins" },
     { id: "audit", label: "Audit" },
@@ -180,6 +185,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
       {tab === "orders" && <OrdersTab />}
       {tab === "treasury" && <TreasuryTab />}
       {tab === "wallet" && <WalletTab />}
+      {tab === "tokens" && <TokensTab />}
       {tab === "settings" && <SettingsTab />}
       {tab === "admins" && <AdminsTab />}
       {tab === "audit" && <AuditTab />}
