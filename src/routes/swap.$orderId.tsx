@@ -8,6 +8,7 @@ import { SiteFooter, SiteHeader } from "@/components/site-shell";
 import { getOrder } from "@/lib/orders.functions";
 
 export const Route = createFileRoute("/swap/$orderId")({
+  loader: ({ params }) => getOrder({ data: { publicId: params.orderId } }),
   head: ({ params }) => ({
     meta: [
       { title: `Order ${params.orderId} — TEXIT Runner` },
@@ -46,10 +47,12 @@ function makeSteps(asset: string) {
 
 function OrderPage() {
   const { orderId } = Route.useParams();
+  const initialOrder = Route.useLoaderData();
   const fn = useServerFn(getOrder);
   const { data: order, error, isError, isPending } = useQuery({
     queryKey: ["order", orderId],
     queryFn: () => fn({ data: { publicId: orderId } }),
+    initialData: initialOrder,
     refetchInterval: (q) => {
       const s = q.state.data?.status;
       if (s === "completed" || s === "failed" || s === "expired" || s === "refunded") return false;
