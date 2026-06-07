@@ -1,5 +1,7 @@
 // Destination-asset registry.
-// - TXC: TEXITcoin native chain, base58 P2PKH starting with `T` (34 chars).
+// - TXC: TEXITcoin native chain. TWO address formats:
+//     • Legacy P2PKH → base58 starting with `T` (34 chars)
+//     • Native SegWit P2WPKH/P2WSH (bech32 hrp `txc`) → starts with `txc1q…`
 // - ISK$: Iskander chain — its own network with TWO address formats:
 //     • Legacy P2PKH (pubKeyHash 0x2d, P2SH 0x2c) → base58 starting with `K`
 //     • Native SegWit P2WPKH (bech32 hrp `isk`) → starts with `isk1q…`
@@ -10,7 +12,10 @@ const B58 = "[1-9A-HJ-NP-Za-km-z]";
 // Bech32 alphabet
 const BECH32 = "[qpzry9x8gf2tvdw0s3jn54khce6mua7l]";
 
-const TXC_ADDRESS_REGEX = new RegExp(`^T${B58}{33}$`);
+// TXC legacy (T-prefix base58, 34 chars) OR TXC native SegWit (txc1q…, bech32).
+const TXC_ADDRESS_REGEX = new RegExp(
+  `^(T${B58}{33}|txc1${BECH32}{6,87})$`,
+);
 
 // ISK legacy (K-prefix base58, ~34 chars) OR ISK native SegWit (isk1q…, bech32).
 // Bech32 P2WPKH is `isk1q` + 38 chars (total 43); P2WSH is `isk1q` + 58 chars.
@@ -27,7 +32,7 @@ export const DESTINATIONS = {
     bitmartCurrency: "TXC",
     bitmartNetwork: "TXC",
     addressRegex: TXC_ADDRESS_REGEX,
-    addressHint: "Your native TEXITcoin address (starts with T, 34 chars)",
+    addressHint: "Your TEXITcoin address — legacy (T…) or SegWit (txc1q…)",
     walletUrl: "https://wallet.texitcoin.org",
   },
   "ISK$": {

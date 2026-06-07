@@ -213,7 +213,7 @@ function SwapPage() {
                 </div>
                 {dest.trim().length > 0 && !addressValid ? (
                   <div className="text-[10px] font-mono text-accent uppercase tracking-widest px-1">
-                    Must be a {destConfig.label} address (starts with T, 34 chars)
+                    Invalid {destConfig.label} address — {destConfig.addressHint}
                   </div>
                 ) : null}
               </Field>
