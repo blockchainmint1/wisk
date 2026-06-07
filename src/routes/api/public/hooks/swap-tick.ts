@@ -53,6 +53,7 @@ interface OrderRow {
   deposit_address: string;
   dest_txc_address: string;
   quoted_txc_out: number;
+  quoted_txc_per_usd: number;
   expires_at: string;
   paid_amount_usd: number | null;
   bitmart_order_id: string | null;
@@ -86,7 +87,7 @@ async function watchDeposits() {
   const { data: orders } = await supabaseAdmin
     .from("orders")
     .select(
-      "id,public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_txc_address,quoted_txc_out,expires_at,paid_amount_usd,bitmart_order_id,bitmart_filled_txc,withdrawal_id",
+      "id,public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_txc_address,quoted_txc_out,quoted_txc_per_usd,expires_at,paid_amount_usd,bitmart_order_id,bitmart_filled_txc,withdrawal_id",
     )
     .in("status", ["awaiting_payment", "payment_detected"])
     .returns<OrderRow[]>();
@@ -148,6 +149,13 @@ async function watchDeposits() {
             0,
           );
 
+          // Re-price the TXC payout to match what the customer actually sent,
+          // at the locked quote rate. Protects us on underpayments and
+          // credits the customer fairly on overpayments.
+          const repricedTxcOut = +(totalPaidUsd * Number(order.quoted_txc_per_usd)).toFixed(8);
+          const originalTxcOut = Number(order.quoted_txc_out);
+          const repriced = Math.abs(repricedTxcOut - originalTxcOut) > 0.00000001;
+
           if (order.status === "awaiting_payment") {
             await supabaseAdmin
               .from("orders")
@@ -155,22 +163,38 @@ async function watchDeposits() {
                 status: "payment_detected",
                 paid_tx_hash: t.txHash,
                 paid_amount_usd: totalPaidUsd,
+                quoted_txc_out: repricedTxcOut,
               })
               .eq("id", order.id);
             order.status = "payment_detected";
             order.paid_amount_usd = totalPaidUsd;
+            order.quoted_txc_out = repricedTxcOut;
             await logOrderEvent(order.id, "state", "payment_detected", {
               tx_hash: t.txHash,
               usd: totalPaidUsd,
               confirmations,
+              original_txc_out: originalTxcOut,
+              repriced_txc_out: repricedTxcOut,
             });
             await notifyById("payment_detected", order.id);
           } else {
             await supabaseAdmin
               .from("orders")
-              .update({ paid_amount_usd: totalPaidUsd })
+              .update({
+                paid_amount_usd: totalPaidUsd,
+                quoted_txc_out: repricedTxcOut,
+              })
               .eq("id", order.id);
             order.paid_amount_usd = totalPaidUsd;
+            order.quoted_txc_out = repricedTxcOut;
+            if (repriced) {
+              await logOrderEvent(order.id, "note", "repriced", {
+                additional_tx: t.txHash,
+                total_usd: totalPaidUsd,
+                original_txc_out: originalTxcOut,
+                repriced_txc_out: repricedTxcOut,
+              });
+            }
           }
 
           if (
