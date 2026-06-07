@@ -4,7 +4,17 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { CHAINS, type ChainKey } from "./chains";
 import { deriveDepositAddress } from "./hd.server";
 
-const DEFAULT_RPCS: Record<ChainKey, string> = {
+// Prefer Alchemy (we have an API key) — public RPCs rate-limit aggressively
+// (HTTP 429) when scanning many addresses across many chains.
+const ALCHEMY_HOSTS: Record<ChainKey, string> = {
+  ethereum: "eth-mainnet.g.alchemy.com",
+  base: "base-mainnet.g.alchemy.com",
+  arbitrum: "arb-mainnet.g.alchemy.com",
+  polygon: "polygon-mainnet.g.alchemy.com",
+  bsc: "bnb-mainnet.g.alchemy.com",
+};
+
+const FALLBACK_RPCS: Record<ChainKey, string> = {
   ethereum: "https://ethereum-rpc.publicnode.com",
   base: "https://base-rpc.publicnode.com",
   arbitrum: "https://arbitrum-one-rpc.publicnode.com",
@@ -13,8 +23,11 @@ const DEFAULT_RPCS: Record<ChainKey, string> = {
 };
 
 function rpcUrl(chain: ChainKey): string {
-  const envKey = `EVM_RPC_${chain.toUpperCase()}`;
-  return process.env[envKey] || DEFAULT_RPCS[chain];
+  const envOverride = process.env[`EVM_RPC_${chain.toUpperCase()}`];
+  if (envOverride) return envOverride;
+  const key = process.env.ALCHEMY_API_KEY;
+  if (key) return `https://${ALCHEMY_HOSTS[chain]}/v2/${key}`;
+  return FALLBACK_RPCS[chain];
 }
 
 let rpcId = 0;
