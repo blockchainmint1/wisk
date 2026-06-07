@@ -487,16 +487,23 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           watch: { detected: 0 },
           buy: { bought: 0 },
           fills: { filled: 0 },
-          settle: { settled: 0, withdrawing: 0 },
+          settle: { sent: 0, queuedForBitmart: 0 },
+          replenish: { submitted: 0 },
+          isk: { withdrawing: 0 },
           polls: { completed: 0 },
           ms: 0,
         };
         try {
           await expireStale();
           result.watch = await watchDeposits();
-          result.buy = await buyOnBitmart();
-          result.fills = await pollBitmartFills();
-          result.settle = await settleBought();
+          // Pay customer FIRST — never block on Bitmart for TXC orders.
+          result.settle = await settleConfirmed();
+          // Treasury replenishment runs after customer payout, in background.
+          result.replenish = await replenishTreasury();
+          // Bookkeeping for any open Bitmart orders (decoupled from customer).
+          result.fills = await pollBitmartFillsDecoupled();
+          // ISK$ continues through Bitmart withdrawal.
+          result.isk = await settleIskWithdrawal();
           result.polls = await pollWithdrawals();
         } catch (e) {
           console.error("[swap-tick] fatal", e);
