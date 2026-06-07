@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /swap/
+
+Sitemap: https://swap.honest.money/sitemap.xml
