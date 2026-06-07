@@ -8,9 +8,9 @@ export const TXC_SYMBOL = "TXC_USDT";
 export const TXC_NETWORK = "TXC"; // withdrawal network code
 
 function creds() {
-  const key = process.env.BITMART_API_KEY;
-  const secret = process.env.BITMART_API_SECRET;
-  const memo = process.env.BITMART_API_MEMO;
+  const key = process.env.BITMART_API_KEY?.trim();
+  const secret = process.env.BITMART_API_SECRET?.trim();
+  const memo = process.env.BITMART_API_MEMO?.trim();
   if (!key || !secret || !memo) throw new Error("Bitmart credentials are not configured");
   return { key, secret, memo };
 }
