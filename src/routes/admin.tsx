@@ -1669,12 +1669,3 @@ function TokensTab() {
     </div>
   );
 }
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="space-y-1 block">
-      <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">{label}</span>
-      {children}
-    </label>
-  );
-}
