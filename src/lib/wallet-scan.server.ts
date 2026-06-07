@@ -57,17 +57,43 @@ async function rpcBatch(chain: ChainKey, calls: BatchCall[]): Promise<string[]> 
     method: c.method,
     params: c.params,
   }));
-  const res = await fetch(rpcUrl(chain), {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`RPC ${chain} batch HTTP ${res.status}`);
-  const json = (await res.json()) as Array<{
-    id: number;
-    result?: string;
-    error?: { message: string };
-  }>;
+  // Retry on 429 / Alchemy compute-unit throttling with exponential backoff.
+  const maxAttempts = 5;
+  let json: Array<{ id: number; result?: string; error?: { message: string } }> | null = null;
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(rpcUrl(chain), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.status === 429) {
+        await new Promise((r) => setTimeout(r, 400 * 2 ** (attempt - 1)));
+        continue;
+      }
+      if (!res.ok) throw new Error(`RPC ${chain} batch HTTP ${res.status}`);
+      const parsed = (await res.json()) as Array<{
+        id: number;
+        result?: string;
+        error?: { message: string };
+      }>;
+      const throttled = parsed.some(
+        (r) => r.error && /compute units|rate.?limit|throughput|exceeded|429/i.test(r.error.message),
+      );
+      if (throttled && attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, 400 * 2 ** (attempt - 1)));
+        continue;
+      }
+      json = parsed;
+      break;
+    } catch (err) {
+      lastErr = err;
+      if (attempt >= maxAttempts) throw err;
+      await new Promise((r) => setTimeout(r, 400 * 2 ** (attempt - 1)));
+    }
+  }
+  if (!json) throw lastErr instanceof Error ? lastErr : new Error(`RPC ${chain} batch throttled`);
   // Re-order by request id since servers may return out of order
   const byId = new Map<number, { result?: string; error?: { message: string } }>();
   for (const r of json) byId.set(r.id, r);
@@ -247,8 +273,12 @@ export async function scanHdWallet(opts: {
     orderByAddr.set(row.deposit_address, { public_id: row.public_id, status: row.status });
   }
 
-  // Scan each chain in parallel
-  const scans = await Promise.all(chains.map((c) => scanChain(c, indexes)));
+  // Scan chains sequentially to stay within Alchemy's per-second CU budget.
+  // Parallel scans across 5 chains can spike CU usage and trigger 429s.
+  const scans: Awaited<ReturnType<typeof scanChain>>[] = [];
+  for (const c of chains) {
+    scans.push(await scanChain(c, indexes));
+  }
 
   const addresses: AddressBalance[] = [];
   const chainSummaries: WalletScanResult["chains"] = [];
