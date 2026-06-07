@@ -77,14 +77,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "swapTXC" },
+      { name: "description", content: "Swap stablecoins on EVM for TXC or wTXC with a 5% premium." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "swapTXC" },
+      { property: "og:description", content: "Swap stablecoins on EVM for TXC or wTXC with a 5% premium." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "swapTXC" },
+      { name: "twitter:description", content: "Swap stablecoins on EVM for TXC or wTXC with a 5% premium." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/6d467578-a8e3-4751-9ed9-116ee4f42bf3/id-preview-494c0a9a--9fa74c59-6726-48bb-a5bf-a6cc868c7787.lovable.app-1780819348498.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/6d467578-a8e3-4751-9ed9-116ee4f42bf3/id-preview-494c0a9a--9fa74c59-6726-48bb-a5bf-a6cc868c7787.lovable.app-1780819348498.png" },
     ],
     links: [
       {
