@@ -167,15 +167,20 @@ export async function scanHdWallet(opts: {
     .select("next_index")
     .eq("id", 1)
     .maybeSingle();
-  const nextIndex = counterRow?.next_index ?? 0;
-  const totalAddresses = nextIndex;
+  // Index 0 = admin/treasury. Customer deposits start at index 1, so the
+  // total number of *ever-derived* addresses is max(nextIndex, 1) — index 0
+  // is always implicitly derived as the treasury.
+  const nextIndex = counterRow?.next_index ?? 1;
+  const totalAddresses = Math.max(nextIndex, 1);
 
-  // Cap how many we actually scan (newest first for relevance)
+  // Cap how many we actually scan (newest first for relevance) but ALWAYS
+  // include index 0 (admin treasury) regardless of the window.
   const startIdx = Math.max(0, nextIndex - maxAddresses);
-  const indexes: Array<{ index: number; address: string }> = [];
-  for (let i = startIdx; i < nextIndex; i++) {
-    indexes.push({ index: i, address: deriveDepositAddress(i).toLowerCase() });
-  }
+  const indexesSet = new Set<number>([0]);
+  for (let i = startIdx; i < nextIndex; i++) indexesSet.add(i);
+  const indexes: Array<{ index: number; address: string }> = Array.from(indexesSet)
+    .sort((a, b) => a - b)
+    .map((i) => ({ index: i, address: deriveDepositAddress(i).toLowerCase() }));
 
   // Pull open-order linkage in one shot
   const { data: orderRows } = await supabaseAdmin
@@ -216,8 +221,9 @@ export async function scanHdWallet(opts: {
     for (const row of scan.rows) {
       const linked = orderByAddr.get(row.address);
       row.linkedOrderId = linked ? `${linked.public_id} (${linked.status})` : null;
-      // Only include rows with any non-zero balance — keeps payload small
-      if (row.native > 0 || row.totalUsd > 0) addresses.push(row);
+      // Keep zero-balance rows ONLY for the admin treasury (index 0); skip
+      // every other empty derived address to keep the payload small.
+      if (row.index === 0 || row.native > 0 || row.totalUsd > 0) addresses.push(row);
     }
   });
 

@@ -28,7 +28,7 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-type Tab = "orders" | "wallet" | "settings" | "admins" | "audit";
+type Tab = "orders" | "treasury" | "wallet" | "settings" | "admins" | "audit";
 
 function AdminPage() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -139,6 +139,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
   const [tab, setTab] = useState<Tab>("orders");
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: "orders", label: "Orders" },
+    { id: "treasury", label: "Treasury" },
     { id: "wallet", label: "Wallet" },
     { id: "settings", label: "Settings" },
     { id: "admins", label: "Admins" },
@@ -172,6 +173,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
       </div>
 
       {tab === "orders" && <OrdersTab />}
+      {tab === "treasury" && <TreasuryTab />}
       {tab === "wallet" && <WalletTab />}
       {tab === "settings" && <SettingsTab />}
       {tab === "admins" && <AdminsTab />}
@@ -284,6 +286,205 @@ function OrdersTab() {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// ===== Treasury Tab =====
+function TreasuryTab() {
+  const scanFn = useServerFn(adminWalletScan);
+  const ALL_CHAINS = ["ethereum", "bsc", "base", "arbitrum", "polygon"] as const;
+
+  const scan = useQuery({
+    queryKey: ["admin", "treasury-scan"],
+    queryFn: () => scanFn({ data: { chains: ALL_CHAINS as unknown as never } }),
+    refetchInterval: 60_000,
+  });
+
+  const data = scan.data;
+  const admin = data?.addresses.find((a) => a.index === 0) ?? null;
+  const customer = data?.addresses.filter((a) => a.index !== 0) ?? [];
+  const totalUsd = data
+    ? data.chains.reduce((s, c) => s + c.totalStableUsd, 0)
+    : 0;
+  const adminUsd = admin?.totalUsd ?? 0;
+  const customerUsd = customer.reduce((s, a) => s + a.totalUsd, 0);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-end flex-wrap gap-3">
+        <div>
+          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+            Treasury
+          </div>
+          <p className="text-xs font-mono text-muted-foreground mt-2 max-w-xl leading-relaxed">
+            Live balances across every xpub-derived receive address. Index{" "}
+            <span className="text-foreground">#0</span> is the admin treasury;
+            customer deposits rotate through index #1+.
+          </p>
+        </div>
+        <button
+          onClick={() => scan.refetch()}
+          className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-2 rounded hover:bg-foreground hover:text-background"
+        >
+          {scan.isFetching ? "Scanning…" : "Refresh"}
+        </button>
+      </div>
+
+      {scan.error ? (
+        <div className="text-xs font-mono text-accent">
+          {(scan.error as Error).message}
+        </div>
+      ) : null}
+
+      {!data ? (
+        <div className="text-[10px] font-mono text-muted-foreground">Scanning all chains…</div>
+      ) : (
+        <>
+          {/* Totals */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="bg-secondary/40 border border-border rounded-xl p-5">
+              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                Total holdings
+              </div>
+              <div className="font-mono text-3xl mt-2">${totalUsd.toFixed(2)}</div>
+            </div>
+            <div className="bg-secondary/40 border border-border rounded-xl p-5">
+              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                Admin (#0)
+              </div>
+              <div className="font-mono text-3xl mt-2">${adminUsd.toFixed(2)}</div>
+            </div>
+            <div className="bg-secondary/40 border border-border rounded-xl p-5">
+              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                In customer slots
+              </div>
+              <div className="font-mono text-3xl mt-2">${customerUsd.toFixed(2)}</div>
+              <div className="text-[10px] font-mono text-muted-foreground mt-1">
+                {customer.length} funded · {data.totalAddresses - 1} ever issued
+              </div>
+            </div>
+          </div>
+
+          {/* Admin treasury card */}
+          {admin ? (
+            <div className="border border-accent/40 bg-accent/5 rounded-xl p-5 space-y-3">
+              <div className="flex justify-between items-start gap-3 flex-wrap">
+                <div>
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-accent">
+                    Admin treasury · index #0
+                  </div>
+                  <div className="font-mono text-sm mt-2 break-all">{admin.address}</div>
+                </div>
+                <button
+                  onClick={() => navigator.clipboard.writeText(admin.address)}
+                  className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-1.5 rounded hover:bg-foreground hover:text-background"
+                >
+                  Copy
+                </button>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 pt-2 border-t border-border">
+                {data.chains.map((c) => {
+                  // Pull this address's per-chain row to show its breakdown
+                  // (scan stores one row per chain per address)
+                  const row = data.addresses.find(
+                    (r) => r.index === 0 && r.chain === c.chain,
+                  );
+                  return (
+                    <div key={c.chain} className="text-[10px] font-mono">
+                      <div className="uppercase tracking-widest text-muted-foreground">
+                        {c.chainName}
+                      </div>
+                      <div className="text-foreground mt-1">
+                        ${row?.totalUsd.toFixed(2) ?? "0.00"}
+                      </div>
+                      <div className="text-muted-foreground">
+                        {(row?.native ?? 0).toFixed(6)} {c.nativeSymbol}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          {/* Per-chain totals */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {data.chains.map((c) => (
+              <div key={c.chain} className="bg-secondary/40 border border-border rounded p-4">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                  {c.chainName}
+                </div>
+                {c.error ? (
+                  <div className="text-[10px] font-mono text-accent mt-1">{c.error}</div>
+                ) : (
+                  <>
+                    <div className="font-mono text-sm mt-1">
+                      ${c.totalStableUsd.toFixed(2)}
+                    </div>
+                    <div className="font-mono text-[10px] text-muted-foreground">
+                      {c.totalNative.toFixed(6)} {c.nativeSymbol}
+                    </div>
+                    <div className="font-mono text-[10px] text-muted-foreground">
+                      blk {c.blockNumber} · {c.latencyMs}ms
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Customer slots with funds */}
+          <div>
+            <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-2">
+              Funded customer slots
+            </div>
+            <div className="overflow-x-auto border border-border rounded-xl">
+              <table className="w-full text-xs font-mono">
+                <thead className="bg-secondary/40 text-muted-foreground uppercase tracking-widest text-[10px]">
+                  <tr>
+                    <th className="text-left p-3">#</th>
+                    <th className="text-left p-3">Address</th>
+                    <th className="text-left p-3">Chain</th>
+                    <th className="text-right p-3">Stables (USD)</th>
+                    <th className="text-right p-3">Native</th>
+                    <th className="text-left p-3">Linked order</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customer.map((a) => (
+                    <tr key={`${a.chain}-${a.address}`} className="border-t border-border">
+                      <td className="p-3">{a.index}</td>
+                      <td className="p-3 truncate max-w-[20ch]">{a.address}</td>
+                      <td className="p-3">{a.chainName}</td>
+                      <td className="p-3 text-right">
+                        {a.totalUsd > 0 ? `$${a.totalUsd.toFixed(2)}` : "—"}
+                      </td>
+                      <td className="p-3 text-right">
+                        {a.native > 0 ? `${a.native.toFixed(6)} ${a.nativeSymbol}` : "—"}
+                      </td>
+                      <td className="p-3 text-muted-foreground">{a.linkedOrderId ?? "—"}</td>
+                    </tr>
+                  ))}
+                  {!customer.length ? (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                        No customer slots currently hold a balance.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="text-[10px] font-mono text-muted-foreground">
+            Generated {new Date(data.generatedAt).toLocaleTimeString()} ·{" "}
+            {data.scannedAddresses} addresses scanned
+            {data.errors.length ? ` · ${data.errors.join(" · ")}` : ""}
+          </div>
+        </>
+      )}
     </div>
   );
 }
