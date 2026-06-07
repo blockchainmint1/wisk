@@ -188,7 +188,7 @@ async function watchDeposits() {
             order.paid_amount_usd = totalPaidUsd;
             order.quoted_txc_out = repricedTxcOut;
             if (repriced) {
-              await logOrderEvent(order.id, "quote", "repriced", {
+              await logOrderEvent(order.id, "note", "repriced", {
                 additional_tx: t.txHash,
                 total_usd: totalPaidUsd,
                 original_txc_out: originalTxcOut,
