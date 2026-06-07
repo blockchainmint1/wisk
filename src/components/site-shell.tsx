@@ -42,6 +42,9 @@ export function SiteFooter() {
           <p className="max-w-xs leading-relaxed">
             Stablecoins in, native assets out. Liquidity sourced live from Bitmart.
           </p>
+          <p className="text-muted-foreground">
+            Part of the honest.money ecosystem
+          </p>
         </div>
         <div className="flex gap-12 font-mono text-[10px] uppercase tracking-widest">
           <div className="space-y-2">
