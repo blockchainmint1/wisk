@@ -106,13 +106,14 @@ export const adminOrderDetail = createServerFn({ method: "POST" })
       }
     }
 
-    // Hot wallet balance (TXC only)
+    // Hot wallet balance (TXC + ISK$)
     let hotBalance: {
       address: string;
       confirmedTxc: number;
       unconfirmedTxc: number;
     } | null = null;
-    if ((order.dest_asset ?? "TXC") === "TXC") {
+    const destAsset = order.dest_asset ?? "TXC";
+    if (destAsset === "TXC") {
       try {
         const { getTxcHotAddress, getTxcAddressBalanceSats } = await import(
           "./txc-sign.server"
@@ -121,6 +122,26 @@ export const adminOrderDetail = createServerFn({ method: "POST" })
         const bal = await getTxcAddressBalanceSats(address);
         hotBalance = {
           address,
+          confirmedTxc: bal.confirmed / 1e8,
+          unconfirmedTxc: bal.unconfirmed / 1e8,
+        };
+      } catch {
+        hotBalance = null;
+      }
+    } else if (destAsset === "ISK$") {
+      try {
+        const { getIskHotAddresses, getIskAddressBalanceSats } = await import(
+          "./isk-sign.server"
+        );
+        const { legacy, segwit } = getIskHotAddresses();
+        const [sw, lg] = await Promise.all([
+          getIskAddressBalanceSats(segwit).catch(() => ({ confirmed: 0, unconfirmed: 0 })),
+          getIskAddressBalanceSats(legacy).catch(() => ({ confirmed: 0, unconfirmed: 0 })),
+        ]);
+        const useSegwit = sw.confirmed + sw.unconfirmed >= lg.confirmed + lg.unconfirmed;
+        const bal = useSegwit ? sw : lg;
+        hotBalance = {
+          address: useSegwit ? segwit : legacy,
           confirmedTxc: bal.confirmed / 1e8,
           unconfirmedTxc: bal.unconfirmed / 1e8,
         };

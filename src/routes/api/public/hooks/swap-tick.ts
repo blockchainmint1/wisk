@@ -1,13 +1,15 @@
 // Fulfillment cron tick — called by pg_cron every minute.
-// Customer flow (TXC):
+// Customer flow (TXC and ISK$):
 //   awaiting_payment → payment_detected → confirmed → sending → completed
-//   TXC is sent locally from our hot wallet using the quoted amount.
-//   Bitmart is NEVER on the critical path for TXC orders.
+//   Payout is signed + broadcast locally from our hot wallet using the
+//   quoted amount. Bitmart is NEVER on the critical path.
 // Treasury replenishment (background, decoupled):
-//   For completed TXC orders, submit a market buy on Bitmart to refill our
-//   wallet. The bitmart_order_id / bitmart_filled_txc columns track this but
-//   never gate customer payout.
-// ISK$ flow still goes through Bitmart buy → withdraw until local signing.
+//   For completed TXC/ISK$ orders, submit a market buy on Bitmart to refill
+//   our hot wallet. The bitmart_order_id / bitmart_filled_txc columns track
+//   this but never gate customer payout.
+// Legacy ISK$ Bitmart withdrawal path (settleIskWithdrawal / pollWithdrawals)
+// is retained only so in-flight orders from before the local-sign migration
+// can drain to `completed`.
 // Auth: route lives under /api/public/* which bypasses Lovable's site auth.
 
 import { createFileRoute } from "@tanstack/react-router";
@@ -28,6 +30,7 @@ import { getChain, getToken, type ChainKey } from "@/lib/chains";
 import { getDestination } from "@/lib/destinations";
 import { notifyOrderEvent, logOrderEvent } from "@/lib/telegram.server";
 import { sendTxc } from "@/lib/txc-sign.server";
+import { sendIsk } from "@/lib/isk-sign.server";
 
 async function notifyById(
   event: Parameters<typeof notifyOrderEvent>[0],
@@ -219,9 +222,10 @@ async function watchDeposits() {
 }
 
 /**
- * For confirmed orders, pay the customer IMMEDIATELY.
- * - TXC: sign + broadcast locally using the quoted amount.
- * - ISK$: still flows through Bitmart (buyOnBitmartForIskOrders + withdraw).
+ * For confirmed orders, pay the customer IMMEDIATELY using local signing.
+ * Both TXC and ISK$ now sign + broadcast directly from our hot wallet.
+ * Bitmart is NEVER on the critical path — treasury replenishment runs
+ * in the background after the customer is paid.
  */
 async function settleConfirmed() {
   const { data: orders } = await supabaseAdmin
@@ -242,65 +246,43 @@ async function settleConfirmed() {
   if (!orders?.length) return { sent: 0, queuedForBitmart: 0 };
 
   let sent = 0;
-  let queuedForBitmart = 0;
+  const queuedForBitmart = 0;
 
   for (const o of orders) {
     const asset = o.dest_asset || "TXC";
     try {
-      if (asset === "TXC") {
-        // ---- Pay customer locally, no Bitmart dependency ----
-        await supabaseAdmin.from("orders").update({ status: "sending" }).eq("id", o.id);
-        await logOrderEvent(o.id, "state", "sending", { asset, amount: o.quoted_txc_out });
-        await notifyById("sending", o.id);
+      // ---- Pay customer locally, no Bitmart dependency (TXC + ISK$) ----
+      await supabaseAdmin.from("orders").update({ status: "sending" }).eq("id", o.id);
+      await logOrderEvent(o.id, "state", "sending", { asset, amount: o.quoted_txc_out });
+      await notifyById("sending", o.id);
 
-        const result = await sendTxc({
-          toAddress: o.dest_txc_address,
-          amountTxc: Number(o.quoted_txc_out),
-        });
+      const result =
+        asset === "TXC"
+          ? await sendTxc({
+              toAddress: o.dest_txc_address,
+              amountTxc: Number(o.quoted_txc_out),
+            })
+          : asset === "ISK$"
+            ? await sendIsk({
+                toAddress: o.dest_txc_address,
+                amountIsk: Number(o.quoted_txc_out),
+              })
+            : (() => {
+                throw new Error(`Unsupported dest_asset: ${asset}`);
+              })();
 
-        await supabaseAdmin
-          .from("orders")
-          .update({
-            status: "completed",
-            txc_tx_hash: result.txid,
-            txc_fee_sats: result.feeSats,
-            txc_from_address: result.fromAddress,
-          })
-          .eq("id", o.id);
-        await logOrderEvent(o.id, "payout", "sent", { ...result });
-        await notifyById("completed", o.id);
-        sent += 1;
-      } else {
-        // ISK$ — still goes through Bitmart buy → withdraw
-        const dest = getDestination(asset);
-        const notional = o.paid_amount_usd ?? 0;
-        if (notional <= 0) {
-          await failOrder(o.id, "Missing paid amount");
-          continue;
-        }
-        const buyNotional = +(notional / 1.05).toFixed(2);
-        await supabaseAdmin
-          .from("orders")
-          .update({ status: "buying_on_bitmart" })
-          .eq("id", o.id);
-        await logOrderEvent(o.id, "state", "buying_on_bitmart", {
-          notional: buyNotional,
-          symbol: dest.bitmartSymbol,
-        });
-        const { order_id } = await submitMarketBuy({
-          symbol: dest.bitmartSymbol,
-          notionalUsdt: buyNotional,
-        });
-        await supabaseAdmin
-          .from("orders")
-          .update({ bitmart_order_id: order_id })
-          .eq("id", o.id);
-        await logOrderEvent(o.id, "bitmart", "buy_submitted", {
-          bitmart_order_id: order_id,
-          notional: buyNotional,
-        });
-        queuedForBitmart += 1;
-      }
+      await supabaseAdmin
+        .from("orders")
+        .update({
+          status: "completed",
+          txc_tx_hash: result.txid,
+          txc_fee_sats: result.feeSats,
+          txc_from_address: result.fromAddress,
+        })
+        .eq("id", o.id);
+      await logOrderEvent(o.id, "payout", "sent", { ...result });
+      await notifyById("completed", o.id);
+      sent += 1;
     } catch (e) {
       await failOrder(o.id, e instanceof Error ? e.message : "Settlement failed");
     }
@@ -310,16 +292,16 @@ async function settleConfirmed() {
 
 /**
  * Treasury replenishment — runs AFTER the customer is paid.
- * For each completed TXC order that has not yet had a Bitmart buy submitted,
- * submit a market buy to refill our hot wallet. This is best-effort: failures
- * here do NOT affect the customer order, they just log and retry next tick.
+ * For each completed TXC or ISK$ order that has not yet had a Bitmart buy
+ * submitted, submit a market buy to refill our hot wallet. This is
+ * best-effort: failures here do NOT affect the customer order, they just
+ * log and retry next tick.
  */
 async function replenishTreasury() {
   const { data: orders } = await supabaseAdmin
     .from("orders")
     .select("id,public_id,paid_amount_usd,dest_asset")
     .eq("status", "completed")
-    .eq("dest_asset", "TXC")
     .is("bitmart_order_id", null)
     .not("paid_amount_usd", "is", null)
     .limit(10)

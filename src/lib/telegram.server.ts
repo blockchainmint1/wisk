@@ -151,20 +151,42 @@ async function recordEvent(
 async function getHotBalance(
   order: OrderSummary,
 ): Promise<HotBalanceInfo | null> {
-  if ((order.dest_asset ?? "TXC") !== "TXC") return null;
+  const asset = order.dest_asset ?? "TXC";
   try {
-    const { getTxcHotAddress, getTxcAddressBalanceSats } = await import(
-      "./txc-sign.server"
-    );
-    const address = getTxcHotAddress();
-    const { confirmed, unconfirmed } = await getTxcAddressBalanceSats(address);
-    const confirmedTxc = confirmed / 1e8;
-    const unconfirmedTxc = unconfirmed / 1e8;
-    const expectedPayout = Number(
-      order.bitmart_filled_txc ?? order.quoted_txc_out ?? 0,
-    );
-    const low = expectedPayout > 0 && confirmedTxc < expectedPayout * 2;
-    return { asset: "TXC", address, confirmedTxc, unconfirmedTxc, low };
+    if (asset === "TXC") {
+      const { getTxcHotAddress, getTxcAddressBalanceSats } = await import(
+        "./txc-sign.server"
+      );
+      const address = getTxcHotAddress();
+      const { confirmed, unconfirmed } = await getTxcAddressBalanceSats(address);
+      const confirmedTxc = confirmed / 1e8;
+      const unconfirmedTxc = unconfirmed / 1e8;
+      const expectedPayout = Number(
+        order.bitmart_filled_txc ?? order.quoted_txc_out ?? 0,
+      );
+      const low = expectedPayout > 0 && confirmedTxc < expectedPayout * 2;
+      return { asset: "TXC", address, confirmedTxc, unconfirmedTxc, low };
+    }
+    if (asset === "ISK$") {
+      const { getIskHotAddresses, getIskAddressBalanceSats } = await import(
+        "./isk-sign.server"
+      );
+      const { legacy, segwit } = getIskHotAddresses();
+      const [sw, lg] = await Promise.all([
+        getIskAddressBalanceSats(segwit).catch(() => ({ confirmed: 0, unconfirmed: 0 })),
+        getIskAddressBalanceSats(legacy).catch(() => ({ confirmed: 0, unconfirmed: 0 })),
+      ]);
+      // Pick the address actually holding funds; prefer SegWit on ties.
+      const useSegwit = sw.confirmed + sw.unconfirmed >= lg.confirmed + lg.unconfirmed;
+      const bal = useSegwit ? sw : lg;
+      const address = useSegwit ? segwit : legacy;
+      const confirmedTxc = bal.confirmed / 1e8;
+      const unconfirmedTxc = bal.unconfirmed / 1e8;
+      const expectedPayout = Number(order.quoted_txc_out ?? 0);
+      const low = expectedPayout > 0 && confirmedTxc < expectedPayout * 2;
+      return { asset: "ISK$", address, confirmedTxc, unconfirmedTxc, low };
+    }
+    return null;
   } catch (err) {
     console.warn("[hot-balance] read failed", err);
     return null;
