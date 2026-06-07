@@ -524,12 +524,30 @@ function KV({ k, v, mono }: { k: string; v: React.ReactNode; mono?: boolean }) {
 // ===== Treasury Tab =====
 function TreasuryTab() {
   const scanFn = useServerFn(adminWalletScan);
+  const debtFn = useServerFn(adminTreasuryDebt);
+  const bulkBuyFn = useServerFn(adminBulkReplenish);
+  const qc = useQueryClient();
   const ALL_CHAINS = ["ethereum", "bsc", "base", "arbitrum", "polygon"] as const;
 
   const scan = useQuery({
     queryKey: ["admin", "treasury-scan"],
     queryFn: () => scanFn({ data: { chains: ALL_CHAINS as unknown as never } }),
     refetchInterval: 60_000,
+  });
+
+  const debt = useQuery({
+    queryKey: ["admin", "treasury-debt"],
+    queryFn: () => debtFn(),
+    refetchInterval: 30_000,
+  });
+
+  const [bulkAmount, setBulkAmount] = useState("");
+  const bulkBuy = useMutation({
+    mutationFn: (notionalUsdt: number) => bulkBuyFn({ data: { notionalUsdt } }),
+    onSuccess: () => {
+      setBulkAmount("");
+      qc.invalidateQueries({ queryKey: ["admin", "treasury-debt"] });
+    },
   });
 
   const data = scan.data;
