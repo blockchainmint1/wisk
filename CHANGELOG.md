@@ -4,6 +4,14 @@ All notable changes to this project. Newest entries on top. Dates are UTC.
 
 ## 2026-06-07
 
+- **Admin login switched to magic link.** Removed password sign-in from
+  `/admin`. Admins now enter their email and receive a one-time magic link.
+  Seeded `bobby@blockchainmint.com` as an admin — the role is granted
+  automatically on first sign-in via an `auth.users` insert trigger.
+  - Files: `src/routes/admin.tsx`, migration `grant_admin_to_seed_emails`.
+
+## 2026-06-07
+
 - **Telegram notifications for order lifecycle.** Sends messages to a single
   admin chat (`TELEGRAM_CHAT_ID`) on: order created, deposit detected, deposit
   confirmed, Bitmart buy filled, completed, failed, and expired. Uses the
