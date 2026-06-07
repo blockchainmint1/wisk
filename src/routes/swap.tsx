@@ -80,7 +80,14 @@ function SwapPage() {
       });
     },
     onSuccess: (res) => {
-      navigate({ to: "/swap/$orderId", params: { orderId: res.publicId } });
+      console.log("createOrder result:", res);
+      const id = res?.publicId;
+      if (!id) {
+        setError("Order created but no ID returned. Please refresh.");
+        return;
+      }
+      // Hard navigation to bypass any router preload issues
+      window.location.href = `/swap/${id}`;
     },
     onError: (e: Error) => {
       console.error("createOrder failed:", e);
