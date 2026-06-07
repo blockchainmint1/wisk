@@ -242,6 +242,7 @@ async function pollBitmartFills() {
             bitmart_avg_price: avgPrice,
           })
           .eq("id", o.id);
+        await notifyById("bitmart_filled", o.id);
         filled += 1;
       } else if (detail.state === "canceled") {
         await failOrder(o.id, "Bitmart order canceled");
