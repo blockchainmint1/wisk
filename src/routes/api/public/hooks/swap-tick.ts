@@ -176,8 +176,8 @@ async function watchDeposits() {
               tx_hash: t.txHash,
               usd: totalPaidUsd,
               confirmations,
-              original_txc_out: originalTxcOut,
-              repriced_txc_out: repricedTxcOut,
+              original_payout: originalTxcOut,
+              repriced_payout: repricedTxcOut,
             });
             await notifyById("payment_detected", order.id);
           } else {
