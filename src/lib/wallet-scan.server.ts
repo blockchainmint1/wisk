@@ -4,7 +4,17 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { CHAINS, type ChainKey } from "./chains";
 import { deriveDepositAddress } from "./hd.server";
 
-const DEFAULT_RPCS: Record<ChainKey, string> = {
+// Prefer Alchemy (we have an API key) — public RPCs rate-limit aggressively
+// (HTTP 429) when scanning many addresses across many chains.
+const ALCHEMY_HOSTS: Record<ChainKey, string> = {
+  ethereum: "eth-mainnet.g.alchemy.com",
+  base: "base-mainnet.g.alchemy.com",
+  arbitrum: "arb-mainnet.g.alchemy.com",
+  polygon: "polygon-mainnet.g.alchemy.com",
+  bsc: "bnb-mainnet.g.alchemy.com",
+};
+
+const FALLBACK_RPCS: Record<ChainKey, string> = {
   ethereum: "https://ethereum-rpc.publicnode.com",
   base: "https://base-rpc.publicnode.com",
   arbitrum: "https://arbitrum-one-rpc.publicnode.com",
@@ -13,8 +23,11 @@ const DEFAULT_RPCS: Record<ChainKey, string> = {
 };
 
 function rpcUrl(chain: ChainKey): string {
-  const envKey = `EVM_RPC_${chain.toUpperCase()}`;
-  return process.env[envKey] || DEFAULT_RPCS[chain];
+  const envOverride = process.env[`EVM_RPC_${chain.toUpperCase()}`];
+  if (envOverride) return envOverride;
+  const key = process.env.ALCHEMY_API_KEY;
+  if (key) return `https://${ALCHEMY_HOSTS[chain]}/v2/${key}`;
+  return FALLBACK_RPCS[chain];
 }
 
 let rpcId = 0;
@@ -28,6 +41,42 @@ async function rpcCall<T>(chain: ChainKey, method: string, params: unknown[]): P
   const json = (await res.json()) as { result?: T; error?: { message: string } };
   if (json.error) throw new Error(`RPC ${chain} ${method}: ${json.error.message}`);
   return json.result as T;
+}
+
+interface BatchCall {
+  method: string;
+  params: unknown[];
+}
+// JSON-RPC batch: single HTTP request for many calls. Massively reduces
+// request count on multi-address scans and avoids rate-limiting.
+async function rpcBatch(chain: ChainKey, calls: BatchCall[]): Promise<string[]> {
+  if (calls.length === 0) return [];
+  const body = calls.map((c) => ({
+    jsonrpc: "2.0",
+    id: ++rpcId,
+    method: c.method,
+    params: c.params,
+  }));
+  const res = await fetch(rpcUrl(chain), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`RPC ${chain} batch HTTP ${res.status}`);
+  const json = (await res.json()) as Array<{
+    id: number;
+    result?: string;
+    error?: { message: string };
+  }>;
+  // Re-order by request id since servers may return out of order
+  const byId = new Map<number, { result?: string; error?: { message: string } }>();
+  for (const r of json) byId.set(r.id, r);
+  return body.map((req) => {
+    const r = byId.get(req.id);
+    if (!r) throw new Error(`RPC ${chain} batch missing id ${req.id}`);
+    if (r.error) throw new Error(`RPC ${chain} ${req.method}: ${r.error.message}`);
+    return r.result ?? "0x0";
+  });
 }
 
 // ERC20 balanceOf selector
@@ -97,10 +146,23 @@ async function scanChain(
 }> {
   const cfg = CHAINS[chain];
   const start = Date.now();
-  let blockNumber: number | null = null;
+
+  // Build one batched JSON-RPC payload for the entire chain:
+  //   1× eth_blockNumber + N× eth_getBalance + N×T× eth_call (balanceOf)
+  const calls: BatchCall[] = [{ method: "eth_blockNumber", params: [] }];
+  for (const { address } of addresses) {
+    calls.push({ method: "eth_getBalance", params: [address, "latest"] });
+    for (const t of cfg.tokens) {
+      calls.push({
+        method: "eth_call",
+        params: [{ to: t.address, data: balanceOfData(address) }, "latest"],
+      });
+    }
+  }
+
+  let results: string[];
   try {
-    const hex = await rpcCall<string>(chain, "eth_blockNumber", []);
-    blockNumber = Number.parseInt(hex, 16);
+    results = await rpcBatch(chain, calls);
   } catch (err) {
     return {
       blockNumber: null,
@@ -110,41 +172,31 @@ async function scanChain(
     };
   }
 
+  const blockNumber = Number.parseInt(results[0] ?? "0x0", 16);
+  const perAddrCount = 1 + cfg.tokens.length;
   const rows: AddressBalance[] = [];
-  for (const { index, address } of addresses) {
-    try {
-      const [nativeHex, ...tokenHexes] = await Promise.all([
-        rpcCall<string>(chain, "eth_getBalance", [address, "latest"]),
-        ...cfg.tokens.map((t) =>
-          rpcCall<string>(chain, "eth_call", [
-            { to: t.address, data: balanceOfData(address) },
-            "latest",
-          ]),
-        ),
-      ]);
-
-      const native = fmtUnits(hexToBig(nativeHex), 18);
-      const tokens = cfg.tokens.map((t, i) => ({
-        symbol: t.symbol,
-        balance: fmtUnits(hexToBig(tokenHexes[i] ?? "0x0"), t.decimals),
-      }));
-      const totalUsd = tokens.reduce((sum, t) => sum + t.balance, 0);
-
-      rows.push({
-        index,
-        address,
-        chain,
-        chainName: cfg.name,
-        native,
-        nativeSymbol: NATIVE_SYMBOL[chain],
-        tokens,
-        totalUsd,
-        linkedOrderId: null,
-      });
-    } catch (err) {
-      console.warn(`[wallet-scan] ${chain} ${address} failed`, err);
-    }
-  }
+  addresses.forEach(({ index, address }, i) => {
+    const base = 1 + i * perAddrCount;
+    const nativeHex = results[base] ?? "0x0";
+    const tokenHexes = results.slice(base + 1, base + perAddrCount);
+    const native = fmtUnits(hexToBig(nativeHex), 18);
+    const tokens = cfg.tokens.map((t, j) => ({
+      symbol: t.symbol,
+      balance: fmtUnits(hexToBig(tokenHexes[j] ?? "0x0"), t.decimals),
+    }));
+    const totalUsd = tokens.reduce((sum, t) => sum + t.balance, 0);
+    rows.push({
+      index,
+      address,
+      chain,
+      chainName: cfg.name,
+      native,
+      nativeSymbol: NATIVE_SYMBOL[chain],
+      tokens,
+      totalUsd,
+      linkedOrderId: null,
+    });
+  });
 
   return {
     blockNumber,
