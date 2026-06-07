@@ -53,6 +53,7 @@ interface OrderRow {
   deposit_address: string;
   dest_txc_address: string;
   quoted_txc_out: number;
+  quoted_txc_per_usd: number;
   expires_at: string;
   paid_amount_usd: number | null;
   bitmart_order_id: string | null;
