@@ -76,9 +76,9 @@ export const createOrder = createServerFn({ method: "POST" })
         deposit_address: depositAddress.toLowerCase(),
         deposit_index: idxData,
         dest_asset: dest.key,
-        dest_txc_address: data.destAddress,
-        quoted_txc_per_usd: assetPerUsd,
-        quoted_txc_out: assetOut,
+        dest_address: data.destAddress,
+        quoted_dest_per_usd: assetPerUsd,
+        quoted_dest_out: assetOut,
         premium_bps: settings.premium_bps,
         bitmart_spot_price: spot,
         expires_at: expiresAt,
@@ -95,8 +95,8 @@ export const createOrder = createServerFn({ method: "POST" })
         source_chain: data.sourceChain,
         source_token: data.sourceToken,
         source_amount_usd: data.usdAmount,
-        quoted_txc_out: assetOut,
-        dest_txc_address: data.destAddress,
+        quoted_dest_out: assetOut,
+        dest_address: data.destAddress,
         dest_asset: dest.key,
       });
     }
@@ -112,7 +112,7 @@ export const getOrder = createServerFn({ method: "POST" })
     const { data: order, error } = await supabaseAdmin
       .from("orders")
       .select(
-        "public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_asset,dest_txc_address,quoted_txc_out,quoted_txc_per_usd,premium_bps,bitmart_spot_price,created_at,expires_at,paid_tx_hash,paid_amount_usd,bitmart_avg_price,bitmart_filled_txc,txc_tx_hash,error_message",
+        "public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_asset,dest_address,quoted_dest_out,quoted_dest_per_usd,premium_bps,bitmart_spot_price,created_at,expires_at,paid_tx_hash,paid_amount_usd,bitmart_avg_price,bitmart_filled_dest,dest_tx_hash,error_message",
       )
       .eq("public_id", data.publicId)
       .maybeSingle();

@@ -5,7 +5,7 @@
 //   quoted amount. Bitmart is NEVER on the critical path.
 // Treasury replenishment (background, decoupled):
 //   For completed TXC/ISK$ orders, submit a market buy on Bitmart to refill
-//   our hot wallet. The bitmart_order_id / bitmart_filled_txc columns track
+//   our hot wallet. The bitmart_order_id / bitmart_filled_dest columns track
 //   this but never gate customer payout.
 // Legacy ISK$ Bitmart withdrawal path (settleIskWithdrawal / pollWithdrawals)
 // is retained only so in-flight orders from before the local-sign migration
@@ -39,7 +39,7 @@ async function notifyById(
   const { data } = await supabaseAdmin
     .from("orders")
     .select(
-      "id,public_id,source_chain,source_token,source_amount_usd,paid_amount_usd,dest_asset,dest_txc_address,quoted_txc_out,bitmart_order_id,bitmart_filled_txc,bitmart_avg_price,paid_tx_hash,txc_tx_hash,txc_fee_sats,txc_from_address,error_message",
+      "id,public_id,source_chain,source_token,source_amount_usd,paid_amount_usd,dest_asset,dest_address,quoted_dest_out,bitmart_order_id,bitmart_filled_dest,bitmart_avg_price,paid_tx_hash,dest_tx_hash,dest_fee_sats,dest_from_address,error_message",
     )
     .eq("id", orderId)
     .maybeSingle();
@@ -54,13 +54,13 @@ interface OrderRow {
   source_token: string;
   source_amount_usd: number;
   deposit_address: string;
-  dest_txc_address: string;
-  quoted_txc_out: number;
-  quoted_txc_per_usd: number;
+  dest_address: string;
+  quoted_dest_out: number;
+  quoted_dest_per_usd: number;
   expires_at: string;
   paid_amount_usd: number | null;
   bitmart_order_id: string | null;
-  bitmart_filled_txc: number | null;
+  bitmart_filled_dest: number | null;
   withdrawal_id: string | null;
 }
 
@@ -90,7 +90,7 @@ async function watchDeposits() {
   const { data: orders } = await supabaseAdmin
     .from("orders")
     .select(
-      "id,public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_txc_address,quoted_txc_out,quoted_txc_per_usd,expires_at,paid_amount_usd,bitmart_order_id,bitmart_filled_txc,withdrawal_id",
+      "id,public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_address,quoted_dest_out,quoted_dest_per_usd,expires_at,paid_amount_usd,bitmart_order_id,bitmart_filled_dest,withdrawal_id",
     )
     .in("status", ["awaiting_payment", "payment_detected"])
     .returns<OrderRow[]>();
@@ -155,8 +155,8 @@ async function watchDeposits() {
           // Re-price the TXC payout to match what the customer actually sent,
           // at the locked quote rate. Protects us on underpayments and
           // credits the customer fairly on overpayments.
-          const repricedTxcOut = +(totalPaidUsd * Number(order.quoted_txc_per_usd)).toFixed(8);
-          const originalTxcOut = Number(order.quoted_txc_out);
+          const repricedTxcOut = +(totalPaidUsd * Number(order.quoted_dest_per_usd)).toFixed(8);
+          const originalTxcOut = Number(order.quoted_dest_out);
           const repriced = Math.abs(repricedTxcOut - originalTxcOut) > 0.00000001;
 
           if (order.status === "awaiting_payment") {
@@ -166,12 +166,12 @@ async function watchDeposits() {
                 status: "payment_detected",
                 paid_tx_hash: t.txHash,
                 paid_amount_usd: totalPaidUsd,
-                quoted_txc_out: repricedTxcOut,
+                quoted_dest_out: repricedTxcOut,
               })
               .eq("id", order.id);
             order.status = "payment_detected";
             order.paid_amount_usd = totalPaidUsd;
-            order.quoted_txc_out = repricedTxcOut;
+            order.quoted_dest_out = repricedTxcOut;
             await logOrderEvent(order.id, "state", "payment_detected", {
               tx_hash: t.txHash,
               usd: totalPaidUsd,
@@ -185,11 +185,11 @@ async function watchDeposits() {
               .from("orders")
               .update({
                 paid_amount_usd: totalPaidUsd,
-                quoted_txc_out: repricedTxcOut,
+                quoted_dest_out: repricedTxcOut,
               })
               .eq("id", order.id);
             order.paid_amount_usd = totalPaidUsd;
-            order.quoted_txc_out = repricedTxcOut;
+            order.quoted_dest_out = repricedTxcOut;
             if (repriced) {
             await logOrderEvent(order.id, "note", "repriced", {
                 additional_tx: t.txHash,
@@ -230,15 +230,15 @@ async function watchDeposits() {
 async function settleConfirmed() {
   const { data: orders } = await supabaseAdmin
     .from("orders")
-    .select("id,public_id,quoted_txc_out,dest_txc_address,dest_asset,paid_amount_usd")
+    .select("id,public_id,quoted_dest_out,dest_address,dest_asset,paid_amount_usd")
     .eq("status", "confirmed")
     .limit(10)
     .returns<
       Array<{
         id: string;
         public_id: string;
-        quoted_txc_out: number;
-        dest_txc_address: string;
+        quoted_dest_out: number;
+        dest_address: string;
         dest_asset: string;
         paid_amount_usd: number | null;
       }>
@@ -253,19 +253,19 @@ async function settleConfirmed() {
     try {
       // ---- Pay customer locally, no Bitmart dependency (TXC + ISK$) ----
       await supabaseAdmin.from("orders").update({ status: "sending" }).eq("id", o.id);
-      await logOrderEvent(o.id, "state", "sending", { asset, amount: o.quoted_txc_out });
+      await logOrderEvent(o.id, "state", "sending", { asset, amount: o.quoted_dest_out });
       await notifyById("sending", o.id);
 
       const result =
         asset === "TXC"
           ? await sendTxc({
-              toAddress: o.dest_txc_address,
-              amountTxc: Number(o.quoted_txc_out),
+              toAddress: o.dest_address,
+              amountTxc: Number(o.quoted_dest_out),
             })
           : asset === "ISK$"
             ? await sendIsk({
-                toAddress: o.dest_txc_address,
-                amountIsk: Number(o.quoted_txc_out),
+                toAddress: o.dest_address,
+                amountIsk: Number(o.quoted_dest_out),
               })
             : (() => {
                 throw new Error(`Unsupported dest_asset: ${asset}`);
@@ -275,9 +275,9 @@ async function settleConfirmed() {
         .from("orders")
         .update({
           status: "completed",
-          txc_tx_hash: result.txid,
-          txc_fee_sats: result.feeSats,
-          txc_from_address: result.fromAddress,
+          dest_tx_hash: result.txid,
+          dest_fee_sats: result.feeSats,
+          dest_from_address: result.fromAddress,
         })
         .eq("id", o.id);
       await logOrderEvent(o.id, "payout", "sent", { ...result });
@@ -347,7 +347,7 @@ async function replenishTreasury() {
 
 /**
  * Poll Bitmart fills for ANY order with a bitmart_order_id and no recorded
- * fill yet. Updates bookkeeping (bitmart_filled_txc, bitmart_avg_price) but
+ * fill yet. Updates bookkeeping (bitmart_filled_dest, bitmart_avg_price) but
  * does NOT change customer-facing status for TXC orders (already completed).
  * For ISK$ orders still in buying_on_bitmart, advances to `bought` so the
  * withdrawal step picks them up.
@@ -355,16 +355,16 @@ async function replenishTreasury() {
 async function pollBitmartFillsDecoupled() {
   const { data: orders } = await supabaseAdmin
     .from("orders")
-    .select("id,status,bitmart_order_id,bitmart_filled_txc,dest_asset")
+    .select("id,status,bitmart_order_id,bitmart_filled_dest,dest_asset")
     .not("bitmart_order_id", "is", null)
-    .is("bitmart_filled_txc", null)
+    .is("bitmart_filled_dest", null)
     .limit(20)
     .returns<
       Array<{
         id: string;
         status: string;
         bitmart_order_id: string;
-        bitmart_filled_txc: number | null;
+        bitmart_filled_dest: number | null;
         dest_asset: string;
       }>
     >();
@@ -378,11 +378,11 @@ async function pollBitmartFillsDecoupled() {
         const txcAmount = Number.parseFloat(detail.filled_size);
         const avgPrice = Number.parseFloat(detail.price_avg);
         const update: {
-          bitmart_filled_txc: number;
+          bitmart_filled_dest: number;
           bitmart_avg_price: number;
           status?: "bought";
         } = {
-          bitmart_filled_txc: txcAmount,
+          bitmart_filled_dest: txcAmount,
           bitmart_avg_price: avgPrice,
         };
         // ISK$ flow: advance to `bought` so withdrawal step takes over.
@@ -417,14 +417,14 @@ async function pollBitmartFillsDecoupled() {
 async function settleIskWithdrawal() {
   const { data: orders } = await supabaseAdmin
     .from("orders")
-    .select("id,bitmart_filled_txc,dest_txc_address,dest_asset")
+    .select("id,bitmart_filled_dest,dest_address,dest_asset")
     .eq("status", "bought")
     .neq("dest_asset", "TXC")
     .returns<
       Array<{
         id: string;
-        bitmart_filled_txc: number;
-        dest_txc_address: string;
+        bitmart_filled_dest: number;
+        dest_address: string;
         dest_asset: string;
       }>
     >();
@@ -438,8 +438,8 @@ async function settleIskWithdrawal() {
       const { withdraw_id } = await submitWithdrawal({
         currency: dest.bitmartCurrency,
         network: dest.bitmartNetwork,
-        amount: o.bitmart_filled_txc,
-        address: o.dest_txc_address,
+        amount: o.bitmart_filled_dest,
+        address: o.dest_address,
       });
       await supabaseAdmin.from("orders").update({ withdrawal_id: withdraw_id }).eq("id", o.id);
       await logOrderEvent(o.id, "bitmart", "withdraw_submitted", { withdraw_id });
@@ -468,7 +468,7 @@ async function pollWithdrawals() {
       if (detail.status === 3 && detail.tx_id) {
         await supabaseAdmin
           .from("orders")
-          .update({ status: "completed", txc_tx_hash: detail.tx_id })
+          .update({ status: "completed", dest_tx_hash: detail.tx_id })
           .eq("id", o.id);
         await logOrderEvent(o.id, "bitmart", "withdraw_completed", { tx_id: detail.tx_id });
         await notifyById("completed", o.id);
