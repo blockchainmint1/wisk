@@ -602,3 +602,137 @@ export const adminBulkReplenish = createServerFn({ method: "POST" })
       return { ok: false as const, error: msg };
     }
   });
+
+// ===== Custom tokens (admin-managed source asset registry) =====
+const CHAIN_ENUM = z.enum(["ethereum", "base", "arbitrum", "polygon", "bsc"]);
+
+const CustomTokenInput = z
+  .object({
+    chain: CHAIN_ENUM,
+    symbol: z
+      .string()
+      .trim()
+      .min(1)
+      .max(20)
+      .regex(/^[A-Za-z0-9.$_-]+$/, "Symbol may use letters, digits, . $ _ -"),
+    address: z.string().trim().max(80).default(""),
+    decimals: z.number().int().min(0).max(36),
+    isNative: z.boolean().default(false),
+    bitmartSymbol: z
+      .string()
+      .trim()
+      .max(40)
+      .regex(/^[A-Z0-9_]+$/i, "Bitmart symbol like ETH_USDT")
+      .optional()
+      .or(z.literal("")),
+    enabled: z.boolean().default(true),
+  })
+  .superRefine((data, ctx) => {
+    if (data.isNative) {
+      if (!data.bitmartSymbol) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["bitmartSymbol"],
+          message: "Native tokens need a Bitmart symbol (e.g. ETH_USDT) for pricing",
+        });
+      }
+    } else {
+      if (!/^0x[a-fA-F0-9]{40}$/.test(data.address)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["address"],
+          message: "ERC-20 address must be 0x + 40 hex",
+        });
+      }
+    }
+  });
+
+export const adminListCustomTokens = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context.userId);
+    const { data, error } = await supabaseAdmin
+      .from("custom_tokens")
+      .select("id,chain,symbol,address,decimals,is_native,bitmart_symbol,enabled,created_at,updated_at")
+      .order("chain", { ascending: true })
+      .order("symbol", { ascending: true });
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const adminCreateCustomToken = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => CustomTokenInput.parse(input))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const row = {
+      chain: data.chain,
+      symbol: data.symbol,
+      address: data.isNative ? "native" : data.address.toLowerCase(),
+      decimals: data.decimals,
+      is_native: data.isNative,
+      bitmart_symbol: data.bitmartSymbol ? data.bitmartSymbol.toUpperCase() : null,
+      enabled: data.enabled,
+      created_by: context.userId,
+    };
+    const { data: inserted, error } = await supabaseAdmin
+      .from("custom_tokens")
+      .insert(row)
+      .select("id")
+      .single();
+    if (error) {
+      if (/duplicate|unique/i.test(error.message)) {
+        throw new Error(`A token with symbol ${data.symbol} already exists on ${data.chain}`);
+      }
+      throw new Error(error.message);
+    }
+    invalidateChainsCache();
+    await audit(context.userId, "custom_token_create", row);
+    return { ok: true as const, id: inserted.id };
+  });
+
+const UpdateCustomTokenInput = z.object({
+  id: z.string().uuid(),
+  enabled: z.boolean().optional(),
+  decimals: z.number().int().min(0).max(36).optional(),
+  bitmartSymbol: z.string().trim().max(40).optional().nullable(),
+});
+
+export const adminUpdateCustomToken = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => UpdateCustomTokenInput.parse(input))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const patch: Record<string, unknown> = {};
+    if (data.enabled !== undefined) patch.enabled = data.enabled;
+    if (data.decimals !== undefined) patch.decimals = data.decimals;
+    if (data.bitmartSymbol !== undefined) {
+      patch.bitmart_symbol = data.bitmartSymbol
+        ? data.bitmartSymbol.toUpperCase()
+        : null;
+    }
+    if (Object.keys(patch).length === 0) return { ok: true as const };
+    const { error } = await supabaseAdmin
+      .from("custom_tokens")
+      .update(patch)
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    invalidateChainsCache();
+    await audit(context.userId, "custom_token_update", { id: data.id, ...patch });
+    return { ok: true as const };
+  });
+
+export const adminDeleteCustomToken = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { error } = await supabaseAdmin
+      .from("custom_tokens")
+      .delete()
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    invalidateChainsCache();
+    await audit(context.userId, "custom_token_delete", { id: data.id });
+    return { ok: true as const };
+  });
