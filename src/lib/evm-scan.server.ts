@@ -1,30 +1,88 @@
 // Scan an EVM chain for ERC-20 Transfer events arriving at a deposit address.
 import { CHAINS, type ChainKey } from "./chains";
 
-const DEFAULT_RPCS: Record<ChainKey, string> = {
-  ethereum: "https://ethereum-rpc.publicnode.com",
-  base: "https://base-rpc.publicnode.com",
-  arbitrum: "https://arbitrum-one-rpc.publicnode.com",
-  polygon: "https://polygon-bor-rpc.publicnode.com",
-  bsc: "https://bsc-rpc.publicnode.com",
+// Fallback list per chain — tried in order, with the next one used on HTTP 429
+// or 5xx. Free public endpoints throttle aggressively from Workers, so we
+// rotate. Operators can override with `EVM_RPC_<CHAIN>` (comma-separated for
+// multiple).
+const DEFAULT_RPCS: Record<ChainKey, string[]> = {
+  ethereum: [
+    "https://eth.drpc.org",
+    "https://rpc.ankr.com/eth",
+    "https://cloudflare-eth.com",
+    "https://ethereum.publicnode.com",
+    "https://1rpc.io/eth",
+    "https://eth.llamarpc.com",
+  ],
+  base: [
+    "https://base.drpc.org",
+    "https://mainnet.base.org",
+    "https://base-rpc.publicnode.com",
+    "https://base.llamarpc.com",
+  ],
+  arbitrum: [
+    "https://arbitrum.drpc.org",
+    "https://arb1.arbitrum.io/rpc",
+    "https://arbitrum-one-rpc.publicnode.com",
+    "https://arbitrum.llamarpc.com",
+  ],
+  polygon: [
+    "https://polygon.drpc.org",
+    "https://polygon-rpc.com",
+    "https://polygon-bor-rpc.publicnode.com",
+    "https://polygon.llamarpc.com",
+  ],
+  bsc: [
+    "https://bsc.drpc.org",
+    "https://bsc-dataseed.binance.org",
+    "https://bsc-rpc.publicnode.com",
+  ],
 };
 
-function rpcUrl(chain: ChainKey): string {
+function rpcUrls(chain: ChainKey): string[] {
   const envKey = `EVM_RPC_${chain.toUpperCase()}`;
-  return process.env[envKey] || DEFAULT_RPCS[chain];
+  const env = process.env[envKey];
+  if (env) {
+    return env
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return DEFAULT_RPCS[chain];
 }
 
 let rpcId = 0;
 async function rpc<T = unknown>(chain: ChainKey, method: string, params: unknown[]): Promise<T> {
-  const res = await fetch(rpcUrl(chain), {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: ++rpcId, method, params }),
-  });
-  if (!res.ok) throw new Error(`RPC ${chain} ${method} HTTP ${res.status}`);
-  const json = (await res.json()) as { result?: T; error?: { message: string } };
-  if (json.error) throw new Error(`RPC ${chain} ${method}: ${json.error.message}`);
-  return json.result as T;
+  const urls = rpcUrls(chain);
+  let lastErr: Error | null = null;
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: ++rpcId, method, params }),
+      });
+      if (res.status === 429 || res.status >= 500) {
+        lastErr = new Error(`RPC ${chain} ${method} via ${url} HTTP ${res.status}`);
+        continue;
+      }
+      if (!res.ok) throw new Error(`RPC ${chain} ${method} via ${url} HTTP ${res.status}`);
+      const json = (await res.json()) as { result?: T; error?: { message: string } };
+      if (json.error) {
+        // Treat rate-limit-ish messages as retryable.
+        const msg = json.error.message || "";
+        if (/rate|limit|throttle|too many/i.test(msg)) {
+          lastErr = new Error(`RPC ${chain} ${method} via ${url}: ${msg}`);
+          continue;
+        }
+        throw new Error(`RPC ${chain} ${method} via ${url}: ${msg}`);
+      }
+      return json.result as T;
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e));
+    }
+  }
+  throw lastErr ?? new Error(`RPC ${chain} ${method}: all endpoints failed`);
 }
 
 const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
