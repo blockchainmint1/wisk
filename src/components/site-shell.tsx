@@ -40,7 +40,7 @@ export function SiteFooter() {
         <div className="text-[10px] font-mono uppercase tracking-widest space-y-4">
           <p className="font-bold text-foreground">Sovereign Protocol</p>
           <p className="max-w-xs leading-relaxed">
-            Stablecoins in, native TXC out. Liquidity sourced live from Bitmart.
+            Stablecoins in, native assets out. Liquidity sourced live from Bitmart.
           </p>
         </div>
         <div className="flex gap-12 font-mono text-[10px] uppercase tracking-widest">
