@@ -1,7 +1,8 @@
 // Scan all derived HD deposit addresses for native + stablecoin balances.
 // Read-only — uses public RPCs via evm-scan.server.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { CHAINS, type ChainKey } from "./chains";
+import { CHAINS, isNativeToken, type ChainKey } from "./chains";
+import { getMergedChains } from "./chains.server";
 import { deriveDepositAddress } from "./hd.server";
 
 // Prefer Alchemy (we have an API key) — public RPCs rate-limit aggressively
