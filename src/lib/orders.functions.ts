@@ -57,6 +57,17 @@ export const createOrder = createServerFn({ method: "POST" })
       .single();
 
     if (error || !order) throw new Error("Failed to create order: " + (error?.message ?? ""));
+
+    // Fire-and-forget Telegram notification
+    void notifyOrderEvent("created", {
+      public_id: order.public_id,
+      source_chain: data.sourceChain,
+      source_token: data.sourceToken,
+      source_amount_usd: data.usdAmount,
+      quoted_txc_out: txcOut,
+      dest_txc_address: data.destTxcAddress,
+    });
+
     return { publicId: order.public_id };
   });
 
