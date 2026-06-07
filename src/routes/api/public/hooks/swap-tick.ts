@@ -19,6 +19,21 @@ import {
   weiToUsd,
 } from "@/lib/evm-scan.server";
 import { getChain, getToken, type ChainKey } from "@/lib/chains";
+import { notifyOrderEvent } from "@/lib/telegram.server";
+
+async function notifyById(
+  event: Parameters<typeof notifyOrderEvent>[0],
+  orderId: string,
+) {
+  const { data } = await supabaseAdmin
+    .from("orders")
+    .select(
+      "public_id,source_chain,source_token,source_amount_usd,paid_amount_usd,dest_txc_address,quoted_txc_out,bitmart_filled_txc,bitmart_avg_price,paid_tx_hash,txc_tx_hash,error_message",
+    )
+    .eq("id", orderId)
+    .maybeSingle();
+  if (data) void notifyOrderEvent(event, data);
+}
 
 interface OrderRow {
   id: string;
@@ -42,14 +57,17 @@ async function failOrder(orderId: string, message: string) {
     .from("orders")
     .update({ status: "failed", error_message: message })
     .eq("id", orderId);
+  await notifyById("failed", orderId);
 }
 
 async function expireStale() {
-  await supabaseAdmin
+  const { data: expired } = await supabaseAdmin
     .from("orders")
     .update({ status: "expired" })
     .eq("status", "awaiting_payment")
-    .lt("expires_at", new Date().toISOString());
+    .lt("expires_at", new Date().toISOString())
+    .select("id");
+  for (const row of expired ?? []) await notifyById("expired", row.id);
 }
 
 async function watchDeposits() {
@@ -134,6 +152,7 @@ async function watchDeposits() {
               .eq("id", order.id);
             order.status = "payment_detected";
             order.paid_amount_usd = totalPaidUsd;
+            await notifyById("payment_detected", order.id);
           } else {
             // Keep paid_amount_usd in sync as more transfers arrive.
             await supabaseAdmin
@@ -151,6 +170,7 @@ async function watchDeposits() {
               .from("orders")
               .update({ status: "confirmed" })
               .eq("id", order.id);
+            await notifyById("payment_confirmed", order.id);
             detected += 1;
           }
         }
@@ -222,6 +242,7 @@ async function pollBitmartFills() {
             bitmart_avg_price: avgPrice,
           })
           .eq("id", o.id);
+        await notifyById("bitmart_filled", o.id);
         filled += 1;
       } else if (detail.state === "canceled") {
         await failOrder(o.id, "Bitmart order canceled");
@@ -276,6 +297,7 @@ async function pollWithdrawals() {
           .from("orders")
           .update({ status: "completed", txc_tx_hash: detail.tx_id })
           .eq("id", o.id);
+        await notifyById("completed", o.id);
         completed += 1;
       } else if (detail.status === 4 || detail.status === 5) {
         await failOrder(o.id, `Withdrawal failed (status ${detail.status})`);
