@@ -1477,7 +1477,15 @@ function TokensTab() {
   };
 
   const create = useMutation({
-    mutationFn: (data: Parameters<typeof createFn>[0]["data"]) => createFn({ data }),
+    mutationFn: (data: {
+      chain: TokenChain;
+      symbol: string;
+      address: string;
+      decimals: number;
+      isNative: boolean;
+      bitmartSymbol?: string;
+      enabled: boolean;
+    }) => createFn({ data }),
     onSuccess: invalidate,
   });
   const update = useMutation({
