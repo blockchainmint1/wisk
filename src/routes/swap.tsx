@@ -13,13 +13,13 @@ import { getQuote } from "@/lib/quote.functions";
 export const Route = createFileRoute("/swap")({
   head: () => ({
     meta: [
-      { title: "Swap — TEXIT Runner" },
+      { title: "Swap — SWAP" },
       {
         name: "description",
         content:
           "Quote and initiate your USDC/USDT/DAI → TXC or ISK$ swap. Live pricing, 5% protocol fee, unique deposit address per order.",
       },
-      { property: "og:title", content: "Swap — TEXIT Runner" },
+      { property: "og:title", content: "Swap — SWAP" },
       {
         property: "og:description",
         content: "Stablecoins in. Native TXC or ISK$ out. Live Bitmart pricing.",
