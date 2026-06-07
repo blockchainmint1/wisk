@@ -83,7 +83,7 @@ function HomePage() {
             <Principle
               n="01"
               title="One direction. Done well."
-              body="Stablecoins in, native TXC out. No bridges, no wrapped tokens, no liquidity pools to manage."
+              body="Stablecoins in, native TXC, ISK or ZCU out. No bridges, no wrapped tokens, no liquidity pools to manage."
             />
             <Principle
               n="02"
