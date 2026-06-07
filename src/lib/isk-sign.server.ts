@@ -154,8 +154,8 @@ async function resolveHot(): Promise<ResolvedHot> {
   ]);
   const pick: ResolvedHot =
     swUtxos.length > 0 || lgUtxos.length === 0
-      ? { kind: "p2wpkh", address: sw.address!, output: sw.output! }
-      : { kind: "p2pkh", address: lg.address!, output: lg.output! };
+      ? { kind: "p2wpkh", address: sw.address!, output: Buffer.from(sw.output!) }
+      : { kind: "p2pkh", address: lg.address!, output: Buffer.from(lg.output!) };
   resolvedHot = pick;
   return pick;
 }
