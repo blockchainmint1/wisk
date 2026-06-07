@@ -170,6 +170,7 @@ async function watchDeposits() {
               .from("orders")
               .update({ status: "confirmed" })
               .eq("id", order.id);
+            await notifyById("payment_confirmed", order.id);
             detected += 1;
           }
         }
