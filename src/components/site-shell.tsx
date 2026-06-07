@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import logoAsset from "@/assets/honest-money-logo.png.asset.json";
 
 export function SiteHeader({ ticker }: { ticker?: ReactNode }) {
   return (
