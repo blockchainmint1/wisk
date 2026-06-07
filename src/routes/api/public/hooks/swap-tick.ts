@@ -176,8 +176,8 @@ async function watchDeposits() {
               tx_hash: t.txHash,
               usd: totalPaidUsd,
               confirmations,
-              original_txc_out: originalTxcOut,
-              repriced_txc_out: repricedTxcOut,
+              original_payout: originalTxcOut,
+              repriced_payout: repricedTxcOut,
             });
             await notifyById("payment_detected", order.id);
           } else {
@@ -191,11 +191,11 @@ async function watchDeposits() {
             order.paid_amount_usd = totalPaidUsd;
             order.quoted_txc_out = repricedTxcOut;
             if (repriced) {
-              await logOrderEvent(order.id, "note", "repriced", {
+            await logOrderEvent(order.id, "note", "repriced", {
                 additional_tx: t.txHash,
                 total_usd: totalPaidUsd,
-                original_txc_out: originalTxcOut,
-                repriced_txc_out: repricedTxcOut,
+                original_payout: originalTxcOut,
+                repriced_payout: repricedTxcOut,
               });
             }
           }
