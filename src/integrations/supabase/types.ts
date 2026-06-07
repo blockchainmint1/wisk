@@ -189,14 +189,17 @@ export type Database = {
       orders: {
         Row: {
           bitmart_avg_price: number | null
-          bitmart_filled_txc: number | null
+          bitmart_filled_dest: number | null
           bitmart_order_id: string | null
           bitmart_spot_price: number
           created_at: string
           deposit_address: string
           deposit_index: number
+          dest_address: string
           dest_asset: string
-          dest_txc_address: string
+          dest_fee_sats: number | null
+          dest_from_address: string | null
+          dest_tx_hash: string | null
           error_message: string | null
           expires_at: string
           id: string
@@ -204,28 +207,28 @@ export type Database = {
           paid_tx_hash: string | null
           premium_bps: number
           public_id: string
-          quoted_txc_out: number
-          quoted_txc_per_usd: number
+          quoted_dest_out: number
+          quoted_dest_per_usd: number
           source_amount_usd: number
           source_chain: string
           source_token: string
           status: Database["public"]["Enums"]["order_status"]
-          txc_fee_sats: number | null
-          txc_from_address: string | null
-          txc_tx_hash: string | null
           updated_at: string
           withdrawal_id: string | null
         }
         Insert: {
           bitmart_avg_price?: number | null
-          bitmart_filled_txc?: number | null
+          bitmart_filled_dest?: number | null
           bitmart_order_id?: string | null
           bitmart_spot_price: number
           created_at?: string
           deposit_address: string
           deposit_index: number
+          dest_address: string
           dest_asset?: string
-          dest_txc_address: string
+          dest_fee_sats?: number | null
+          dest_from_address?: string | null
+          dest_tx_hash?: string | null
           error_message?: string | null
           expires_at?: string
           id?: string
@@ -233,28 +236,28 @@ export type Database = {
           paid_tx_hash?: string | null
           premium_bps?: number
           public_id?: string
-          quoted_txc_out: number
-          quoted_txc_per_usd: number
+          quoted_dest_out: number
+          quoted_dest_per_usd: number
           source_amount_usd: number
           source_chain: string
           source_token: string
           status?: Database["public"]["Enums"]["order_status"]
-          txc_fee_sats?: number | null
-          txc_from_address?: string | null
-          txc_tx_hash?: string | null
           updated_at?: string
           withdrawal_id?: string | null
         }
         Update: {
           bitmart_avg_price?: number | null
-          bitmart_filled_txc?: number | null
+          bitmart_filled_dest?: number | null
           bitmart_order_id?: string | null
           bitmart_spot_price?: number
           created_at?: string
           deposit_address?: string
           deposit_index?: number
+          dest_address?: string
           dest_asset?: string
-          dest_txc_address?: string
+          dest_fee_sats?: number | null
+          dest_from_address?: string | null
+          dest_tx_hash?: string | null
           error_message?: string | null
           expires_at?: string
           id?: string
@@ -262,15 +265,12 @@ export type Database = {
           paid_tx_hash?: string | null
           premium_bps?: number
           public_id?: string
-          quoted_txc_out?: number
-          quoted_txc_per_usd?: number
+          quoted_dest_out?: number
+          quoted_dest_per_usd?: number
           source_amount_usd?: number
           source_chain?: string
           source_token?: string
           status?: Database["public"]["Enums"]["order_status"]
-          txc_fee_sats?: number | null
-          txc_from_address?: string | null
-          txc_tx_hash?: string | null
           updated_at?: string
           withdrawal_id?: string | null
         }
