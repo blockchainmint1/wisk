@@ -5,13 +5,13 @@ import { SiteFooter, SiteHeader } from "@/components/site-shell";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "TEXIT Runner — Swap stables for native TXC" },
+      { title: "swapTXC — Swap stables for native TXC" },
       {
         name: "description",
         content:
           "Exit to sovereignty. Swap USDC, USDT, pyUSD or any stable on Ethereum, Base, Arbitrum, Polygon, or BSC for native TXC, ISK or ZCU. Live Bitmart pricing, 5% protocol fee.",
       },
-      { property: "og:title", content: "TEXIT Runner — Swap stables for native TXC" },
+      { property: "og:title", content: "swapTXC — Swap stables for native TXC" },
       {
         property: "og:description",
         content: "Stablecoins in. Sovereign TXC out. Live Bitmart liquidity, 5% protocol fee.",
