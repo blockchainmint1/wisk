@@ -332,11 +332,11 @@ type OrderRowData = {
   source_chain: string;
   source_token: string;
   source_amount_usd: number;
-  dest_txc_address: string;
-  quoted_txc_out: number;
+  dest_address: string;
+  quoted_dest_out: number;
   created_at: string;
-  bitmart_filled_txc: number | null;
-  txc_tx_hash: string | null;
+  bitmart_filled_dest: number | null;
+  dest_tx_hash: string | null;
   error_message: string | null;
 };
 
@@ -356,11 +356,11 @@ function OrderRow({ order: o, onRetry }: { order: OrderRowData; onRetry: () => v
         <td className="p-3">{o.source_chain} · {o.source_token}</td>
         <td className="p-3 text-right">${Number(o.source_amount_usd).toFixed(2)}</td>
         <td className="p-3 text-right">
-          {o.bitmart_filled_txc != null
-            ? Number(o.bitmart_filled_txc).toFixed(4)
-            : Number(o.quoted_txc_out).toFixed(4)}
+          {o.bitmart_filled_dest != null
+            ? Number(o.bitmart_filled_dest).toFixed(4)
+            : Number(o.quoted_dest_out).toFixed(4)}
         </td>
-        <td className="p-3 truncate max-w-[14ch]">{o.dest_txc_address}</td>
+        <td className="p-3 truncate max-w-[14ch]">{o.dest_address}</td>
         <td className="p-3">{new Date(o.created_at).toLocaleString()}</td>
         <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
           {o.status === "failed" ? (
@@ -410,7 +410,7 @@ function OrderDetail({ publicId }: { publicId: string }) {
       <DetailGrid title="Quote">
         <KV k="Spot" v={`$${Number(order.bitmart_spot_price ?? 0).toFixed(6)}`} />
         <KV k="Premium" v={`${(order.premium_bps / 100).toFixed(2)}%`} />
-        <KV k="Quoted out" v={`${Number(order.quoted_txc_out).toFixed(4)} ${asset}`} />
+        <KV k="Quoted out" v={`${Number(order.quoted_dest_out).toFixed(4)} ${asset}`} />
         <KV k="Expires" v={new Date(order.expires_at).toLocaleString()} />
       </DetailGrid>
 
@@ -428,8 +428,8 @@ function OrderDetail({ publicId }: { publicId: string }) {
         <KV
           k="Filled"
           v={
-            order.bitmart_filled_txc != null
-              ? `${Number(order.bitmart_filled_txc).toFixed(4)} ${asset}`
+            order.bitmart_filled_dest != null
+              ? `${Number(order.bitmart_filled_dest).toFixed(4)} ${asset}`
               : bitmartLive && "state" in bitmartLive
                 ? `(live) ${bitmartLive.state} · ${bitmartLive.filled_size}`
                 : "—"
@@ -457,19 +457,19 @@ function OrderDetail({ publicId }: { publicId: string }) {
 
       {/* Payout */}
       <DetailGrid title="Payout">
-        <KV k="From" v={order.txc_from_address ?? "—"} mono />
-        <KV k="To" v={order.dest_txc_address} mono />
+        <KV k="From" v={order.dest_from_address ?? "—"} mono />
+        <KV k="To" v={order.dest_address} mono />
         <KV
           k="Tx hash"
           v={
-            order.txc_tx_hash ? (
+            order.dest_tx_hash ? (
               <a
-                href={explorer(order.txc_tx_hash)}
+                href={explorer(order.dest_tx_hash)}
                 target="_blank"
                 rel="noreferrer"
                 className="text-accent underline break-all"
               >
-                {order.txc_tx_hash}
+                {order.dest_tx_hash}
               </a>
             ) : (
               "—"
@@ -479,8 +479,8 @@ function OrderDetail({ publicId }: { publicId: string }) {
         <KV
           k="Fee"
           v={
-            order.txc_fee_sats != null
-              ? `${(Number(order.txc_fee_sats) / 1e8).toFixed(8)} ${asset}`
+            order.dest_fee_sats != null
+              ? `${(Number(order.dest_fee_sats) / 1e8).toFixed(8)} ${asset}`
               : "—"
           }
         />

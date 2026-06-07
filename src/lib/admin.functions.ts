@@ -41,7 +41,7 @@ export const adminListOrders = createServerFn({ method: "POST" })
     const { data: rows, error } = await supabaseAdmin
       .from("orders")
       .select(
-        "public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_txc_address,quoted_txc_out,created_at,paid_amount_usd,bitmart_filled_txc,txc_tx_hash,error_message",
+        "public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_address,quoted_dest_out,created_at,paid_amount_usd,bitmart_filled_dest,dest_tx_hash,error_message",
       )
       .order("created_at", { ascending: false })
       .limit(data.limit);
@@ -90,7 +90,7 @@ export const adminOrderDetail = createServerFn({ method: "POST" })
       | { order_id: string; state: string; filled_size: string; filled_notional: string; price_avg: string }
       | { error: string }
       | null = null;
-    if (order.bitmart_order_id && order.bitmart_filled_txc == null) {
+    if (order.bitmart_order_id && order.bitmart_filled_dest == null) {
       try {
         const { getOrderDetail } = await import("./bitmart.server");
         const d = await getOrderDetail(order.bitmart_order_id);
@@ -436,10 +436,10 @@ export const adminTreasuryDebt = createServerFn({ method: "POST" })
     await assertAdmin(context.userId);
 
     // All TXC orders that went to the customer (completed) — the hot wallet
-    // already sent quoted_txc_out; bitmart_filled_txc is what we re-bought.
+    // already sent quoted_dest_out; bitmart_filled_dest is what we re-bought.
     const { data: rows, error } = await supabaseAdmin
       .from("orders")
-      .select("public_id,quoted_txc_out,bitmart_filled_txc,bitmart_avg_price,paid_amount_usd,created_at,status,bitmart_order_id")
+      .select("public_id,quoted_dest_out,bitmart_filled_dest,bitmart_avg_price,paid_amount_usd,created_at,status,bitmart_order_id")
       .eq("dest_asset", "TXC")
       .eq("status", "completed");
     if (error) throw new Error(error.message);
@@ -458,14 +458,14 @@ export const adminTreasuryDebt = createServerFn({ method: "POST" })
     }> = [];
 
     for (const r of rows ?? []) {
-      const sold = Number(r.quoted_txc_out ?? 0);
-      const bought = Number(r.bitmart_filled_txc ?? 0);
+      const sold = Number(r.quoted_dest_out ?? 0);
+      const bought = Number(r.bitmart_filled_dest ?? 0);
       const avg = Number(r.bitmart_avg_price ?? 0);
       txcSold += sold;
       txcBought += bought;
       if (bought > 0 && avg > 0) usdtSpent += bought * avg;
       usdtTakenIn += Number(r.paid_amount_usd ?? 0);
-      if (r.bitmart_order_id && r.bitmart_filled_txc == null) pendingBuys += 1;
+      if (r.bitmart_order_id && r.bitmart_filled_dest == null) pendingBuys += 1;
       const gap = sold - bought;
       if (gap > 0.0001) {
         shortfalls.push({

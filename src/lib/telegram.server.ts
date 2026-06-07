@@ -25,15 +25,15 @@ interface OrderSummary {
   source_amount_usd?: number | null;
   paid_amount_usd?: number | null;
   dest_asset?: string | null;
-  dest_txc_address?: string | null;
-  quoted_txc_out?: number | null;
+  dest_address?: string | null;
+  quoted_dest_out?: number | null;
   bitmart_order_id?: string | null;
-  bitmart_filled_txc?: number | null;
+  bitmart_filled_dest?: number | null;
   bitmart_avg_price?: number | null;
   paid_tx_hash?: string | null;
-  txc_tx_hash?: string | null;
-  txc_fee_sats?: number | null;
-  txc_from_address?: string | null;
+  dest_tx_hash?: string | null;
+  dest_fee_sats?: number | null;
+  dest_from_address?: string | null;
   error_message?: string | null;
 }
 
@@ -88,7 +88,7 @@ function buildMessage(
     lines.push(`Pay: ${escapeHtml(o.source_token ?? "?")} on ${escapeHtml(o.source_chain ?? "?")}`);
   }
   if (event === "created") {
-    lines.push(`Quote: ${fmtUsd(o.source_amount_usd)} → ${fmtAsset(o.quoted_txc_out, asset)}`);
+    lines.push(`Quote: ${fmtUsd(o.source_amount_usd)} → ${fmtAsset(o.quoted_dest_out, asset)}`);
   }
   if (event === "payment_detected" || event === "payment_confirmed") {
     lines.push(`Received: ${fmtUsd(o.paid_amount_usd)}`);
@@ -96,21 +96,21 @@ function buildMessage(
   }
   if (event === "bitmart_filled") {
     lines.push(
-      `Filled: ${fmtAsset(o.bitmart_filled_txc, asset)} @ ${
+      `Filled: ${fmtAsset(o.bitmart_filled_dest, asset)} @ ${
         o.bitmart_avg_price != null ? fmtUsd(o.bitmart_avg_price) : "—"
       }`,
     );
     if (o.bitmart_order_id) lines.push(`Bitmart: <code>${escapeHtml(o.bitmart_order_id)}</code>`);
   }
   if (event === "sending") {
-    lines.push(`Sending: ${fmtAsset(o.bitmart_filled_txc ?? o.quoted_txc_out, asset)}`);
-    lines.push(`To: <code>${escapeHtml(o.dest_txc_address)}</code>`);
+    lines.push(`Sending: ${fmtAsset(o.bitmart_filled_dest ?? o.quoted_dest_out, asset)}`);
+    lines.push(`To: <code>${escapeHtml(o.dest_address)}</code>`);
   }
   if (event === "completed") {
-    lines.push(`Sent: ${fmtAsset(o.bitmart_filled_txc ?? o.quoted_txc_out, asset)} → <code>${escapeHtml(o.dest_txc_address)}</code>`);
-    if (o.txc_tx_hash) lines.push(`Tx: <code>${escapeHtml(o.txc_tx_hash)}</code>`);
-    if (o.txc_fee_sats != null) {
-      lines.push(`Fee: ${(o.txc_fee_sats / 1e8).toFixed(8)} ${asset}`);
+    lines.push(`Sent: ${fmtAsset(o.bitmart_filled_dest ?? o.quoted_dest_out, asset)} → <code>${escapeHtml(o.dest_address)}</code>`);
+    if (o.dest_tx_hash) lines.push(`Tx: <code>${escapeHtml(o.dest_tx_hash)}</code>`);
+    if (o.dest_fee_sats != null) {
+      lines.push(`Fee: ${(o.dest_fee_sats / 1e8).toFixed(8)} ${asset}`);
     }
   }
   if (event === "failed" || event === "expired") {
@@ -162,7 +162,7 @@ async function getHotBalance(
       const confirmedTxc = confirmed / 1e8;
       const unconfirmedTxc = unconfirmed / 1e8;
       const expectedPayout = Number(
-        order.bitmart_filled_txc ?? order.quoted_txc_out ?? 0,
+        order.bitmart_filled_dest ?? order.quoted_dest_out ?? 0,
       );
       const low = expectedPayout > 0 && confirmedTxc < expectedPayout * 2;
       return { asset: "TXC", address, confirmedTxc, unconfirmedTxc, low };
@@ -182,7 +182,7 @@ async function getHotBalance(
       const address = useSegwit ? segwit : legacy;
       const confirmedTxc = bal.confirmed / 1e8;
       const unconfirmedTxc = bal.unconfirmed / 1e8;
-      const expectedPayout = Number(order.quoted_txc_out ?? 0);
+      const expectedPayout = Number(order.quoted_dest_out ?? 0);
       const low = expectedPayout > 0 && confirmedTxc < expectedPayout * 2;
       return { asset: "ISK$", address, confirmedTxc, unconfirmedTxc, low };
     }

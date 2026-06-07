@@ -164,7 +164,7 @@ function OrderPage() {
               <KV label="Sending" value={`$${Number(order.source_amount_usd).toFixed(2)}`} />
               <KV
                 label="Quote"
-                value={`${Number(order.quoted_txc_out).toFixed(4)} ${destAsset} @ $${Number(order.bitmart_spot_price).toFixed(6)}`}
+                value={`${Number(order.quoted_dest_out).toFixed(4)} ${destAsset} @ $${Number(order.bitmart_spot_price).toFixed(6)}`}
               />
               {order.paid_tx_hash ? (
                 <KV
@@ -181,17 +181,17 @@ function OrderPage() {
                   }
                 />
               ) : null}
-              {order.txc_tx_hash ? (
+              {order.dest_tx_hash ? (
                 <KV
                   label={`${destAsset} Tx`}
                   value={
                     <a
                       className="text-success hover:underline break-all"
-                      href={`https://mempool.texitcoin.org/tx/${order.txc_tx_hash}`}
+                      href={`https://mempool.texitcoin.org/tx/${order.dest_tx_hash}`}
                       target="_blank"
                       rel="noreferrer"
                     >
-                      {order.txc_tx_hash.slice(0, 10)}…{order.txc_tx_hash.slice(-8)}
+                      {order.dest_tx_hash.slice(0, 10)}…{order.dest_tx_hash.slice(-8)}
                     </a>
                   }
                 />
