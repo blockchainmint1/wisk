@@ -26,11 +26,12 @@ import {
   scanIncomingTransfers,
   weiToUsd,
 } from "@/lib/evm-scan.server";
-import { getChain, getToken, type ChainKey } from "@/lib/chains";
+import { getChain, getToken, isNativeToken, type ChainKey } from "@/lib/chains";
 import { getDestination } from "@/lib/destinations";
 import { notifyOrderEvent, logOrderEvent } from "@/lib/telegram.server";
 import { sendTxc } from "@/lib/txc-sign.server";
 import { sendIsk } from "@/lib/isk-sign.server";
+import { getSpotPrice } from "@/lib/bitmart.server";
 
 async function notifyById(
   event: Parameters<typeof notifyOrderEvent>[0],
