@@ -86,11 +86,11 @@ export const adminOrderDetail = createServerFn({ method: "POST" })
       ]);
 
     // Resolve Bitmart fill detail live if we have an order id and no fill yet
-    let bitmartLive: unknown = null;
+    let bitmartLive: Record<string, unknown> | null = null;
     if (order.bitmart_order_id && order.bitmart_filled_txc == null) {
       try {
         const { getOrderDetail } = await import("./bitmart.server");
-        bitmartLive = await getOrderDetail(order.bitmart_order_id);
+        bitmartLive = (await getOrderDetail(order.bitmart_order_id)) as unknown as Record<string, unknown>;
       } catch (e) {
         bitmartLive = { error: e instanceof Error ? e.message : String(e) };
       }

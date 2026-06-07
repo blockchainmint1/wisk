@@ -330,7 +330,7 @@ async function settleBought() {
             txc_from_address: result.fromAddress,
           })
           .eq("id", o.id);
-        await logOrderEvent(o.id, "payout", "sent", result);
+        await logOrderEvent(o.id, "payout", "sent", { ...result });
         await notifyById("completed", o.id);
         settled += 1;
       } else {
