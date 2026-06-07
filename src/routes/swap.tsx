@@ -6,6 +6,7 @@ import { LiveTicker } from "@/components/live-ticker";
 import { SiteFooter, SiteHeader } from "@/components/site-shell";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Wallet } from "lucide-react";
+import { DEST_ASSETS, DESTINATIONS, type DestAsset } from "@/lib/destinations";
 import { createOrder, listChainOptions } from "@/lib/orders.functions";
 import { getQuote } from "@/lib/quote.functions";
 
@@ -16,12 +17,12 @@ export const Route = createFileRoute("/swap")({
       {
         name: "description",
         content:
-          "Quote and initiate your USDC/USDT/DAI → TXC swap. Live pricing, 5% protocol fee, unique deposit address per order.",
+          "Quote and initiate your USDC/USDT/DAI → TXC or ISK$ swap. Live pricing, 5% protocol fee, unique deposit address per order.",
       },
       { property: "og:title", content: "Swap — TEXIT Runner" },
       {
         property: "og:description",
-        content: "Stablecoins in. Native TXC out. Live Bitmart pricing.",
+        content: "Stablecoins in. Native TXC or ISK$ out. Live Bitmart pricing.",
       },
     ],
   }),
@@ -43,8 +44,11 @@ function SwapPage() {
   const [chain, setChain] = useState<string>("ethereum");
   const [token, setToken] = useState<string>("USDC");
   const [amount, setAmount] = useState<string>("1000");
+  const [destAsset, setDestAsset] = useState<DestAsset>("TXC");
   const [dest, setDest] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+
+  const destConfig = DESTINATIONS[destAsset];
 
   const usdAmount = useMemo(() => {
     const n = Number.parseFloat(amount.replace(/,/g, ""));
@@ -52,13 +56,15 @@ function SwapPage() {
   }, [amount]);
 
   const { data: quote } = useQuery({
-    queryKey: ["quote", usdAmount],
-    queryFn: () => quoteFn({ data: { usdAmount: Math.max(usdAmount, 1) } }),
+    queryKey: ["quote", usdAmount, destAsset],
+    queryFn: () => quoteFn({ data: { usdAmount: Math.max(usdAmount, 1), destAsset } }),
     refetchInterval: 15_000,
   });
 
-  const txcOut =
+  const assetOut =
     quote?.ok && usdAmount > 0 ? (usdAmount / quote.effectivePriceUsd).toFixed(8) : "—";
+
+  const addressValid = destConfig.addressRegex.test(dest.trim());
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -68,7 +74,8 @@ function SwapPage() {
           sourceChain: chain as "ethereum" | "base" | "arbitrum" | "polygon" | "bsc",
           sourceToken: token as "USDC" | "USDT" | "DAI",
           usdAmount,
-          destTxcAddress: dest.trim(),
+          destAsset,
+          destAddress: dest.trim(),
         },
       });
     },
@@ -85,7 +92,7 @@ function SwapPage() {
     setToken(tokenOptions[0] as string);
   }
 
-  const formValid = usdAmount >= 10 && dest.trim().length >= 20 && quote?.ok === true;
+  const formValid = usdAmount >= 10 && addressValid && quote?.ok === true;
 
   return (
     <div className="min-h-screen">
@@ -96,7 +103,7 @@ function SwapPage() {
             Exchange Terminal
           </div>
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter leading-none">
-            Swap to <span className="text-accent">TXC</span>
+            Swap to <span className="text-accent">{destConfig.label}</span>
           </h1>
         </div>
 
@@ -104,6 +111,29 @@ function SwapPage() {
           <div className="absolute -inset-1 bg-accent/10 blur-3xl rounded-3xl -z-10" />
           <div className="bg-secondary border border-border p-1 rounded-2xl">
             <div className="bg-background border border-border rounded-xl p-6 space-y-5">
+              {/* Destination asset toggle */}
+              <Field label="Destination Asset">
+                <div className="grid grid-cols-2 gap-2">
+                  {DEST_ASSETS.map((a) => {
+                    const active = a === destAsset;
+                    return (
+                      <button
+                        key={a}
+                        type="button"
+                        onClick={() => setDestAsset(a)}
+                        className={`p-4 rounded-lg font-mono text-sm border transition-colors ${
+                          active
+                            ? "border-accent text-accent bg-accent/10"
+                            : "border-border bg-secondary text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {DESTINATIONS[a].label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </Field>
+
               {/* Chain + token + amount */}
               <Field label="Source Chain">
                 <select
@@ -140,13 +170,13 @@ function SwapPage() {
                 </div>
               </Field>
 
-              <Field label="Recipient TXC Address">
+              <Field label={`Recipient ${destConfig.label} Address`}>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={dest}
                     onChange={(e) => setDest(e.target.value)}
-                    placeholder="Your native TEXITcoin address"
+                    placeholder={destConfig.addressHint}
                     className="flex-1 bg-secondary border border-border p-4 rounded-lg font-mono text-sm focus:outline-none focus:border-accent"
                   />
                   <TooltipProvider delayDuration={150}>
@@ -166,11 +196,20 @@ function SwapPage() {
                     </Tooltip>
                   </TooltipProvider>
                 </div>
+                {dest.trim().length > 0 && !addressValid ? (
+                  <div className="text-[10px] font-mono text-accent uppercase tracking-widest px-1">
+                    Must be a {destConfig.label} address (starts with T, 34 chars)
+                  </div>
+                ) : null}
               </Field>
 
               {/* Quote breakdown */}
               <div className="bg-secondary/50 rounded-lg p-4 space-y-2 text-xs font-mono">
-                <Row label="You receive" value={`${txcOut} TXC`} strong />
+                <Row
+                  label="You receive"
+                  value={`${assetOut} ${destConfig.label}`}
+                  strong
+                />
                 <Row
                   label="Spot price"
                   value={quote?.ok ? `$${quote.spotPriceUsd.toFixed(6)}` : "—"}
