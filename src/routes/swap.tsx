@@ -82,7 +82,10 @@ function SwapPage() {
     onSuccess: (res) => {
       navigate({ to: "/swap/$orderId", params: { orderId: res.publicId } });
     },
-    onError: (e: Error) => setError(e.message),
+    onError: (e: Error) => {
+      console.error("createOrder failed:", e);
+      setError(e?.message || "Order creation failed. Please try again or check console.");
+    },
   });
 
   const chainOpt = chains?.find((c) => c.key === chain);
