@@ -159,6 +159,33 @@ export type Database = {
         }
         Relationships: []
       }
+      order_events: {
+        Row: {
+          created_at: string
+          details: Json | null
+          event: string
+          id: string
+          kind: string
+          order_id: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json | null
+          event: string
+          id?: string
+          kind: string
+          order_id: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json | null
+          event?: string
+          id?: string
+          kind?: string
+          order_id?: string
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           bitmart_avg_price: number | null
@@ -183,6 +210,8 @@ export type Database = {
           source_chain: string
           source_token: string
           status: Database["public"]["Enums"]["order_status"]
+          txc_fee_sats: number | null
+          txc_from_address: string | null
           txc_tx_hash: string | null
           updated_at: string
           withdrawal_id: string | null
@@ -210,6 +239,8 @@ export type Database = {
           source_chain: string
           source_token: string
           status?: Database["public"]["Enums"]["order_status"]
+          txc_fee_sats?: number | null
+          txc_from_address?: string | null
           txc_tx_hash?: string | null
           updated_at?: string
           withdrawal_id?: string | null
@@ -237,6 +268,8 @@ export type Database = {
           source_chain?: string
           source_token?: string
           status?: Database["public"]["Enums"]["order_status"]
+          txc_fee_sats?: number | null
+          txc_from_address?: string | null
           txc_tx_hash?: string | null
           updated_at?: string
           withdrawal_id?: string | null
@@ -291,6 +324,7 @@ export type Database = {
         | "expired"
         | "failed"
         | "refunded"
+        | "sending"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -430,6 +464,7 @@ export const Constants = {
         "expired",
         "failed",
         "refunded",
+        "sending",
       ],
     },
   },

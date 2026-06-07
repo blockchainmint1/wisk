@@ -1,7 +1,8 @@
 // Fulfillment cron tick — called by pg_cron every minute.
 // 1) Watch awaiting orders for deposit confirmation
-// 2) Buy TXC on Bitmart for confirmed orders
-// 3) Trigger and poll withdrawals
+// 2) Buy TXC/ISK$ on Bitmart for confirmed orders
+// 3a) TXC orders: send locally from our hot wallet (cheaper than Bitmart withdraw)
+// 3b) ISK$ orders: still go through Bitmart withdrawal (local signing TBD)
 // Auth: pg_cron uses Supabase publishable key in `apikey` header. Route lives
 // under /api/public/* which bypasses Lovable's site auth.
 import { createFileRoute } from "@tanstack/react-router";
@@ -20,7 +21,8 @@ import {
 } from "@/lib/evm-scan.server";
 import { getChain, getToken, type ChainKey } from "@/lib/chains";
 import { getDestination } from "@/lib/destinations";
-import { notifyOrderEvent } from "@/lib/telegram.server";
+import { notifyOrderEvent, logOrderEvent } from "@/lib/telegram.server";
+import { sendTxc } from "@/lib/txc-sign.server";
 
 async function notifyById(
   event: Parameters<typeof notifyOrderEvent>[0],
@@ -29,7 +31,7 @@ async function notifyById(
   const { data } = await supabaseAdmin
     .from("orders")
     .select(
-      "public_id,source_chain,source_token,source_amount_usd,paid_amount_usd,dest_asset,dest_txc_address,quoted_txc_out,bitmart_filled_txc,bitmart_avg_price,paid_tx_hash,txc_tx_hash,error_message",
+      "id,public_id,source_chain,source_token,source_amount_usd,paid_amount_usd,dest_asset,dest_txc_address,quoted_txc_out,bitmart_order_id,bitmart_filled_txc,bitmart_avg_price,paid_tx_hash,txc_tx_hash,txc_fee_sats,txc_from_address,error_message",
     )
     .eq("id", orderId)
     .maybeSingle();
@@ -58,6 +60,7 @@ async function failOrder(orderId: string, message: string) {
     .from("orders")
     .update({ status: "failed", error_message: message })
     .eq("id", orderId);
+  await logOrderEvent(orderId, "error", "failed", { message });
   await notifyById("failed", orderId);
 }
 
@@ -68,7 +71,10 @@ async function expireStale() {
     .eq("status", "awaiting_payment")
     .lt("expires_at", new Date().toISOString())
     .select("id");
-  for (const row of expired ?? []) await notifyById("expired", row.id);
+  for (const row of expired ?? []) {
+    await logOrderEvent(row.id, "state", "expired", {});
+    await notifyById("expired", row.id);
+  }
 }
 
 async function watchDeposits() {
@@ -81,7 +87,6 @@ async function watchDeposits() {
     .returns<OrderRow[]>();
   if (!orders?.length) return { detected: 0 };
 
-  // Group by chain to batch RPC calls
   const byChain = new Map<ChainKey, OrderRow[]>();
   for (const o of orders) {
     const k = o.source_chain as ChainKey;
@@ -97,8 +102,6 @@ async function watchDeposits() {
       const fromBlock = chainStartScanBlock(chainKey, currentBlock);
       const tokenAddresses = Array.from(new Set(group.map((o) => getToken(chainKey, o.source_token).address)));
 
-      // Scan each unique address (RPC limitation: topic3 must be a single value
-      // or null, so we loop per address)
       for (const order of group) {
         const transfers = await scanIncomingTransfers({
           chain: chainKey,
@@ -115,7 +118,6 @@ async function watchDeposits() {
           const usd = weiToUsd(t.amountWei, token.decimals);
           const confirmations = currentBlock - t.blockNumber + 1;
 
-          // Record the deposit (idempotent via unique constraint)
           await supabaseAdmin.from("deposits").upsert(
             {
               order_id: order.id,
@@ -132,7 +134,6 @@ async function watchDeposits() {
             { onConflict: "chain,tx_hash,log_index" },
           );
 
-          // Sum all deposits for this order (handles multi-tx payments).
           const { data: allDeposits } = await supabaseAdmin
             .from("deposits")
             .select("amount_usd")
@@ -153,9 +154,13 @@ async function watchDeposits() {
               .eq("id", order.id);
             order.status = "payment_detected";
             order.paid_amount_usd = totalPaidUsd;
+            await logOrderEvent(order.id, "state", "payment_detected", {
+              tx_hash: t.txHash,
+              usd: totalPaidUsd,
+              confirmations,
+            });
             await notifyById("payment_detected", order.id);
           } else {
-            // Keep paid_amount_usd in sync as more transfers arrive.
             await supabaseAdmin
               .from("orders")
               .update({ paid_amount_usd: totalPaidUsd })
@@ -171,6 +176,7 @@ async function watchDeposits() {
               .from("orders")
               .update({ status: "confirmed" })
               .eq("id", order.id);
+            await logOrderEvent(order.id, "state", "confirmed", { confirmations });
             await notifyById("payment_confirmed", order.id);
             detected += 1;
           }
@@ -209,12 +215,15 @@ async function buyOnBitmart() {
         continue;
       }
       const dest = getDestination(o.dest_asset);
-      // We retain the 5% premium; spend (notional / 1.05) on the spot buy.
       const buyNotional = +(notional / 1.05).toFixed(2);
       await supabaseAdmin
         .from("orders")
         .update({ status: "buying_on_bitmart" })
         .eq("id", o.id);
+      await logOrderEvent(o.id, "state", "buying_on_bitmart", {
+        notional: buyNotional,
+        symbol: dest.bitmartSymbol,
+      });
       const { order_id } = await submitMarketBuy({
         symbol: dest.bitmartSymbol,
         notionalUsdt: buyNotional,
@@ -223,6 +232,10 @@ async function buyOnBitmart() {
         .from("orders")
         .update({ bitmart_order_id: order_id })
         .eq("id", o.id);
+      await logOrderEvent(o.id, "bitmart", "buy_submitted", {
+        bitmart_order_id: order_id,
+        notional: buyNotional,
+      });
       bought += 1;
     } catch (e) {
       await failOrder(o.id, e instanceof Error ? e.message : "Bitmart buy failed");
@@ -255,6 +268,10 @@ async function pollBitmartFills() {
             bitmart_avg_price: avgPrice,
           })
           .eq("id", o.id);
+        await logOrderEvent(o.id, "bitmart", "filled", {
+          filled: txcAmount,
+          avg_price: avgPrice,
+        });
         await notifyById("bitmart_filled", o.id);
         filled += 1;
       } else if (detail.state === "canceled") {
@@ -267,7 +284,12 @@ async function pollBitmartFills() {
   return { filled };
 }
 
-async function withdrawTxc() {
+/**
+ * Pay out completed Bitmart buys to the customer.
+ * - TXC: sign + broadcast locally (skip Bitmart withdrawal entirely).
+ * - ISK$: still uses Bitmart withdrawal until local signing is wired.
+ */
+async function settleBought() {
   const { data: orders } = await supabaseAdmin
     .from("orders")
     .select("id,bitmart_filled_txc,dest_txc_address,dest_asset")
@@ -280,26 +302,56 @@ async function withdrawTxc() {
         dest_asset: string;
       }>
     >();
-  if (!orders?.length) return { withdrawing: 0 };
+  if (!orders?.length) return { settled: 0, withdrawing: 0 };
 
+  let settled = 0;
   let withdrawing = 0;
+
   for (const o of orders) {
+    const asset = o.dest_asset || "TXC";
     try {
-      const dest = getDestination(o.dest_asset);
-      await supabaseAdmin.from("orders").update({ status: "withdrawing" }).eq("id", o.id);
-      const { withdraw_id } = await submitWithdrawal({
-        currency: dest.bitmartCurrency,
-        network: dest.bitmartNetwork,
-        amount: o.bitmart_filled_txc,
-        address: o.dest_txc_address,
-      });
-      await supabaseAdmin.from("orders").update({ withdrawal_id: withdraw_id }).eq("id", o.id);
-      withdrawing += 1;
+      if (asset === "TXC") {
+        // Local signing path
+        await supabaseAdmin.from("orders").update({ status: "sending" }).eq("id", o.id);
+        await logOrderEvent(o.id, "state", "sending", { asset });
+        await notifyById("sending", o.id);
+
+        const result = await sendTxc({
+          toAddress: o.dest_txc_address,
+          amountTxc: Number(o.bitmart_filled_txc),
+        });
+
+        await supabaseAdmin
+          .from("orders")
+          .update({
+            status: "completed",
+            txc_tx_hash: result.txid,
+            txc_fee_sats: result.feeSats,
+            txc_from_address: result.fromAddress,
+          })
+          .eq("id", o.id);
+        await logOrderEvent(o.id, "payout", "sent", { ...result });
+        await notifyById("completed", o.id);
+        settled += 1;
+      } else {
+        // ISK$ — Bitmart withdraw fallback
+        const dest = getDestination(asset);
+        await supabaseAdmin.from("orders").update({ status: "withdrawing" }).eq("id", o.id);
+        const { withdraw_id } = await submitWithdrawal({
+          currency: dest.bitmartCurrency,
+          network: dest.bitmartNetwork,
+          amount: o.bitmart_filled_txc,
+          address: o.dest_txc_address,
+        });
+        await supabaseAdmin.from("orders").update({ withdrawal_id: withdraw_id }).eq("id", o.id);
+        await logOrderEvent(o.id, "bitmart", "withdraw_submitted", { withdraw_id });
+        withdrawing += 1;
+      }
     } catch (e) {
-      await failOrder(o.id, e instanceof Error ? e.message : "Withdrawal failed");
+      await failOrder(o.id, e instanceof Error ? e.message : "Settlement failed");
     }
   }
-  return { withdrawing };
+  return { settled, withdrawing };
 }
 
 async function pollWithdrawals() {
@@ -320,6 +372,7 @@ async function pollWithdrawals() {
           .from("orders")
           .update({ status: "completed", txc_tx_hash: detail.tx_id })
           .eq("id", o.id);
+        await logOrderEvent(o.id, "bitmart", "withdraw_completed", { tx_id: detail.tx_id });
         await notifyById("completed", o.id);
         completed += 1;
       } else if (detail.status === 4 || detail.status === 5) {
@@ -342,7 +395,7 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           watch: { detected: 0 },
           buy: { bought: 0 },
           fills: { filled: 0 },
-          withdraw: { withdrawing: 0 },
+          settle: { settled: 0, withdrawing: 0 },
           polls: { completed: 0 },
           ms: 0,
         };
@@ -351,7 +404,7 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           result.watch = await watchDeposits();
           result.buy = await buyOnBitmart();
           result.fills = await pollBitmartFills();
-          result.withdraw = await withdrawTxc();
+          result.settle = await settleBought();
           result.polls = await pollWithdrawals();
         } catch (e) {
           console.error("[swap-tick] fatal", e);
@@ -366,7 +419,6 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
         });
       },
       GET: async () => {
-        // Health check
         return new Response(JSON.stringify({ ok: true }), {
           headers: { "content-type": "application/json" },
         });

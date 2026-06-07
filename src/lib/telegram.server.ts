@@ -1,6 +1,9 @@
 // Telegram notification helper. Server-only.
 // Uses the Lovable connector gateway — no raw bot token needed.
-// Sends to a single admin chat/channel configured via TELEGRAM_CHAT_ID secret.
+// Also logs every notify into the order_events table so the admin
+// detail panel has a full timeline per order.
+
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/telegram";
 
@@ -9,11 +12,13 @@ export type OrderNotifyEvent =
   | "payment_detected"
   | "payment_confirmed"
   | "bitmart_filled"
+  | "sending"
   | "completed"
   | "failed"
   | "expired";
 
 interface OrderSummary {
+  id?: string | null;
   public_id: string;
   source_chain?: string | null;
   source_token?: string | null;
@@ -22,11 +27,22 @@ interface OrderSummary {
   dest_asset?: string | null;
   dest_txc_address?: string | null;
   quoted_txc_out?: number | null;
+  bitmart_order_id?: string | null;
   bitmart_filled_txc?: number | null;
   bitmart_avg_price?: number | null;
   paid_tx_hash?: string | null;
   txc_tx_hash?: string | null;
+  txc_fee_sats?: number | null;
+  txc_from_address?: string | null;
   error_message?: string | null;
+}
+
+interface HotBalanceInfo {
+  asset: string; // 'TXC' | 'ISK$'
+  address: string;
+  confirmedTxc: number;
+  unconfirmedTxc: number;
+  low: boolean; // flagged if balance < 2× expected payout
 }
 
 function escapeHtml(value: unknown): string {
@@ -48,32 +64,28 @@ function fmtAsset(n: number | null | undefined, asset: string): string {
 
 function header(event: OrderNotifyEvent): string {
   switch (event) {
-    case "created":
-      return "🆕 New order";
-    case "payment_detected":
-      return "👀 Deposit detected";
-    case "payment_confirmed":
-      return "✅ Deposit confirmed";
-    case "bitmart_filled":
-      return "💱 Bitmart buy filled";
-    case "completed":
-      return "🎉 Order completed";
-    case "failed":
-      return "❌ Order failed";
-    case "expired":
-      return "⌛ Order expired";
+    case "created": return "🆕 New order";
+    case "payment_detected": return "👀 Deposit detected";
+    case "payment_confirmed": return "✅ Deposit confirmed";
+    case "bitmart_filled": return "💱 Bitmart buy filled";
+    case "sending": return "📤 Sending payout";
+    case "completed": return "🎉 Order completed";
+    case "failed": return "❌ Order failed";
+    case "expired": return "⌛ Order expired";
   }
 }
 
-function buildMessage(event: OrderNotifyEvent, o: OrderSummary): string {
+function buildMessage(
+  event: OrderNotifyEvent,
+  o: OrderSummary,
+  balance: HotBalanceInfo | null,
+): string {
   const asset = o.dest_asset || "TXC";
   const lines: string[] = [];
   lines.push(`<b>${header(event)}</b>`);
   lines.push(`<code>${escapeHtml(o.public_id)}</code> · ${escapeHtml(asset)}`);
   if (o.source_chain || o.source_token) {
-    lines.push(
-      `Pay: ${escapeHtml(o.source_token ?? "?")} on ${escapeHtml(o.source_chain ?? "?")}`,
-    );
+    lines.push(`Pay: ${escapeHtml(o.source_token ?? "?")} on ${escapeHtml(o.source_chain ?? "?")}`);
   }
   if (event === "created") {
     lines.push(`Quote: ${fmtUsd(o.source_amount_usd)} → ${fmtAsset(o.quoted_txc_out, asset)}`);
@@ -88,17 +100,75 @@ function buildMessage(event: OrderNotifyEvent, o: OrderSummary): string {
         o.bitmart_avg_price != null ? fmtUsd(o.bitmart_avg_price) : "—"
       }`,
     );
+    if (o.bitmart_order_id) lines.push(`Bitmart: <code>${escapeHtml(o.bitmart_order_id)}</code>`);
+  }
+  if (event === "sending") {
+    lines.push(`Sending: ${fmtAsset(o.bitmart_filled_txc ?? o.quoted_txc_out, asset)}`);
+    lines.push(`To: <code>${escapeHtml(o.dest_txc_address)}</code>`);
   }
   if (event === "completed") {
-    lines.push(
-      `Sent: ${fmtAsset(o.bitmart_filled_txc, asset)} → <code>${escapeHtml(o.dest_txc_address)}</code>`,
-    );
-    if (o.txc_tx_hash) lines.push(`${escapeHtml(asset)} tx: <code>${escapeHtml(o.txc_tx_hash)}</code>`);
+    lines.push(`Sent: ${fmtAsset(o.bitmart_filled_txc ?? o.quoted_txc_out, asset)} → <code>${escapeHtml(o.dest_txc_address)}</code>`);
+    if (o.txc_tx_hash) lines.push(`Tx: <code>${escapeHtml(o.txc_tx_hash)}</code>`);
+    if (o.txc_fee_sats != null) {
+      lines.push(`Fee: ${(o.txc_fee_sats / 1e8).toFixed(8)} ${asset}`);
+    }
   }
   if (event === "failed" || event === "expired") {
     if (o.error_message) lines.push(`Reason: ${escapeHtml(o.error_message)}`);
   }
+
+  if (balance) {
+    const flag = balance.low ? " ⚠️ LOW" : "";
+    lines.push(
+      `Hot ${escapeHtml(balance.asset)}: ${balance.confirmedTxc.toFixed(4)}${
+        balance.unconfirmedTxc ? ` (+${balance.unconfirmedTxc.toFixed(4)} pending)` : ""
+      }${flag}`,
+    );
+  }
+
   return lines.join("\n");
+}
+
+async function recordEvent(
+  orderId: string | null | undefined,
+  kind: string,
+  event: string,
+  details: Record<string, unknown>,
+) {
+  if (!orderId) return;
+  try {
+    await supabaseAdmin.from("order_events").insert({
+      order_id: orderId,
+      kind,
+      event,
+      details: details as never,
+    });
+  } catch (err) {
+    console.error("[order_events] insert failed", err);
+  }
+}
+
+async function getHotBalance(
+  order: OrderSummary,
+): Promise<HotBalanceInfo | null> {
+  if ((order.dest_asset ?? "TXC") !== "TXC") return null;
+  try {
+    const { getTxcHotAddress, getTxcAddressBalanceSats } = await import(
+      "./txc-sign.server"
+    );
+    const address = getTxcHotAddress();
+    const { confirmed, unconfirmed } = await getTxcAddressBalanceSats(address);
+    const confirmedTxc = confirmed / 1e8;
+    const unconfirmedTxc = unconfirmed / 1e8;
+    const expectedPayout = Number(
+      order.bitmart_filled_txc ?? order.quoted_txc_out ?? 0,
+    );
+    const low = expectedPayout > 0 && confirmedTxc < expectedPayout * 2;
+    return { asset: "TXC", address, confirmedTxc, unconfirmedTxc, low };
+  } catch (err) {
+    console.warn("[hot-balance] read failed", err);
+    return null;
+  }
 }
 
 export async function notifyOrderEvent(
@@ -109,14 +179,16 @@ export async function notifyOrderEvent(
   const telegramKey = process.env.TELEGRAM_API_KEY;
   const chatId = process.env.TELEGRAM_CHAT_ID;
 
-  // Notifications are best-effort. Missing config = silently skip so the
-  // fulfillment pipeline never breaks because of Telegram.
+  const balance = await getHotBalance(order);
+
+  // Always record in order_events even if Telegram isn't configured.
+  await recordEvent(order.id, "telegram", event, {
+    sent: !!(lovableKey && telegramKey && chatId),
+    balance,
+  });
+
   if (!lovableKey || !telegramKey || !chatId) {
-    console.warn("[telegram] skipping notify; missing config", {
-      hasLovableKey: !!lovableKey,
-      hasTelegramKey: !!telegramKey,
-      hasChatId: !!chatId,
-    });
+    console.warn("[telegram] skipping notify; missing config");
     return;
   }
 
@@ -130,7 +202,7 @@ export async function notifyOrderEvent(
       },
       body: JSON.stringify({
         chat_id: chatId,
-        text: buildMessage(event, order),
+        text: buildMessage(event, order, balance),
         parse_mode: "HTML",
         disable_web_page_preview: true,
       }),
@@ -138,8 +210,25 @@ export async function notifyOrderEvent(
     if (!res.ok) {
       const body = await res.text();
       console.error(`[telegram] sendMessage ${res.status}: ${body}`);
+      await recordEvent(order.id, "error", "telegram_failed", {
+        status: res.status,
+        body: body.slice(0, 500),
+      });
     }
   } catch (err) {
     console.error("[telegram] notify failed", err);
+    await recordEvent(order.id, "error", "telegram_failed", {
+      message: err instanceof Error ? err.message : String(err),
+    });
   }
+}
+
+/** Record an arbitrary order event (state transition, bitmart trade, payout). */
+export async function logOrderEvent(
+  orderId: string,
+  kind: "state" | "bitmart" | "payout" | "error" | "note",
+  event: string,
+  details: Record<string, unknown> = {},
+): Promise<void> {
+  await recordEvent(orderId, kind, event, details);
 }

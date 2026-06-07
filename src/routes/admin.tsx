@@ -11,6 +11,7 @@ import {
   adminInviteAdmin,
   adminListAdmins,
   adminListOrders,
+  adminOrderDetail,
   adminRetryOrder,
   adminRevokeAdmin,
   adminTelegramTest,
@@ -235,6 +236,7 @@ function OrdersTab() {
         <table className="w-full text-xs font-mono">
           <thead className="bg-secondary/40 text-muted-foreground uppercase tracking-widest text-[10px]">
             <tr>
+              <th className="w-6 p-3"></th>
               <th className="text-left p-3">Order</th>
               <th className="text-left p-3">Status</th>
               <th className="text-left p-3">Source</th>
@@ -247,38 +249,15 @@ function OrdersTab() {
           </thead>
           <tbody>
             {orders.data?.map((o) => (
-              <tr key={o.public_id} className="border-t border-border">
-                <td className="p-3">{o.public_id}</td>
-                <td className="p-3">
-                  <span className="text-accent">{o.status.replace(/_/g, " ")}</span>
-                  {o.error_message ? (
-                    <div className="text-[10px] text-muted-foreground">{o.error_message}</div>
-                  ) : null}
-                </td>
-                <td className="p-3">{o.source_chain} · {o.source_token}</td>
-                <td className="p-3 text-right">${Number(o.source_amount_usd).toFixed(2)}</td>
-                <td className="p-3 text-right">
-                  {o.bitmart_filled_txc != null
-                    ? Number(o.bitmart_filled_txc).toFixed(4)
-                    : Number(o.quoted_txc_out).toFixed(4)}
-                </td>
-                <td className="p-3 truncate max-w-[14ch]">{o.dest_txc_address}</td>
-                <td className="p-3">{new Date(o.created_at).toLocaleString()}</td>
-                <td className="p-3 text-right">
-                  {o.status === "failed" ? (
-                    <button
-                      onClick={() => retry.mutate(o.public_id)}
-                      className="border border-border px-2 py-1 rounded hover:bg-foreground hover:text-background"
-                    >
-                      Retry
-                    </button>
-                  ) : null}
-                </td>
-              </tr>
+              <OrderRow
+                key={o.public_id}
+                order={o}
+                onRetry={() => retry.mutate(o.public_id)}
+              />
             ))}
             {!orders.data?.length && !orders.isLoading ? (
               <tr>
-                <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                <td colSpan={9} className="p-8 text-center text-muted-foreground">
                   No orders yet.
                 </td>
               </tr>
@@ -286,6 +265,256 @@ function OrdersTab() {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+type OrderRowData = {
+  public_id: string;
+  status: string;
+  source_chain: string;
+  source_token: string;
+  source_amount_usd: number;
+  dest_txc_address: string;
+  quoted_txc_out: number;
+  created_at: string;
+  bitmart_filled_txc: number | null;
+  txc_tx_hash: string | null;
+  error_message: string | null;
+};
+
+function OrderRow({ order: o, onRetry }: { order: OrderRowData; onRetry: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <tr className="border-t border-border hover:bg-secondary/20 cursor-pointer" onClick={() => setOpen((v) => !v)}>
+        <td className="p-3 text-muted-foreground">{open ? "▾" : "▸"}</td>
+        <td className="p-3">{o.public_id}</td>
+        <td className="p-3">
+          <span className="text-accent">{o.status.replace(/_/g, " ")}</span>
+          {o.error_message ? (
+            <div className="text-[10px] text-muted-foreground">{o.error_message}</div>
+          ) : null}
+        </td>
+        <td className="p-3">{o.source_chain} · {o.source_token}</td>
+        <td className="p-3 text-right">${Number(o.source_amount_usd).toFixed(2)}</td>
+        <td className="p-3 text-right">
+          {o.bitmart_filled_txc != null
+            ? Number(o.bitmart_filled_txc).toFixed(4)
+            : Number(o.quoted_txc_out).toFixed(4)}
+        </td>
+        <td className="p-3 truncate max-w-[14ch]">{o.dest_txc_address}</td>
+        <td className="p-3">{new Date(o.created_at).toLocaleString()}</td>
+        <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
+          {o.status === "failed" ? (
+            <button
+              onClick={onRetry}
+              className="border border-border px-2 py-1 rounded hover:bg-foreground hover:text-background"
+            >
+              Retry
+            </button>
+          ) : null}
+        </td>
+      </tr>
+      {open ? (
+        <tr className="border-t border-border bg-background/40">
+          <td colSpan={9} className="p-0">
+            <OrderDetail publicId={o.public_id} />
+          </td>
+        </tr>
+      ) : null}
+    </>
+  );
+}
+
+function OrderDetail({ publicId }: { publicId: string }) {
+  const detailFn = useServerFn(adminOrderDetail);
+  const q = useQuery({
+    queryKey: ["admin", "order-detail", publicId],
+    queryFn: () => detailFn({ data: { publicId } }),
+    refetchInterval: 8000,
+  });
+
+  if (q.isLoading) {
+    return <div className="p-6 text-[10px] font-mono text-muted-foreground">Loading detail…</div>;
+  }
+  if (q.error) {
+    return <div className="p-6 text-xs font-mono text-accent">{(q.error as Error).message}</div>;
+  }
+  if (!q.data) return null;
+
+  const { order, deposits, events, audit, bitmartLive, hotBalance } = q.data;
+  const asset = order.dest_asset ?? "TXC";
+  const explorer = (txid: string) => `https://explorer.texitcoin.org/tx/${txid}`;
+
+  return (
+    <div className="p-5 space-y-5">
+      {/* Quote */}
+      <DetailGrid title="Quote">
+        <KV k="Spot" v={`$${Number(order.bitmart_spot_price ?? 0).toFixed(6)}`} />
+        <KV k="Premium" v={`${(order.premium_bps / 100).toFixed(2)}%`} />
+        <KV k="Quoted out" v={`${Number(order.quoted_txc_out).toFixed(4)} ${asset}`} />
+        <KV k="Expires" v={new Date(order.expires_at).toLocaleString()} />
+      </DetailGrid>
+
+      {/* Deposit */}
+      <DetailGrid title="Deposit">
+        <KV k="Address" v={order.deposit_address} mono />
+        <KV k="Paid" v={order.paid_amount_usd != null ? `$${Number(order.paid_amount_usd).toFixed(2)}` : "—"} />
+        <KV k="Tx" v={order.paid_tx_hash ?? "—"} mono />
+        <KV k="Deposits" v={String(deposits.length)} />
+      </DetailGrid>
+
+      {/* Bitmart trade */}
+      <DetailGrid title="Bitmart trade">
+        <KV k="Order ID" v={order.bitmart_order_id ?? "—"} mono />
+        <KV
+          k="Filled"
+          v={
+            order.bitmart_filled_txc != null
+              ? `${Number(order.bitmart_filled_txc).toFixed(4)} ${asset}`
+              : bitmartLive && "state" in bitmartLive
+                ? `(live) ${bitmartLive.state} · ${bitmartLive.filled_size}`
+                : "—"
+          }
+        />
+        <KV
+          k="Avg price"
+          v={
+            order.bitmart_avg_price != null
+              ? `$${Number(order.bitmart_avg_price).toFixed(6)}`
+              : bitmartLive && "price_avg" in bitmartLive
+                ? `$${Number(bitmartLive.price_avg).toFixed(6)}`
+                : "—"
+          }
+        />
+        <KV
+          k="Notional spent"
+          v={
+            order.paid_amount_usd
+              ? `$${(Number(order.paid_amount_usd) / 1.05).toFixed(2)}`
+              : "—"
+          }
+        />
+      </DetailGrid>
+
+      {/* Payout */}
+      <DetailGrid title="Payout">
+        <KV k="From" v={order.txc_from_address ?? "—"} mono />
+        <KV k="To" v={order.dest_txc_address} mono />
+        <KV
+          k="Tx hash"
+          v={
+            order.txc_tx_hash ? (
+              <a
+                href={explorer(order.txc_tx_hash)}
+                target="_blank"
+                rel="noreferrer"
+                className="text-accent underline break-all"
+              >
+                {order.txc_tx_hash}
+              </a>
+            ) : (
+              "—"
+            )
+          }
+        />
+        <KV
+          k="Fee"
+          v={
+            order.txc_fee_sats != null
+              ? `${(Number(order.txc_fee_sats) / 1e8).toFixed(8)} ${asset}`
+              : "—"
+          }
+        />
+        {hotBalance ? (
+          <>
+            <KV k="Hot wallet" v={hotBalance.address} mono />
+            <KV
+              k="Hot balance"
+              v={`${hotBalance.confirmedTxc.toFixed(4)} ${asset}${
+                hotBalance.unconfirmedTxc
+                  ? ` (+${hotBalance.unconfirmedTxc.toFixed(4)} pending)`
+                  : ""
+              }`}
+            />
+          </>
+        ) : null}
+      </DetailGrid>
+
+      {/* Timeline */}
+      <div>
+        <SectionHeader>Event timeline</SectionHeader>
+        <div className="border border-border rounded">
+          {events.length ? (
+            events.map((e) => (
+              <div
+                key={e.id}
+                className="px-3 py-2 border-b border-border last:border-b-0 grid grid-cols-[140px_90px_120px_1fr] gap-3 items-start text-[11px]"
+              >
+                <span className="text-muted-foreground">
+                  {new Date(e.created_at).toLocaleString()}
+                </span>
+                <span className="uppercase tracking-widest text-accent text-[10px]">{e.kind}</span>
+                <span>{e.event}</span>
+                <span className="text-muted-foreground break-all">
+                  {e.details ? JSON.stringify(e.details) : ""}
+                </span>
+              </div>
+            ))
+          ) : (
+            <div className="px-3 py-3 text-[10px] text-muted-foreground">No events yet.</div>
+          )}
+        </div>
+      </div>
+
+      {audit.length ? (
+        <div>
+          <SectionHeader>Admin actions</SectionHeader>
+          <div className="border border-border rounded">
+            {audit.map((a) => (
+              <div
+                key={a.id}
+                className="px-3 py-2 border-b border-border last:border-b-0 grid grid-cols-[140px_120px_1fr] gap-3 text-[11px]"
+              >
+                <span className="text-muted-foreground">{new Date(a.created_at).toLocaleString()}</span>
+                <span>{a.action}</span>
+                <span className="text-muted-foreground break-all">
+                  {a.details ? JSON.stringify(a.details) : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function DetailGrid({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <SectionHeader>{title}</SectionHeader>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 border border-border rounded p-4">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function SectionHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-2">
+      {children}
+    </div>
+  );
+}
+
+function KV({ k, v, mono }: { k: string; v: React.ReactNode; mono?: boolean }) {
+  return (
+    <div className="grid grid-cols-[110px_1fr] gap-2 text-[11px]">
+      <span className="text-muted-foreground">{k}</span>
+      <span className={mono ? "break-all" : ""}>{v}</span>
     </div>
   );
 }

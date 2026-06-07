@@ -49,6 +49,96 @@ export const adminListOrders = createServerFn({ method: "POST" })
     return rows;
   });
 
+// Full detail for one order (for the expandable admin row)
+export const adminOrderDetail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ publicId: z.string().min(3).max(40) }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+
+    const { data: order, error } = await supabaseAdmin
+      .from("orders")
+      .select("*")
+      .eq("public_id", data.publicId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!order) throw new Error("Order not found");
+
+    const [{ data: deposits }, { data: events }, { data: auditRows }] =
+      await Promise.all([
+        supabaseAdmin
+          .from("deposits")
+          .select("*")
+          .eq("order_id", order.id)
+          .order("detected_at", { ascending: true }),
+        supabaseAdmin
+          .from("order_events")
+          .select("id,kind,event,details,created_at")
+          .eq("order_id", order.id)
+          .order("created_at", { ascending: true }),
+        supabaseAdmin
+          .from("admin_audit")
+          .select("id,action,details,actor_user_id,created_at")
+          .eq("order_id", order.id)
+          .order("created_at", { ascending: true }),
+      ]);
+
+    // Resolve Bitmart fill detail live if we have an order id and no fill yet
+    let bitmartLive:
+      | { order_id: string; state: string; filled_size: string; filled_notional: string; price_avg: string }
+      | { error: string }
+      | null = null;
+    if (order.bitmart_order_id && order.bitmart_filled_txc == null) {
+      try {
+        const { getOrderDetail } = await import("./bitmart.server");
+        const d = await getOrderDetail(order.bitmart_order_id);
+        bitmartLive = {
+          order_id: d.order_id,
+          state: d.state,
+          filled_size: d.filled_size,
+          filled_notional: d.filled_notional,
+          price_avg: d.price_avg,
+        };
+      } catch (e) {
+        bitmartLive = { error: e instanceof Error ? e.message : String(e) };
+      }
+    }
+
+    // Hot wallet balance (TXC only)
+    let hotBalance: {
+      address: string;
+      confirmedTxc: number;
+      unconfirmedTxc: number;
+    } | null = null;
+    if ((order.dest_asset ?? "TXC") === "TXC") {
+      try {
+        const { getTxcHotAddress, getTxcAddressBalanceSats } = await import(
+          "./txc-sign.server"
+        );
+        const address = getTxcHotAddress();
+        const bal = await getTxcAddressBalanceSats(address);
+        hotBalance = {
+          address,
+          confirmedTxc: bal.confirmed / 1e8,
+          unconfirmedTxc: bal.unconfirmed / 1e8,
+        };
+      } catch {
+        hotBalance = null;
+      }
+    }
+
+    return {
+      order,
+      deposits: deposits ?? [],
+      events: events ?? [],
+      audit: auditRows ?? [],
+      bitmartLive,
+      hotBalance,
+    };
+  });
+
 export const adminRetryOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
