@@ -15,6 +15,7 @@ export const DESTINATIONS = {
     bitmartNetwork: "TXC",
     addressRegex: TXC_ADDRESS_REGEX,
     addressHint: "Your native TEXITcoin address (starts with T, 34 chars)",
+    walletUrl: "https://wallet.texitcoin.org",
   },
   "ISK$": {
     key: "ISK$",
@@ -24,6 +25,7 @@ export const DESTINATIONS = {
     bitmartNetwork: "ISK",
     addressRegex: TXC_ADDRESS_REGEX,
     addressHint: "Your IskanderCoin address (TXC-format, starts with T, 34 chars)",
+    walletUrl: "https://wallet.iskandercoin.com",
   },
 } as const;
 

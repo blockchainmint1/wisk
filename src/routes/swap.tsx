@@ -183,7 +183,7 @@ function SwapPage() {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <a
-                          href="https://wallet.texitcoin.org"
+                          href={destConfig.walletUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label="Get a wallet"
