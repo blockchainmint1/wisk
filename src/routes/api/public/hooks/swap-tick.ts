@@ -170,19 +170,6 @@ async function watchDeposits() {
             },
             { onConflict: "chain,tx_hash,log_index" },
           );
-              order_id: order.id,
-              chain: chainKey,
-              tx_hash: t.txHash,
-              log_index: t.logIndex,
-              token: t.token,
-              from_address: t.from,
-              to_address: t.to,
-              amount_usd: usd,
-              block_number: t.blockNumber,
-              confirmations,
-            },
-            { onConflict: "chain,tx_hash,log_index" },
-          );
 
           const { data: allDeposits } = await supabaseAdmin
             .from("deposits")
