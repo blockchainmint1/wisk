@@ -10,7 +10,7 @@ export function SiteHeader({ ticker }: { ticker?: ReactNode }) {
             <div className="size-6 bg-accent flex items-center justify-center font-black text-[10px] tracking-tighter text-accent-foreground">
               TXC
             </div>
-            <span className="font-mono font-bold tracking-tight text-sm">TEXIT_RUNNER.V1</span>
+            <span className="font-mono font-bold tracking-tight text-sm">SWAP</span>
           </Link>
           <div className="hidden md:flex items-center gap-6 text-[11px] font-mono text-muted-foreground uppercase tracking-widest">
             <div className="flex items-center gap-2">
