@@ -47,7 +47,7 @@ function makeSteps(asset: string) {
 function OrderPage() {
   const { orderId } = Route.useParams();
   const fn = useServerFn(getOrder);
-  const { data: order } = useQuery({
+  const { data: order, error, isError, isPending } = useQuery({
     queryKey: ["order", orderId],
     queryFn: () => fn({ data: { publicId: orderId } }),
     refetchInterval: (q) => {
@@ -67,13 +67,31 @@ function OrderPage() {
     }).then(setQrUrl).catch(console.error);
   }, [order?.deposit_address]);
 
-  if (!order) {
+  if (isPending) {
     return (
       <div className="min-h-screen">
         <SiteHeader ticker={<LiveTicker />} />
         <div className="max-w-4xl mx-auto px-4 py-20 font-mono text-sm text-muted-foreground">
           Loading order…
         </div>
+      </div>
+    );
+  }
+
+  if (isError || !order) {
+    return (
+      <div className="min-h-screen">
+        <SiteHeader ticker={<LiveTicker />} />
+        <main className="max-w-4xl mx-auto px-4 py-20 font-mono text-sm">
+          <div className="text-accent mb-2">Order not found</div>
+          <div className="text-muted-foreground break-all">
+            {isError ? error.message : `No order exists for ${orderId}.`}
+          </div>
+          <Link to="/swap" className="text-accent underline mt-4 inline-block">
+            Start a new swap
+          </Link>
+        </main>
+        <SiteFooter />
       </div>
     );
   }
