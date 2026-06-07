@@ -297,6 +297,7 @@ async function pollWithdrawals() {
           .from("orders")
           .update({ status: "completed", txc_tx_hash: detail.tx_id })
           .eq("id", o.id);
+        await notifyById("completed", o.id);
         completed += 1;
       } else if (detail.status === 4 || detail.status === 5) {
         await failOrder(o.id, `Withdrawal failed (status ${detail.status})`);
