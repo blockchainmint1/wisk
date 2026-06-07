@@ -22,7 +22,7 @@ export const Route = createFileRoute("/swap")({
       { property: "og:title", content: "Swap — SWAP" },
       {
         property: "og:description",
-        content: "Stablecoins in. Native TXC or ISK$ out. Live Bitmart pricing.",
+        content: "Stablecoins in. Native TXC, ISK or ZCU out. Live Bitmart pricing.",
       },
     ],
   }),
