@@ -187,7 +187,7 @@ function OrderPage() {
                   value={
                     <a
                       className="text-success hover:underline break-all"
-                      href={`https://mempool.texitcoin.org/tx/${order.dest_tx_hash}`}
+                      href={`${destAsset === "ISK$" ? "https://mempool.iskandercoin.com" : "https://mempool.texitcoin.org"}/tx/${order.dest_tx_hash}`}
                       target="_blank"
                       rel="noreferrer"
                     >
