@@ -4,7 +4,7 @@
 // addresses are allocated starting at index 1 (see next_hd_index() in DB).
 
 import { HDKey } from "@scure/bip32";
-import { secp256k1 } from "@noble/curves/secp256k1";
+import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak256 } from "viem";
 
 let cachedRoot: HDKey | null = null;
