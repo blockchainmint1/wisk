@@ -191,9 +191,12 @@ function OrdersTab() {
   const balFn = useServerFn(adminBitmartBalances);
   const retryFn = useServerFn(adminRetryOrder);
 
+  const [pageSize, setPageSize] = useState<10 | 25 | 50>(25);
+  const [page, setPage] = useState(0);
+
   const orders = useQuery({
     queryKey: ["admin", "orders"],
-    queryFn: () => listFn({ data: { limit: 100 } }),
+    queryFn: () => listFn({ data: { limit: 200 } }),
     refetchInterval: 10_000,
   });
   const balances = useQuery({
@@ -250,13 +253,15 @@ function OrdersTab() {
             </tr>
           </thead>
           <tbody>
-            {orders.data?.map((o) => (
-              <OrderRow
-                key={o.public_id}
-                order={o}
-                onRetry={() => retry.mutate(o.public_id)}
-              />
-            ))}
+            {(orders.data ?? [])
+              .slice(page * pageSize, page * pageSize + pageSize)
+              .map((o) => (
+                <OrderRow
+                  key={o.public_id}
+                  order={o}
+                  onRetry={() => retry.mutate(o.public_id)}
+                />
+              ))}
             {!orders.data?.length && !orders.isLoading ? (
               <tr>
                 <td colSpan={9} className="p-8 text-center text-muted-foreground">
@@ -267,6 +272,56 @@ function OrdersTab() {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination controls */}
+      {orders.data?.length ? (
+        <div className="flex items-center justify-between flex-wrap gap-3 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span>Rows per page</span>
+            {[10, 25, 50].map((n) => (
+              <button
+                key={n}
+                onClick={() => {
+                  setPageSize(n as 10 | 25 | 50);
+                  setPage(0);
+                }}
+                className={`px-2 py-1 rounded border ${
+                  pageSize === n
+                    ? "bg-foreground text-background border-foreground"
+                    : "border-border hover:border-foreground/60"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-3">
+            <span>
+              {page * pageSize + 1}–
+              {Math.min((page + 1) * pageSize, orders.data.length)} of{" "}
+              {orders.data.length}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="px-2 py-1 rounded border border-border hover:border-foreground/60 disabled:opacity-30 disabled:hover:border-border"
+            >
+              Prev
+            </button>
+            <button
+              onClick={() =>
+                setPage((p) =>
+                  (p + 1) * pageSize < (orders.data?.length ?? 0) ? p + 1 : p,
+                )
+              }
+              disabled={(page + 1) * pageSize >= orders.data.length}
+              className="px-2 py-1 rounded border border-border hover:border-foreground/60 disabled:opacity-30 disabled:hover:border-border"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
