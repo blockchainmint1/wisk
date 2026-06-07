@@ -131,14 +131,36 @@ export interface TxcSendResult {
   inputsUsed: number;
 }
 
+// In-process serializer. Two concurrent sendTxc() calls would otherwise
+// fetch the same UTXO list and try to spend the same input — the second
+// broadcast then fails with "txn-mempool-conflict" / "missing inputs".
+// Chaining sends through a single promise also ensures the second call's
+// /address/.../utxo fetch already includes the first call's unconfirmed
+// change output, so we never get "No confirmed UTXOs" after a recent send.
+let sendChain: Promise<unknown> = Promise.resolve();
+function serialize<T>(fn: () => Promise<T>): Promise<T> {
+  const next = sendChain.then(fn, fn);
+  // Don't let one failure poison the chain.
+  sendChain = next.catch(() => undefined);
+  return next;
+}
+
 /**
  * Build, sign and broadcast a TXC payment using the WIF in TXC_WIF.
  * Fee is deducted from the change output (recipient receives exactly `amountTxc`).
- * Coin selection: accumulate confirmed UTXOs (largest first) until target met.
+ * Coin selection: accumulate UTXOs (largest first) — includes unconfirmed
+ * change from our own previous sends so back-to-back payouts can chain.
  */
 export async function sendTxc(opts: {
   toAddress: string;
   amountTxc: number; // whole TXC, will be converted to sats
+}): Promise<TxcSendResult> {
+  return serialize(() => sendTxcInner(opts));
+}
+
+async function sendTxcInner(opts: {
+  toAddress: string;
+  amountTxc: number;
 }): Promise<TxcSendResult> {
   const COIN = 100_000_000;
   const amountSats = Math.round(opts.amountTxc * COIN);
@@ -161,14 +183,17 @@ export async function sendTxc(opts: {
   const fromAddress = fromPayment.address!;
   const fromScript = fromPayment.output!;
 
-  // Get UTXOs (confirmed only) and sort largest first
-  const utxos = (await getUtxos(fromAddress))
-    .filter((u) => u.status.confirmed)
-    .sort((a, b) => b.value - a.value);
+  // Include BOTH confirmed and unconfirmed UTXOs. Unconfirmed entries are
+  // almost always our own change from a recent payout — safe to spend
+  // (we're the only signer on this address) and required for back-to-back
+  // sends. Largest first for fewer inputs.
+  const allUtxos = await getUtxos(fromAddress);
+  const utxos = allUtxos.slice().sort((a, b) => b.value - a.value);
 
   if (!utxos.length) {
-    throw new Error(`No confirmed UTXOs at hot wallet ${fromAddress}`);
+    throw new Error(`No UTXOs at hot wallet ${fromAddress}`);
   }
+
 
   const feeRate = await getFeeRateSatsPerVb();
 
