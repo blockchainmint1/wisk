@@ -3,7 +3,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getSpotPrice } from "./bitmart.server";
-import { CHAINS, getChain, getToken, isNativeToken, type ChainKey } from "./chains";
+import { CHAINS, isNativeToken, type ChainKey } from "./chains";
+import { getMergedChain, getMergedChains, getMergedToken } from "./chains.server";
 import { DEST_ASSETS, getDestination, type DestAsset } from "./destinations";
 import { deriveDepositAddress } from "./hd.server";
 import { getSettings } from "./settings.server";
@@ -35,8 +36,8 @@ const CreateInput = z
 export const createOrder = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => CreateInput.parse(input))
   .handler(async ({ data }) => {
-    // Validate chain/token pairing
-    getToken(data.sourceChain as ChainKey, data.sourceToken);
+    // Validate chain/token pairing (merged registry)
+    await getMergedToken(data.sourceChain as ChainKey, data.sourceToken);
     const dest = getDestination(data.destAsset);
 
     const settings = await getSettings();
@@ -120,14 +121,14 @@ export const getOrder = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!order) return null;
-    const chain = getChain(order.source_chain);
+    const chain = await getMergedChain(order.source_chain);
 
     // For non-stable native sources (e.g. ETH), surface a live USD spot so
     // the UI can render an approximate "send ~X ETH" hint. Stables stay $1.
     let sourceSpotUsd: number | null = null;
     let sourceNativeAmount: number | null = null;
     try {
-      const token = getToken(order.source_chain as ChainKey, order.source_token);
+      const token = await getMergedToken(order.source_chain as ChainKey, order.source_token);
       if (isNativeToken(token) && token.bitmartSymbol) {
         sourceSpotUsd = await getSpotPrice(token.bitmartSymbol);
         if (sourceSpotUsd > 0) {
@@ -148,7 +149,8 @@ export const getOrder = createServerFn({ method: "POST" })
   });
 
 export const listChainOptions = createServerFn({ method: "GET" }).handler(async () => {
-  return Object.values(CHAINS).map((c) => ({
+  const merged = await getMergedChains();
+  return Object.values(merged).map((c) => ({
     key: c.key,
     name: c.name,
     nativeSymbol: c.nativeSymbol,
