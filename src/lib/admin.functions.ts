@@ -703,7 +703,11 @@ export const adminUpdateCustomToken = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => UpdateCustomTokenInput.parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
-    const patch: Record<string, unknown> = {};
+    const patch: {
+      enabled?: boolean;
+      decimals?: number;
+      bitmart_symbol?: string | null;
+    } = {};
     if (data.enabled !== undefined) patch.enabled = data.enabled;
     if (data.decimals !== undefined) patch.decimals = data.decimals;
     if (data.bitmartSymbol !== undefined) {
