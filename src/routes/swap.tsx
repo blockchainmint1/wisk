@@ -236,6 +236,18 @@ function SwapPage() {
                 </div>
               ) : null}
 
+              {!formValid && !error ? (
+                <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest px-1">
+                  {usdAmount < 10
+                    ? "Enter an amount of at least $10"
+                    : !addressValid
+                      ? `Enter a valid ${destConfig.label} recipient address`
+                      : !quote?.ok
+                        ? "Waiting for live quote…"
+                        : "Complete the form to continue"}
+                </div>
+              ) : null}
+
               <button
                 onClick={() => mutation.mutate()}
                 disabled={!formValid || mutation.isPending}
@@ -247,6 +259,7 @@ function SwapPage() {
               <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest text-center">
                 Quote valid for 15 minutes once you confirm. Minimum $10.
               </p>
+
             </div>
           </div>
         </div>
