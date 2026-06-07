@@ -11,7 +11,9 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SwapRouteImport } from './routes/swap'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as FaqRouteImport } from './routes/faq'
 import { Route as ChangeLogRouteImport } from './routes/change-log'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
@@ -29,9 +31,19 @@ const SwapRoute = SwapRouteImport.update({
   path: '/swap',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FaqRoute = FaqRouteImport.update({
+  id: '/faq',
+  path: '/faq',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChangeLogRoute = ChangeLogRouteImport.update({
@@ -69,7 +81,9 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/change-log': typeof ChangeLogRoute
+  '/faq': typeof FaqRoute
   '/privacy': typeof PrivacyRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/swap': typeof SwapRouteWithChildren
   '/terms': typeof TermsRoute
   '/swap/$orderId': typeof SwapOrderIdRoute
@@ -80,7 +94,9 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/change-log': typeof ChangeLogRoute
+  '/faq': typeof FaqRoute
   '/privacy': typeof PrivacyRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/swap/$orderId': typeof SwapOrderIdRoute
   '/swap': typeof SwapIndexRoute
@@ -91,7 +107,9 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/change-log': typeof ChangeLogRoute
+  '/faq': typeof FaqRoute
   '/privacy': typeof PrivacyRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/swap': typeof SwapRouteWithChildren
   '/terms': typeof TermsRoute
   '/swap/$orderId': typeof SwapOrderIdRoute
@@ -104,7 +122,9 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/change-log'
+    | '/faq'
     | '/privacy'
+    | '/sitemap.xml'
     | '/swap'
     | '/terms'
     | '/swap/$orderId'
@@ -115,7 +135,9 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/change-log'
+    | '/faq'
     | '/privacy'
+    | '/sitemap.xml'
     | '/terms'
     | '/swap/$orderId'
     | '/swap'
@@ -125,7 +147,9 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/change-log'
+    | '/faq'
     | '/privacy'
+    | '/sitemap.xml'
     | '/swap'
     | '/terms'
     | '/swap/$orderId'
@@ -137,7 +161,9 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   ChangeLogRoute: typeof ChangeLogRoute
+  FaqRoute: typeof FaqRoute
   PrivacyRoute: typeof PrivacyRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SwapRoute: typeof SwapRouteWithChildren
   TermsRoute: typeof TermsRoute
   ApiPublicHooksSwapTickRoute: typeof ApiPublicHooksSwapTickRoute
@@ -159,11 +185,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SwapRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/privacy': {
       id: '/privacy'
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/faq': {
+      id: '/faq'
+      path: '/faq'
+      fullPath: '/faq'
+      preLoaderRoute: typeof FaqRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/change-log': {
@@ -227,7 +267,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   ChangeLogRoute: ChangeLogRoute,
+  FaqRoute: FaqRoute,
   PrivacyRoute: PrivacyRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   SwapRoute: SwapRouteWithChildren,
   TermsRoute: TermsRoute,
   ApiPublicHooksSwapTickRoute: ApiPublicHooksSwapTickRoute,

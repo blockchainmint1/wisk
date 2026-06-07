@@ -5,16 +5,41 @@ import { SiteFooter, SiteHeader } from "@/components/site-shell";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "swapTXC — Swap stables for native TXC" },
+      { title: "swapTXC — Swap stables for native TXC, ISK$ or ZCU" },
       {
         name: "description",
         content:
-          "Exit to sovereignty. Swap USDC, USDT, pyUSD or any stable on Ethereum, Base, Arbitrum, Polygon, or BSC for native TXC, ISK or ZCU. Live Bitmart pricing, 5% protocol fee.",
+          "Exit to sovereignty. Swap USDC, USDT, pyUSD or any stable on Ethereum, Base, Arbitrum, Polygon, or BSC for native TXC, ISK$ or ZCU. Live Bitmart pricing, 5% protocol fee.",
       },
-      { property: "og:title", content: "swapTXC — Swap stables for native TXC" },
+      { property: "og:title", content: "swapTXC — Swap stables for native TXC, ISK$ or ZCU" },
       {
         property: "og:description",
-        content: "Stablecoins in. Sovereign TXC out. Live Bitmart liquidity, 5% protocol fee.",
+        content: "Stablecoins in. Sovereign TXC, ISK$ or ZCU out. Live Bitmart liquidity, 5% protocol fee.",
+      },
+      { property: "og:url", content: "https://swap.honest.money/" },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/6d467578-a8e3-4751-9ed9-116ee4f42bf3/id-preview-494c0a9a--9fa74c59-6726-48bb-a5bf-a6cc868c7787.lovable.app-1780819348498.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/6d467578-a8e3-4751-9ed9-116ee4f42bf3/id-preview-494c0a9a--9fa74c59-6726-48bb-a5bf-a6cc868c7787.lovable.app-1780819348498.png",
+      },
+    ],
+    links: [{ rel: "canonical", href: "https://swap.honest.money/" }],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          name: "swapTXC",
+          url: "https://swap.honest.money/",
+          description:
+            "Swap stablecoins on major EVM chains for native TXC, ISK$ or ZCU. Live Bitmart pricing, 5% protocol fee.",
+        }),
       },
     ],
   }),
@@ -68,8 +93,8 @@ function HomePage() {
                 </div>
                 <FlowRow num="01" title="Deposit Stable" detail="Send USDC, USDT, pyUSD or any stable to your unique address" />
                 <FlowRow num="02" title="Confirm On-Chain" detail="We wait for chain-specific confirmations" />
-                <FlowRow num="03" title="Bitmart Spot Buy" detail="Market buy TXC, ISK or ZCU at live price + 5%" />
-                <FlowRow num="04" title="Native Withdrawal" detail="Settled directly to your destination wallet" active />
+                <FlowRow num="03" title="Native Payout" detail="We pay you directly from our hot wallet at the locked quote" />
+                <FlowRow num="04" title="Treasury Refill" detail="We replenish our position on Bitmart in the background" active />
               </div>
             </div>
           </div>
