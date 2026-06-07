@@ -3,7 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { getBalances } from "./bitmart.server";
+import { getBalances, getSpotPrice, submitMarketBuy } from "./bitmart.server";
 import { getSettings, invalidateSettingsCache } from "./settings.server";
 import { scanHdWallet } from "./wallet-scan.server";
 
