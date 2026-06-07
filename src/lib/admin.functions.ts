@@ -3,7 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { getBalances } from "./bitmart.server";
+import { getBalances, getSpotPrice, submitMarketBuy } from "./bitmart.server";
 import { getSettings, invalidateSettingsCache } from "./settings.server";
 import { scanHdWallet } from "./wallet-scan.server";
 
@@ -400,5 +400,109 @@ export const adminTelegramTest = createServerFn({ method: "POST" })
       return { ok: true as const, chatId };
     } catch (e) {
       return { ok: false as const, error: e instanceof Error ? e.message : "Unknown" };
+    }
+  });
+
+// ===== Treasury debt (TXC sold vs TXC re-bought on Bitmart) =====
+// Tracks the running gap between TXC we've paid out to customers from the hot
+// wallet and TXC we've actually replenished via Bitmart. Small market buys can
+// be partially canceled when the unfilled remainder drops under Bitmart's
+// min notional (~5 USDT) — those tiny gaps accumulate here so we can square
+// up in one bulk buy at our convenience.
+export const adminTreasuryDebt = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context.userId);
+
+    // All TXC orders that went to the customer (completed) — the hot wallet
+    // already sent quoted_txc_out; bitmart_filled_txc is what we re-bought.
+    const { data: rows, error } = await supabaseAdmin
+      .from("orders")
+      .select("public_id,quoted_txc_out,bitmart_filled_txc,bitmart_avg_price,paid_amount_usd,created_at,status,bitmart_order_id")
+      .eq("dest_asset", "TXC")
+      .eq("status", "completed");
+    if (error) throw new Error(error.message);
+
+    let txcSold = 0;
+    let txcBought = 0;
+    let usdtSpent = 0;
+    let usdtTakenIn = 0;
+    let pendingBuys = 0;
+    const shortfalls: Array<{
+      public_id: string;
+      sold: number;
+      bought: number;
+      shortfall: number;
+      created_at: string;
+    }> = [];
+
+    for (const r of rows ?? []) {
+      const sold = Number(r.quoted_txc_out ?? 0);
+      const bought = Number(r.bitmart_filled_txc ?? 0);
+      const avg = Number(r.bitmart_avg_price ?? 0);
+      txcSold += sold;
+      txcBought += bought;
+      if (bought > 0 && avg > 0) usdtSpent += bought * avg;
+      usdtTakenIn += Number(r.paid_amount_usd ?? 0);
+      if (r.bitmart_order_id && r.bitmart_filled_txc == null) pendingBuys += 1;
+      const gap = sold - bought;
+      if (gap > 0.0001) {
+        shortfalls.push({
+          public_id: r.public_id,
+          sold,
+          bought,
+          shortfall: gap,
+          created_at: r.created_at,
+        });
+      }
+    }
+    shortfalls.sort((a, b) => b.shortfall - a.shortfall);
+
+    const txcDebt = Math.max(0, txcSold - txcBought);
+    let spotPrice = 0;
+    try {
+      spotPrice = await getSpotPrice("TXC_USDT");
+    } catch {
+      spotPrice = 0;
+    }
+    const estUsdtToSquareUp = spotPrice > 0 ? +(txcDebt * spotPrice * 1.01).toFixed(2) : 0;
+
+    return {
+      txcSold: +txcSold.toFixed(6),
+      txcBought: +txcBought.toFixed(6),
+      txcDebt: +txcDebt.toFixed(6),
+      usdtSpent: +usdtSpent.toFixed(2),
+      usdtTakenIn: +usdtTakenIn.toFixed(2),
+      orderCount: rows?.length ?? 0,
+      pendingBuys,
+      spotPrice,
+      estUsdtToSquareUp,
+      topShortfalls: shortfalls.slice(0, 10),
+    };
+  });
+
+// Place a standalone Bitmart market buy to clear the treasury debt.
+// Not tied to a specific order — pure treasury op, logged in admin_audit.
+export const adminBulkReplenish = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ notionalUsdt: z.number().min(5).max(5000) }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    try {
+      const { order_id } = await submitMarketBuy({ notionalUsdt: data.notionalUsdt });
+      await audit(context.userId, "treasury_bulk_replenish", {
+        notionalUsdt: data.notionalUsdt,
+        bitmart_order_id: order_id,
+      });
+      return { ok: true as const, bitmart_order_id: order_id };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Unknown";
+      await audit(context.userId, "treasury_bulk_replenish_failed", {
+        notionalUsdt: data.notionalUsdt,
+        error: msg,
+      });
+      return { ok: false as const, error: msg };
     }
   });
