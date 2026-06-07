@@ -15,6 +15,7 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ChangeLogRouteImport } from './routes/change-log'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SwapIndexRouteImport } from './routes/swap.index'
 import { Route as SwapOrderIdRouteImport } from './routes/swap.$orderId'
 import { Route as ApiPublicHooksSwapTickRouteImport } from './routes/api/public/hooks/swap-tick'
 
@@ -48,6 +49,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SwapIndexRoute = SwapIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SwapRoute,
+} as any)
 const SwapOrderIdRoute = SwapOrderIdRouteImport.update({
   id: '/$orderId',
   path: '/$orderId',
@@ -67,6 +73,7 @@ export interface FileRoutesByFullPath {
   '/swap': typeof SwapRouteWithChildren
   '/terms': typeof TermsRoute
   '/swap/$orderId': typeof SwapOrderIdRoute
+  '/swap/': typeof SwapIndexRoute
   '/api/public/hooks/swap-tick': typeof ApiPublicHooksSwapTickRoute
 }
 export interface FileRoutesByTo {
@@ -74,9 +81,9 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/change-log': typeof ChangeLogRoute
   '/privacy': typeof PrivacyRoute
-  '/swap': typeof SwapRouteWithChildren
   '/terms': typeof TermsRoute
   '/swap/$orderId': typeof SwapOrderIdRoute
+  '/swap': typeof SwapIndexRoute
   '/api/public/hooks/swap-tick': typeof ApiPublicHooksSwapTickRoute
 }
 export interface FileRoutesById {
@@ -88,6 +95,7 @@ export interface FileRoutesById {
   '/swap': typeof SwapRouteWithChildren
   '/terms': typeof TermsRoute
   '/swap/$orderId': typeof SwapOrderIdRoute
+  '/swap/': typeof SwapIndexRoute
   '/api/public/hooks/swap-tick': typeof ApiPublicHooksSwapTickRoute
 }
 export interface FileRouteTypes {
@@ -100,6 +108,7 @@ export interface FileRouteTypes {
     | '/swap'
     | '/terms'
     | '/swap/$orderId'
+    | '/swap/'
     | '/api/public/hooks/swap-tick'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -107,9 +116,9 @@ export interface FileRouteTypes {
     | '/admin'
     | '/change-log'
     | '/privacy'
-    | '/swap'
     | '/terms'
     | '/swap/$orderId'
+    | '/swap'
     | '/api/public/hooks/swap-tick'
   id:
     | '__root__'
@@ -120,6 +129,7 @@ export interface FileRouteTypes {
     | '/swap'
     | '/terms'
     | '/swap/$orderId'
+    | '/swap/'
     | '/api/public/hooks/swap-tick'
   fileRoutesById: FileRoutesById
 }
@@ -177,6 +187,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/swap/': {
+      id: '/swap/'
+      path: '/'
+      fullPath: '/swap/'
+      preLoaderRoute: typeof SwapIndexRouteImport
+      parentRoute: typeof SwapRoute
+    }
     '/swap/$orderId': {
       id: '/swap/$orderId'
       path: '/$orderId'
@@ -196,10 +213,12 @@ declare module '@tanstack/react-router' {
 
 interface SwapRouteChildren {
   SwapOrderIdRoute: typeof SwapOrderIdRoute
+  SwapIndexRoute: typeof SwapIndexRoute
 }
 
 const SwapRouteChildren: SwapRouteChildren = {
   SwapOrderIdRoute: SwapOrderIdRoute,
+  SwapIndexRoute: SwapIndexRoute,
 }
 
 const SwapRouteWithChildren = SwapRoute._addFileChildren(SwapRouteChildren)
