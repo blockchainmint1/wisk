@@ -580,6 +580,126 @@ function TreasuryTab() {
         </button>
       </div>
 
+      {/* Treasury debt — TXC sold vs TXC re-bought on Bitmart */}
+      {debt.data ? (
+        <div className="border border-border bg-secondary/30 rounded-xl p-5 space-y-4">
+          <div className="flex justify-between items-start gap-3 flex-wrap">
+            <div>
+              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                Treasury debt · TXC owed to hot wallet
+              </div>
+              <p className="text-[11px] font-mono text-muted-foreground mt-2 max-w-xl leading-relaxed">
+                Sum of TXC sent to customers minus TXC re-bought on Bitmart.
+                Small market buys can partially cancel when the remainder drops
+                under Bitmart's ~5 USDT minimum — those gaps land here.
+              </p>
+            </div>
+            <button
+              onClick={() => debt.refetch()}
+              className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-2 rounded hover:bg-foreground hover:text-background"
+            >
+              {debt.isFetching ? "…" : "Refresh"}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="bg-background/60 border border-border rounded-lg p-3">
+              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                TXC sold
+              </div>
+              <div className="font-mono text-xl mt-1">{debt.data.txcSold.toFixed(4)}</div>
+              <div className="text-[10px] font-mono text-muted-foreground">
+                {debt.data.orderCount} orders
+              </div>
+            </div>
+            <div className="bg-background/60 border border-border rounded-lg p-3">
+              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                TXC bought
+              </div>
+              <div className="font-mono text-xl mt-1">{debt.data.txcBought.toFixed(4)}</div>
+              <div className="text-[10px] font-mono text-muted-foreground">
+                ${debt.data.usdtSpent.toFixed(2)} spent
+              </div>
+            </div>
+            <div className="bg-accent/10 border border-accent/40 rounded-lg p-3">
+              <div className="text-[10px] font-mono uppercase tracking-widest text-accent">
+                Outstanding
+              </div>
+              <div className="font-mono text-xl mt-1">{debt.data.txcDebt.toFixed(4)} TXC</div>
+              <div className="text-[10px] font-mono text-muted-foreground">
+                ≈ ${debt.data.estUsdtToSquareUp.toFixed(2)} @ ${debt.data.spotPrice.toFixed(6)}
+              </div>
+            </div>
+            <div className="bg-background/60 border border-border rounded-lg p-3">
+              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                Customer USD in
+              </div>
+              <div className="font-mono text-xl mt-1">${debt.data.usdtTakenIn.toFixed(2)}</div>
+              <div className="text-[10px] font-mono text-muted-foreground">
+                {debt.data.pendingBuys} buys pending
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-end gap-2 flex-wrap pt-2 border-t border-border">
+            <div className="flex-1 min-w-[180px]">
+              <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                Square-up market buy (USDT)
+              </label>
+              <input
+                type="number"
+                min={5}
+                max={5000}
+                step={1}
+                value={bulkAmount}
+                onChange={(e) => setBulkAmount(e.target.value)}
+                placeholder={debt.data.estUsdtToSquareUp.toFixed(2)}
+                className="w-full mt-1 px-3 py-2 bg-background border border-border rounded font-mono text-sm"
+              />
+            </div>
+            <button
+              onClick={() => {
+                const n = parseFloat(bulkAmount || String(debt.data?.estUsdtToSquareUp ?? 0));
+                if (n >= 5) bulkBuy.mutate(n);
+              }}
+              disabled={bulkBuy.isPending}
+              className="text-[10px] font-mono uppercase tracking-widest border border-accent bg-accent/10 text-accent px-4 py-2 rounded hover:bg-accent hover:text-background disabled:opacity-50"
+            >
+              {bulkBuy.isPending ? "Submitting…" : "Buy TXC now"}
+            </button>
+          </div>
+          {bulkBuy.data?.ok === true ? (
+            <div className="text-[11px] font-mono text-foreground">
+              ✓ Bitmart order {bulkBuy.data.bitmart_order_id} submitted.
+            </div>
+          ) : null}
+          {bulkBuy.data?.ok === false ? (
+            <div className="text-[11px] font-mono text-accent">
+              ✗ {bulkBuy.data.error}
+            </div>
+          ) : null}
+
+          {debt.data.topShortfalls.length > 0 ? (
+            <details className="text-[11px] font-mono">
+              <summary className="cursor-pointer text-muted-foreground uppercase tracking-widest text-[10px]">
+                Top shortfalls ({debt.data.topShortfalls.length})
+              </summary>
+              <div className="mt-2 space-y-1">
+                {debt.data.topShortfalls.map((s) => (
+                  <div key={s.public_id} className="grid grid-cols-[1fr_auto_auto] gap-3">
+                    <span>{s.public_id}</span>
+                    <span className="text-muted-foreground">
+                      {s.bought.toFixed(4)} / {s.sold.toFixed(4)}
+                    </span>
+                    <span className="text-accent">-{s.shortfall.toFixed(4)}</span>
+                  </div>
+                ))}
+              </div>
+            </details>
+          ) : null}
+        </div>
+      ) : null}
+
       {scan.error ? (
         <div className="text-xs font-mono text-accent">
           {(scan.error as Error).message}
