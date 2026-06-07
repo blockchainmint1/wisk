@@ -162,7 +162,7 @@ function OrderPage() {
               ) : null}
               {order.txc_tx_hash ? (
                 <KV
-                  label="TXC Tx"
+                  label={`${destAsset} Tx`}
                   value={
                     <span className="text-success break-all">{order.txc_tx_hash}</span>
                   }
