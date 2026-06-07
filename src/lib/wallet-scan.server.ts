@@ -221,8 +221,9 @@ export async function scanHdWallet(opts: {
     for (const row of scan.rows) {
       const linked = orderByAddr.get(row.address);
       row.linkedOrderId = linked ? `${linked.public_id} (${linked.status})` : null;
-      // Only include rows with any non-zero balance — keeps payload small
-      if (row.native > 0 || row.totalUsd > 0) addresses.push(row);
+      // Keep zero-balance rows ONLY for the admin treasury (index 0); skip
+      // every other empty derived address to keep the payload small.
+      if (row.index === 0 || row.native > 0 || row.totalUsd > 0) addresses.push(row);
     }
   });
 
