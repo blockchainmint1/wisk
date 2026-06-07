@@ -13,9 +13,11 @@ bitcoin.initEccLib(ecc);
 const ECPair = ECPairFactory(ecc);
 
 // ===== Network params (TXC mainnet) =====
+// bech32 hrp is "txc" — segwit addresses look like txc1q…
+// Verified against live mempool.texitcoin.org v0_p2wpkh outputs.
 export const TXC_NETWORK: bitcoin.networks.Network = {
   messagePrefix: "\x19Texitcoin Signed Message:\n",
-  bech32: "", // legacy P2PKH only — no bech32 on TXC
+  bech32: "txc",
   bip32: { public: 0x0488b21e, private: 0x0488ade4 },
   pubKeyHash: 0x42, // base58 'T' prefix
   scriptHash: 0x32,
