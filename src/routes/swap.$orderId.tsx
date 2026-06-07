@@ -78,9 +78,11 @@ function OrderPage() {
     );
   }
 
+  const destAsset = order.dest_asset || "TXC";
+  const steps = makeSteps(destAsset);
   const stepIdx = Math.max(
     0,
-    STEPS.findIndex((s) => s.key === order.status),
+    steps.findIndex((s) => s.key === order.status),
   );
   const failed = order.status === "failed" || order.status === "expired";
 
@@ -102,7 +104,7 @@ function OrderPage() {
           {/* Steps */}
           <div className="md:col-span-3">
             <div className="relative space-y-10 pl-8 border-l border-border">
-              {STEPS.map((s, i) => {
+              {steps.map((s, i) => {
                 const done = i < stepIdx && !failed;
                 const active = i === stepIdx && !failed;
                 return (
@@ -141,7 +143,7 @@ function OrderPage() {
               <KV label="Sending" value={`$${Number(order.source_amount_usd).toFixed(2)}`} />
               <KV
                 label="Quote"
-                value={`${Number(order.quoted_txc_out).toFixed(4)} TXC @ $${Number(order.bitmart_spot_price).toFixed(6)}`}
+                value={`${Number(order.quoted_txc_out).toFixed(4)} ${destAsset} @ $${Number(order.bitmart_spot_price).toFixed(6)}`}
               />
               {order.paid_tx_hash ? (
                 <KV
