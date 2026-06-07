@@ -26,7 +26,8 @@ import {
   scanIncomingTransfers,
   weiToUsd,
 } from "@/lib/evm-scan.server";
-import { getChain, getToken, isNativeToken, type ChainKey } from "@/lib/chains";
+import { isNativeToken, type ChainKey } from "@/lib/chains";
+import { getMergedChain, getMergedToken } from "@/lib/chains.server";
 import { getDestination } from "@/lib/destinations";
 import { notifyOrderEvent, logOrderEvent } from "@/lib/telegram.server";
 import { sendTxc } from "@/lib/txc-sign.server";
@@ -107,20 +108,25 @@ async function watchDeposits() {
   let detected = 0;
   for (const [chainKey, group] of byChain) {
     try {
-      const chain = getChain(chainKey);
+      const chain = await getMergedChain(chainKey);
       const currentBlock = await getBlockNumber(chainKey);
       const fromBlock = chainStartScanBlock(chainKey, currentBlock);
 
+      // Resolve every order's token up-front so the inner loop stays sync.
+      const tokenByOrderId = new Map<string, Awaited<ReturnType<typeof getMergedToken>>>();
+      for (const o of group) {
+        tokenByOrderId.set(o.id, await getMergedToken(chainKey, o.source_token));
+      }
+
       // Split orders by source token kind. ERC-20 orders share a batched
       // contract-address filter; native (ETH) orders each scan external txs.
-      const erc20Orders = group.filter((o) => !isNativeToken(getToken(chainKey, o.source_token)));
-      const nativeOrders = group.filter((o) => isNativeToken(getToken(chainKey, o.source_token)));
+      const erc20Orders = group.filter((o) => !isNativeToken(tokenByOrderId.get(o.id)!));
       const tokenAddresses = Array.from(
-        new Set(erc20Orders.map((o) => getToken(chainKey, o.source_token).address)),
+        new Set(erc20Orders.map((o) => tokenByOrderId.get(o.id)!.address)),
       );
 
       for (const order of group) {
-        const orderToken = getToken(chainKey, order.source_token);
+        const orderToken = tokenByOrderId.get(order.id)!;
         const orderIsNative = isNativeToken(orderToken);
         const transfers = await scanIncomingTransfers({
           chain: chainKey,

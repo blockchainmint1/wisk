@@ -88,6 +88,48 @@ export type Database = {
         }
         Relationships: []
       }
+      custom_tokens: {
+        Row: {
+          address: string
+          bitmart_symbol: string | null
+          chain: string
+          created_at: string
+          created_by: string | null
+          decimals: number
+          enabled: boolean
+          id: string
+          is_native: boolean
+          symbol: string
+          updated_at: string
+        }
+        Insert: {
+          address: string
+          bitmart_symbol?: string | null
+          chain: string
+          created_at?: string
+          created_by?: string | null
+          decimals: number
+          enabled?: boolean
+          id?: string
+          is_native?: boolean
+          symbol: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string
+          bitmart_symbol?: string | null
+          chain?: string
+          created_at?: string
+          created_by?: string | null
+          decimals?: number
+          enabled?: boolean
+          id?: string
+          is_native?: boolean
+          symbol?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       deposits: {
         Row: {
           amount_usd: number
