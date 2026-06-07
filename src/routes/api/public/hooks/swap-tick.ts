@@ -57,14 +57,17 @@ async function failOrder(orderId: string, message: string) {
     .from("orders")
     .update({ status: "failed", error_message: message })
     .eq("id", orderId);
+  await notifyById("failed", orderId);
 }
 
 async function expireStale() {
-  await supabaseAdmin
+  const { data: expired } = await supabaseAdmin
     .from("orders")
     .update({ status: "expired" })
     .eq("status", "awaiting_payment")
-    .lt("expires_at", new Date().toISOString());
+    .lt("expires_at", new Date().toISOString())
+    .select("id");
+  for (const row of expired ?? []) await notifyById("expired", row.id);
 }
 
 async function watchDeposits() {
