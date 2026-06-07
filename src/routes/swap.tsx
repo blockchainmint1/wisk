@@ -17,12 +17,12 @@ export const Route = createFileRoute("/swap")({
       {
         name: "description",
         content:
-          "Quote and initiate your USDC/USDT/DAI → TXC or ISK$ swap. Live pricing, 5% protocol fee, unique deposit address per order.",
+          "Quote and initiate your stablecoin → TXC, ISK or ZCU swap. Live pricing, 5% protocol fee, unique deposit address per order.",
       },
       { property: "og:title", content: "Swap — SWAP" },
       {
         property: "og:description",
-        content: "Stablecoins in. Native TXC or ISK$ out. Live Bitmart pricing.",
+        content: "Stablecoins in. Native TXC, ISK or ZCU out. Live Bitmart pricing.",
       },
     ],
   }),

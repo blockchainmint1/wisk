@@ -9,7 +9,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Exit to sovereignty. Swap USDC, USDT, or DAI on Ethereum, Base, Arbitrum, Polygon, or BSC for native TEXITcoin. Live Bitmart pricing, 5% protocol fee.",
+          "Exit to sovereignty. Swap USDC, USDT, pyUSD or any stable on Ethereum, Base, Arbitrum, Polygon, or BSC for native TXC, ISK or ZCU. Live Bitmart pricing, 5% protocol fee.",
       },
       { property: "og:title", content: "TEXIT Runner — Swap stables for native TXC" },
       {
@@ -34,9 +34,9 @@ function HomePage() {
                 SOVEREIGNTY
               </span>
             </h1>
-            <p className="text-lg text-muted-foreground max-w-[42ch] font-medium leading-relaxed">
-              The bridge to native TEXITcoin. Send USDC, USDT, or DAI from any major EVM chain
-              and receive TXC at live Bitmart spot pricing — settled directly to your wallet.
+            <p className="text-lg text-muted-foreground max-w-[42ch] font-medium leading-relaxed text-balance">
+              The bridge to native TEXITcoin, Iskander Coin & Zero Chill Units. Send USDC, USDT, pyUSD or any stable from any major EVM chain
+              and receive TXC, ISK or ZCU at live Bitmart spot pricing — settled directly to your wallet.
             </p>
             <div className="flex gap-4">
               <Link
@@ -66,10 +66,10 @@ function HomePage() {
                 <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
                   Settlement Flow
                 </div>
-                <FlowRow num="01" title="Deposit Stable" detail="Send USDC/USDT/DAI to your unique deposit address" />
+                <FlowRow num="01" title="Deposit Stable" detail="Send USDC, USDT, pyUSD or any stable to your unique address" />
                 <FlowRow num="02" title="Confirm On-Chain" detail="We wait for chain-specific confirmations" />
-                <FlowRow num="03" title="Bitmart Spot Buy" detail="Market buy TXC at live price + 5%" />
-                <FlowRow num="04" title="Native Withdrawal" detail="TXC sent directly to your destination" active />
+                <FlowRow num="03" title="Bitmart Spot Buy" detail="Market buy TXC, ISK or ZCU at live price + 5%" />
+                <FlowRow num="04" title="Native Withdrawal" detail="Settled directly to your destination wallet" active />
               </div>
             </div>
           </div>
@@ -83,7 +83,7 @@ function HomePage() {
             <Principle
               n="01"
               title="One direction. Done well."
-              body="Stablecoins in, native TXC out. No bridges, no wrapped tokens, no liquidity pools to manage."
+              body="Stablecoins in, native TXC, ISK or ZCU out. No bridges, no wrapped tokens, no liquidity pools to manage."
             />
             <Principle
               n="02"
