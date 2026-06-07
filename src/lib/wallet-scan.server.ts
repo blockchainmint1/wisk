@@ -174,7 +174,13 @@ async function scanChain(
 }> {
   const start = Date.now();
   // Native pseudo-tokens have no contract; skip them for balanceOf calls.
-  const erc20Tokens = cfg.tokens.filter((t) => !isNativeToken(t));
+  // Also defensively skip anything whose `address` isn't a 0x-prefixed
+  // 40-hex string — Alchemy rejects the entire batch with "Invalid params"
+  // when even one eth_call has a non-address `to` field.
+  const ERC20_ADDR_RE = /^0x[0-9a-f]{40}$/;
+  const erc20Tokens = cfg.tokens.filter(
+    (t) => !isNativeToken(t) && ERC20_ADDR_RE.test(String(t.address).toLowerCase()),
+  );
 
   // Build one batched JSON-RPC payload for the entire chain:
   //   1× eth_blockNumber + N× eth_getBalance + N×T× eth_call (balanceOf)
