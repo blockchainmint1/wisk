@@ -185,7 +185,14 @@ function OrderPage() {
                 <KV
                   label={`${destAsset} Tx`}
                   value={
-                    <span className="text-success break-all">{order.txc_tx_hash}</span>
+                    <a
+                      className="text-success hover:underline break-all"
+                      href={`https://mempool.texitcoin.org/tx/${order.txc_tx_hash}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {order.txc_tx_hash.slice(0, 10)}…{order.txc_tx_hash.slice(-8)}
+                    </a>
                   }
                 />
               ) : null}
