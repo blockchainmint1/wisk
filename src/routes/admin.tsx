@@ -1477,7 +1477,15 @@ function TokensTab() {
   };
 
   const create = useMutation({
-    mutationFn: (data: Parameters<typeof createFn>[0]["data"]) => createFn({ data }),
+    mutationFn: (data: {
+      chain: TokenChain;
+      symbol: string;
+      address: string;
+      decimals: number;
+      isNative: boolean;
+      bitmartSymbol?: string;
+      enabled: boolean;
+    }) => createFn({ data }),
     onSuccess: invalidate,
   });
   const update = useMutation({
@@ -1667,14 +1675,5 @@ function TokensTab() {
         </table>
       </div>
     </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="space-y-1 block">
-      <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">{label}</span>
-      {children}
-    </label>
   );
 }
