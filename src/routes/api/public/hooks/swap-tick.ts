@@ -113,17 +113,34 @@ async function watchDeposits() {
             { onConflict: "chain,tx_hash,log_index" },
           );
 
+          // Sum all deposits for this order (handles multi-tx payments).
+          const { data: allDeposits } = await supabaseAdmin
+            .from("deposits")
+            .select("amount_usd")
+            .eq("order_id", order.id);
+          const totalPaidUsd = (allDeposits ?? []).reduce(
+            (sum, d) => sum + Number(d.amount_usd ?? 0),
+            0,
+          );
+
           if (order.status === "awaiting_payment") {
             await supabaseAdmin
               .from("orders")
               .update({
                 status: "payment_detected",
                 paid_tx_hash: t.txHash,
-                paid_amount_usd: usd,
+                paid_amount_usd: totalPaidUsd,
               })
               .eq("id", order.id);
             order.status = "payment_detected";
-            order.paid_amount_usd = usd;
+            order.paid_amount_usd = totalPaidUsd;
+          } else {
+            // Keep paid_amount_usd in sync as more transfers arrive.
+            await supabaseAdmin
+              .from("orders")
+              .update({ paid_amount_usd: totalPaidUsd })
+              .eq("id", order.id);
+            order.paid_amount_usd = totalPaidUsd;
           }
 
           if (
