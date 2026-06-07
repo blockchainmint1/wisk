@@ -229,9 +229,9 @@ export async function sendTxc(opts: {
     });
   }
 
-  psbt.addOutput({ address: opts.toAddress, value: amountSats });
+  psbt.addOutput({ address: opts.toAddress, value: BigInt(amountSats) });
   if (needsChange) {
-    psbt.addOutput({ script: fromScript, value: change });
+    psbt.addOutput({ script: fromScript, value: BigInt(change) });
   }
 
   // Sign all inputs
