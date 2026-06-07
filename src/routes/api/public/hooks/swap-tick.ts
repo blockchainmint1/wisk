@@ -1,13 +1,15 @@
 // Fulfillment cron tick — called by pg_cron every minute.
-// Customer flow (TXC):
+// Customer flow (TXC and ISK$):
 //   awaiting_payment → payment_detected → confirmed → sending → completed
-//   TXC is sent locally from our hot wallet using the quoted amount.
-//   Bitmart is NEVER on the critical path for TXC orders.
+//   Payout is signed + broadcast locally from our hot wallet using the
+//   quoted amount. Bitmart is NEVER on the critical path.
 // Treasury replenishment (background, decoupled):
-//   For completed TXC orders, submit a market buy on Bitmart to refill our
-//   wallet. The bitmart_order_id / bitmart_filled_txc columns track this but
-//   never gate customer payout.
-// ISK$ flow still goes through Bitmart buy → withdraw until local signing.
+//   For completed TXC/ISK$ orders, submit a market buy on Bitmart to refill
+//   our hot wallet. The bitmart_order_id / bitmart_filled_txc columns track
+//   this but never gate customer payout.
+// Legacy ISK$ Bitmart withdrawal path (settleIskWithdrawal / pollWithdrawals)
+// is retained only so in-flight orders from before the local-sign migration
+// can drain to `completed`.
 // Auth: route lives under /api/public/* which bypasses Lovable's site auth.
 
 import { createFileRoute } from "@tanstack/react-router";
