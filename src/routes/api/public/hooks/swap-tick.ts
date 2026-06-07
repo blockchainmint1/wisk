@@ -485,7 +485,7 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
         const result = {
           expired: 0,
           watch: { detected: 0 },
-          buy: { bought: 0 },
+          
           fills: { filled: 0 },
           settle: { sent: 0, queuedForBitmart: 0 },
           replenish: { submitted: 0 },
