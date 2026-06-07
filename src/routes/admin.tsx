@@ -273,6 +273,19 @@ function OrdersTab() {
                   key={o.public_id}
                   order={o}
                   onRetry={() => retry.mutate(o.public_id)}
+                  onForceComplete={() => {
+                    if (confirm(`Force ${o.public_id} back into the payout queue?`)) {
+                      forceComplete.mutate(o.public_id);
+                    }
+                  }}
+                  onForceFail={() => {
+                    const reason = prompt(
+                      `Mark ${o.public_id} as failed. Optional reason:`,
+                      "",
+                    );
+                    if (reason === null) return;
+                    forceFail.mutate({ publicId: o.public_id, reason: reason || undefined });
+                  }}
                 />
               ))}
             {!orders.data?.length && !orders.isLoading ? (
