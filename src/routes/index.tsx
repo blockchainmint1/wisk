@@ -68,8 +68,8 @@ function HomePage() {
                 </div>
                 <FlowRow num="01" title="Deposit Stable" detail="Send USDC, USDT, pyUSD or any stable to your unique address" />
                 <FlowRow num="02" title="Confirm On-Chain" detail="We wait for chain-specific confirmations" />
-                <FlowRow num="03" title="Bitmart Spot Buy" detail="Market buy TXC, ISK or ZCU at live price + 5%" />
-                <FlowRow num="04" title="Native Withdrawal" detail="Settled directly to your destination wallet" active />
+                <FlowRow num="03" title="Native Payout" detail="We pay you directly from our hot wallet at the locked quote" />
+                <FlowRow num="04" title="Treasury Refill" detail="We replenish our position on Bitmart in the background" active />
               </div>
             </div>
           </div>
