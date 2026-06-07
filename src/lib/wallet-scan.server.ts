@@ -43,6 +43,42 @@ async function rpcCall<T>(chain: ChainKey, method: string, params: unknown[]): P
   return json.result as T;
 }
 
+interface BatchCall {
+  method: string;
+  params: unknown[];
+}
+// JSON-RPC batch: single HTTP request for many calls. Massively reduces
+// request count on multi-address scans and avoids rate-limiting.
+async function rpcBatch(chain: ChainKey, calls: BatchCall[]): Promise<string[]> {
+  if (calls.length === 0) return [];
+  const body = calls.map((c) => ({
+    jsonrpc: "2.0",
+    id: ++rpcId,
+    method: c.method,
+    params: c.params,
+  }));
+  const res = await fetch(rpcUrl(chain), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`RPC ${chain} batch HTTP ${res.status}`);
+  const json = (await res.json()) as Array<{
+    id: number;
+    result?: string;
+    error?: { message: string };
+  }>;
+  // Re-order by request id since servers may return out of order
+  const byId = new Map<number, { result?: string; error?: { message: string } }>();
+  for (const r of json) byId.set(r.id, r);
+  return body.map((req) => {
+    const r = byId.get(req.id);
+    if (!r) throw new Error(`RPC ${chain} batch missing id ${req.id}`);
+    if (r.error) throw new Error(`RPC ${chain} ${req.method}: ${r.error.message}`);
+    return r.result ?? "0x0";
+  });
+}
+
 // ERC20 balanceOf selector
 function balanceOfData(addr: string): string {
   return "0x70a08231" + addr.toLowerCase().replace(/^0x/, "").padStart(64, "0");
