@@ -276,11 +276,14 @@ export async function scanHdWallet(opts: {
     orderByAddr.set(row.deposit_address, { public_id: row.public_id, status: row.status });
   }
 
+  // Resolve the merged chain config (static + admin tokens) once per scan.
+  const merged = await getMergedChains();
+
   // Scan chains sequentially to stay within Alchemy's per-second CU budget.
   // Parallel scans across 5 chains can spike CU usage and trigger 429s.
   const scans: Awaited<ReturnType<typeof scanChain>>[] = [];
   for (const c of chains) {
-    scans.push(await scanChain(c, indexes));
+    scans.push(await scanChain(c, indexes, merged[c]));
   }
 
   const addresses: AddressBalance[] = [];
@@ -289,7 +292,7 @@ export async function scanHdWallet(opts: {
 
   scans.forEach((scan, idx) => {
     const chain = chains[idx];
-    const cfg = CHAINS[chain];
+    const cfg = merged[chain];
     if (scan.error) errors.push(`${cfg.name}: ${scan.error}`);
     const totalNative = scan.rows.reduce((s, r) => s + r.native, 0);
     const totalStableUsd = scan.rows.reduce((s, r) => s + r.totalUsd, 0);
