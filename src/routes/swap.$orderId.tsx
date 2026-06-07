@@ -6,6 +6,7 @@ import QRCode from "qrcode";
 import { LiveTicker } from "@/components/live-ticker";
 import { SiteFooter, SiteHeader } from "@/components/site-shell";
 import { getOrder } from "@/lib/orders.functions";
+import { recordSwap } from "@/lib/swap-history";
 
 export const Route = createFileRoute("/swap/$orderId")({
   loader: ({ params }) => getOrder({ data: { publicId: params.orderId } }),
@@ -69,6 +70,16 @@ function OrderPage() {
       color: { dark: "#ffffff", light: "#00000000" },
     }).then(setQrUrl).catch(console.error);
   }, [order?.deposit_address]);
+
+  useEffect(() => {
+    if (!order?.public_id) return;
+    recordSwap({
+      publicId: order.public_id,
+      destAsset: order.dest_asset ?? "TXC",
+      sourceAmountUsd: Number(order.source_amount_usd ?? 0),
+      createdAt: order.created_at ?? new Date().toISOString(),
+    });
+  }, [order?.public_id, order?.dest_asset, order?.source_amount_usd, order?.created_at]);
 
   if (isPending) {
     return (

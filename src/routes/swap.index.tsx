@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
 import { LiveTicker } from "@/components/live-ticker";
 import { SiteFooter, SiteHeader } from "@/components/site-shell";
+import { SwapHistory } from "@/components/swap-history";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Wallet } from "lucide-react";
 import { DEST_ASSETS, DESTINATIONS, type DestAsset } from "@/lib/destinations";
@@ -265,6 +266,10 @@ function SwapPage() {
               </p>
             </div>
           </div>
+        </div>
+
+        <div className="mt-8">
+          <SwapHistory />
         </div>
       </main>
       <SiteFooter />
