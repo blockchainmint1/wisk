@@ -87,7 +87,7 @@ async function watchDeposits() {
   const { data: orders } = await supabaseAdmin
     .from("orders")
     .select(
-      "id,public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_txc_address,quoted_txc_out,expires_at,paid_amount_usd,bitmart_order_id,bitmart_filled_txc,withdrawal_id",
+      "id,public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_txc_address,quoted_txc_out,quoted_txc_per_usd,expires_at,paid_amount_usd,bitmart_order_id,bitmart_filled_txc,withdrawal_id",
     )
     .in("status", ["awaiting_payment", "payment_detected"])
     .returns<OrderRow[]>();
