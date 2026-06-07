@@ -54,6 +54,10 @@ export function SiteFooter() {
             <p className="text-success">Network Healthy</p>
             <p>Premium: 5.00%</p>
           </div>
+          <div className="space-y-2">
+            <p className="font-bold text-foreground">Project</p>
+            <Link to="/change-log" className="block hover:text-accent">Change Log</Link>
+          </div>
         </div>
       </div>
     </footer>
