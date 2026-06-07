@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.grant_admin_to_seed_emails() FROM PUBLIC, anon, authenticated;
