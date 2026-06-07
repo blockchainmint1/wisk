@@ -192,6 +192,8 @@ function OrdersTab() {
   const listFn = useServerFn(adminListOrders);
   const balFn = useServerFn(adminBitmartBalances);
   const retryFn = useServerFn(adminRetryOrder);
+  const forceCompleteFn = useServerFn(adminForceComplete);
+  const forceFailFn = useServerFn(adminForceFail);
 
   const [pageSize, setPageSize] = useState<10 | 25 | 50>(25);
   const [page, setPage] = useState(0);
@@ -208,6 +210,15 @@ function OrdersTab() {
   });
   const retry = useMutation({
     mutationFn: (publicId: string) => retryFn({ data: { publicId } }),
+    onSuccess: () => orders.refetch(),
+  });
+  const forceComplete = useMutation({
+    mutationFn: (publicId: string) => forceCompleteFn({ data: { publicId } }),
+    onSuccess: () => orders.refetch(),
+  });
+  const forceFail = useMutation({
+    mutationFn: (vars: { publicId: string; reason?: string }) =>
+      forceFailFn({ data: vars }),
     onSuccess: () => orders.refetch(),
   });
 
