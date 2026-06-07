@@ -290,16 +290,16 @@ async function settleConfirmed() {
 
 /**
  * Treasury replenishment — runs AFTER the customer is paid.
- * For each completed TXC order that has not yet had a Bitmart buy submitted,
- * submit a market buy to refill our hot wallet. This is best-effort: failures
- * here do NOT affect the customer order, they just log and retry next tick.
+ * For each completed TXC or ISK$ order that has not yet had a Bitmart buy
+ * submitted, submit a market buy to refill our hot wallet. This is
+ * best-effort: failures here do NOT affect the customer order, they just
+ * log and retry next tick.
  */
 async function replenishTreasury() {
   const { data: orders } = await supabaseAdmin
     .from("orders")
     .select("id,public_id,paid_amount_usd,dest_asset")
     .eq("status", "completed")
-    .eq("dest_asset", "TXC")
     .is("bitmart_order_id", null)
     .not("paid_amount_usd", "is", null)
     .limit(10)
