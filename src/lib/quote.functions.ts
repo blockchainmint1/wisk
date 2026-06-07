@@ -1,28 +1,38 @@
 // Public quote endpoint: current Bitmart spot price + configurable premium.
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { getTxcSpotPrice } from "./bitmart.server";
+import { getSpotPrice } from "./bitmart.server";
+import { DEST_ASSETS, getDestination, type DestAsset } from "./destinations";
 import { getSettings } from "./settings.server";
 
 const QuoteInput = z.object({
   usdAmount: z.number().positive().max(1_000_000),
+  destAsset: z.enum(DEST_ASSETS as [DestAsset, ...DestAsset[]]).default("TXC"),
 });
 
 export const getQuote = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => QuoteInput.parse(input))
   .handler(async ({ data }) => {
     try {
-      const [spot, settings] = await Promise.all([getTxcSpotPrice(), getSettings()]);
+      const dest = getDestination(data.destAsset);
+      const [spot, settings] = await Promise.all([
+        getSpotPrice(dest.bitmartSymbol),
+        getSettings(),
+      ]);
       const premiumMultiplier = 1 + settings.premium_bps / 10_000;
       const effectivePrice = spot * premiumMultiplier;
-      const txcOut = data.usdAmount / effectivePrice;
+      const assetOut = data.usdAmount / effectivePrice;
       return {
         ok: true as const,
+        destAsset: dest.key,
         spotPriceUsd: spot,
         premiumBps: settings.premium_bps,
         effectivePriceUsd: effectivePrice,
+        assetPerUsd: 1 / effectivePrice,
+        assetOut,
+        // Back-compat fields for any old caller still reading `txc*`.
         txcPerUsd: 1 / effectivePrice,
-        txcOut,
+        txcOut: assetOut,
         minUsd: settings.min_usd,
         maxUsd: settings.max_usd,
         paused: settings.paused,

@@ -2,29 +2,40 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { getTxcSpotPrice } from "./bitmart.server";
+import { getSpotPrice } from "./bitmart.server";
 import { CHAINS, getChain, getToken, type ChainKey } from "./chains";
+import { DEST_ASSETS, getDestination, type DestAsset } from "./destinations";
 import { deriveDepositAddress } from "./hd.server";
 import { getSettings } from "./settings.server";
 import { notifyOrderEvent } from "./telegram.server";
 
-const CreateInput = z.object({
-  sourceChain: z.enum(["ethereum", "base", "arbitrum", "polygon", "bsc"]),
-  sourceToken: z.enum(["USDC", "USDT", "DAI"]),
-  usdAmount: z.number().positive().max(1_000_000),
-  destTxcAddress: z
-    .string()
-    .trim()
-    .min(20)
-    .max(120)
-    .regex(/^[A-Za-z0-9]+$/, "Invalid TXC address"),
-});
+const CreateInput = z
+  .object({
+    sourceChain: z.enum(["ethereum", "base", "arbitrum", "polygon", "bsc"]),
+    sourceToken: z.enum(["USDC", "USDT", "DAI"]),
+    usdAmount: z.number().positive().max(1_000_000),
+    destAsset: z
+      .enum(DEST_ASSETS as [DestAsset, ...DestAsset[]])
+      .default("TXC"),
+    destAddress: z.string().trim().min(20).max(120),
+  })
+  .superRefine((data, ctx) => {
+    const dest = getDestination(data.destAsset);
+    if (!dest.addressRegex.test(data.destAddress)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["destAddress"],
+        message: `Invalid ${dest.label} address`,
+      });
+    }
+  });
 
 export const createOrder = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => CreateInput.parse(input))
   .handler(async ({ data }) => {
     // Validate chain/token pairing
     getToken(data.sourceChain as ChainKey, data.sourceToken);
+    const dest = getDestination(data.destAsset);
 
     const settings = await getSettings();
     if (settings.paused) {
@@ -41,11 +52,11 @@ export const createOrder = createServerFn({ method: "POST" })
     }
 
     // Lock the quote at creation time
-    const spot = await getTxcSpotPrice();
+    const spot = await getSpotPrice(dest.bitmartSymbol);
     const premiumMultiplier = 1 + settings.premium_bps / 10_000;
     const effectivePrice = spot * premiumMultiplier;
-    const txcOut = data.usdAmount / effectivePrice;
-    const txcPerUsd = 1 / effectivePrice;
+    const assetOut = data.usdAmount / effectivePrice;
+    const assetPerUsd = 1 / effectivePrice;
 
     // Allocate next HD address
     const { data: idxData, error: idxErr } = await supabaseAdmin.rpc("next_hd_index");
@@ -64,9 +75,10 @@ export const createOrder = createServerFn({ method: "POST" })
         source_amount_usd: data.usdAmount,
         deposit_address: depositAddress.toLowerCase(),
         deposit_index: idxData,
-        dest_txc_address: data.destTxcAddress,
-        quoted_txc_per_usd: txcPerUsd,
-        quoted_txc_out: txcOut,
+        dest_asset: dest.key,
+        dest_txc_address: data.destAddress,
+        quoted_txc_per_usd: assetPerUsd,
+        quoted_txc_out: assetOut,
         premium_bps: settings.premium_bps,
         bitmart_spot_price: spot,
         expires_at: expiresAt,
@@ -83,8 +95,9 @@ export const createOrder = createServerFn({ method: "POST" })
         source_chain: data.sourceChain,
         source_token: data.sourceToken,
         source_amount_usd: data.usdAmount,
-        quoted_txc_out: txcOut,
-        dest_txc_address: data.destTxcAddress,
+        quoted_txc_out: assetOut,
+        dest_txc_address: data.destAddress,
+        dest_asset: dest.key,
       });
     }
 
@@ -99,7 +112,7 @@ export const getOrder = createServerFn({ method: "POST" })
     const { data: order, error } = await supabaseAdmin
       .from("orders")
       .select(
-        "public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_txc_address,quoted_txc_out,quoted_txc_per_usd,premium_bps,bitmart_spot_price,created_at,expires_at,paid_tx_hash,paid_amount_usd,bitmart_avg_price,bitmart_filled_txc,txc_tx_hash,error_message",
+        "public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_asset,dest_txc_address,quoted_txc_out,quoted_txc_per_usd,premium_bps,bitmart_spot_price,created_at,expires_at,paid_tx_hash,paid_amount_usd,bitmart_avg_price,bitmart_filled_txc,txc_tx_hash,error_message",
       )
       .eq("public_id", data.publicId)
       .maybeSingle();
