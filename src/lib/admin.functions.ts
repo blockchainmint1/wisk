@@ -25,7 +25,7 @@ async function audit(
   await supabaseAdmin.from("admin_audit").insert({
     actor_user_id: actorUserId,
     action,
-    details,
+    details: details as never,
     order_id: orderId ?? null,
   });
 }
