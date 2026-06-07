@@ -152,6 +152,7 @@ async function watchDeposits() {
               .eq("id", order.id);
             order.status = "payment_detected";
             order.paid_amount_usd = totalPaidUsd;
+            await notifyById("payment_detected", order.id);
           } else {
             // Keep paid_amount_usd in sync as more transfers arrive.
             await supabaseAdmin
