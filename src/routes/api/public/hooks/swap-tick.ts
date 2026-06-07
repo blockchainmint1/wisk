@@ -1,10 +1,15 @@
 // Fulfillment cron tick — called by pg_cron every minute.
-// 1) Watch awaiting orders for deposit confirmation
-// 2) Buy TXC/ISK$ on Bitmart for confirmed orders
-// 3a) TXC orders: send locally from our hot wallet (cheaper than Bitmart withdraw)
-// 3b) ISK$ orders: still go through Bitmart withdrawal (local signing TBD)
-// Auth: pg_cron uses Supabase publishable key in `apikey` header. Route lives
-// under /api/public/* which bypasses Lovable's site auth.
+// Customer flow (TXC):
+//   awaiting_payment → payment_detected → confirmed → sending → completed
+//   TXC is sent locally from our hot wallet using the quoted amount.
+//   Bitmart is NEVER on the critical path for TXC orders.
+// Treasury replenishment (background, decoupled):
+//   For completed TXC orders, submit a market buy on Bitmart to refill our
+//   wallet. The bitmart_order_id / bitmart_filled_txc columns track this but
+//   never gate customer payout.
+// ISK$ flow still goes through Bitmart buy → withdraw until local signing.
+// Auth: route lives under /api/public/* which bypasses Lovable's site auth.
+
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
@@ -189,136 +194,44 @@ async function watchDeposits() {
   return { detected };
 }
 
-async function buyOnBitmart() {
+/**
+ * For confirmed orders, pay the customer IMMEDIATELY.
+ * - TXC: sign + broadcast locally using the quoted amount.
+ * - ISK$: still flows through Bitmart (buyOnBitmartForIskOrders + withdraw).
+ */
+async function settleConfirmed() {
   const { data: orders } = await supabaseAdmin
     .from("orders")
-    .select("id,public_id,paid_amount_usd,quoted_txc_out,dest_asset")
+    .select("id,public_id,quoted_txc_out,dest_txc_address,dest_asset,paid_amount_usd")
     .eq("status", "confirmed")
     .limit(10)
     .returns<
       Array<{
         id: string;
         public_id: string;
-        paid_amount_usd: number | null;
         quoted_txc_out: number;
-        dest_asset: string;
-      }>
-    >();
-  if (!orders?.length) return { bought: 0 };
-
-  let bought = 0;
-  for (const o of orders) {
-    try {
-      const notional = o.paid_amount_usd ?? 0;
-      if (notional <= 0) {
-        await failOrder(o.id, "Missing paid amount");
-        continue;
-      }
-      const dest = getDestination(o.dest_asset);
-      const buyNotional = +(notional / 1.05).toFixed(2);
-      await supabaseAdmin
-        .from("orders")
-        .update({ status: "buying_on_bitmart" })
-        .eq("id", o.id);
-      await logOrderEvent(o.id, "state", "buying_on_bitmart", {
-        notional: buyNotional,
-        symbol: dest.bitmartSymbol,
-      });
-      const { order_id } = await submitMarketBuy({
-        symbol: dest.bitmartSymbol,
-        notionalUsdt: buyNotional,
-      });
-      await supabaseAdmin
-        .from("orders")
-        .update({ bitmart_order_id: order_id })
-        .eq("id", o.id);
-      await logOrderEvent(o.id, "bitmart", "buy_submitted", {
-        bitmart_order_id: order_id,
-        notional: buyNotional,
-      });
-      bought += 1;
-    } catch (e) {
-      await failOrder(o.id, e instanceof Error ? e.message : "Bitmart buy failed");
-    }
-  }
-  return { bought };
-}
-
-async function pollBitmartFills() {
-  const { data: orders } = await supabaseAdmin
-    .from("orders")
-    .select("id,bitmart_order_id")
-    .eq("status", "buying_on_bitmart")
-    .not("bitmart_order_id", "is", null)
-    .returns<Array<{ id: string; bitmart_order_id: string }>>();
-  if (!orders?.length) return { filled: 0 };
-
-  let filled = 0;
-  for (const o of orders) {
-    try {
-      const detail = await getOrderDetail(o.bitmart_order_id);
-      if (detail.state === "filled") {
-        const txcAmount = Number.parseFloat(detail.filled_size);
-        const avgPrice = Number.parseFloat(detail.price_avg);
-        await supabaseAdmin
-          .from("orders")
-          .update({
-            status: "bought",
-            bitmart_filled_txc: txcAmount,
-            bitmart_avg_price: avgPrice,
-          })
-          .eq("id", o.id);
-        await logOrderEvent(o.id, "bitmart", "filled", {
-          filled: txcAmount,
-          avg_price: avgPrice,
-        });
-        await notifyById("bitmart_filled", o.id);
-        filled += 1;
-      } else if (detail.state === "canceled") {
-        await failOrder(o.id, "Bitmart order canceled");
-      }
-    } catch (e) {
-      console.error("[poll-fill]", o.bitmart_order_id, e);
-    }
-  }
-  return { filled };
-}
-
-/**
- * Pay out completed Bitmart buys to the customer.
- * - TXC: sign + broadcast locally (skip Bitmart withdrawal entirely).
- * - ISK$: still uses Bitmart withdrawal until local signing is wired.
- */
-async function settleBought() {
-  const { data: orders } = await supabaseAdmin
-    .from("orders")
-    .select("id,bitmart_filled_txc,dest_txc_address,dest_asset")
-    .eq("status", "bought")
-    .returns<
-      Array<{
-        id: string;
-        bitmart_filled_txc: number;
         dest_txc_address: string;
         dest_asset: string;
+        paid_amount_usd: number | null;
       }>
     >();
-  if (!orders?.length) return { settled: 0, withdrawing: 0 };
+  if (!orders?.length) return { sent: 0, queuedForBitmart: 0 };
 
-  let settled = 0;
-  let withdrawing = 0;
+  let sent = 0;
+  let queuedForBitmart = 0;
 
   for (const o of orders) {
     const asset = o.dest_asset || "TXC";
     try {
       if (asset === "TXC") {
-        // Local signing path
+        // ---- Pay customer locally, no Bitmart dependency ----
         await supabaseAdmin.from("orders").update({ status: "sending" }).eq("id", o.id);
-        await logOrderEvent(o.id, "state", "sending", { asset });
+        await logOrderEvent(o.id, "state", "sending", { asset, amount: o.quoted_txc_out });
         await notifyById("sending", o.id);
 
         const result = await sendTxc({
           toAddress: o.dest_txc_address,
-          amountTxc: Number(o.bitmart_filled_txc),
+          amountTxc: Number(o.quoted_txc_out),
         });
 
         await supabaseAdmin
@@ -332,27 +245,206 @@ async function settleBought() {
           .eq("id", o.id);
         await logOrderEvent(o.id, "payout", "sent", { ...result });
         await notifyById("completed", o.id);
-        settled += 1;
+        sent += 1;
       } else {
-        // ISK$ — Bitmart withdraw fallback
+        // ISK$ — still goes through Bitmart buy → withdraw
         const dest = getDestination(asset);
-        await supabaseAdmin.from("orders").update({ status: "withdrawing" }).eq("id", o.id);
-        const { withdraw_id } = await submitWithdrawal({
-          currency: dest.bitmartCurrency,
-          network: dest.bitmartNetwork,
-          amount: o.bitmart_filled_txc,
-          address: o.dest_txc_address,
+        const notional = o.paid_amount_usd ?? 0;
+        if (notional <= 0) {
+          await failOrder(o.id, "Missing paid amount");
+          continue;
+        }
+        const buyNotional = +(notional / 1.05).toFixed(2);
+        await supabaseAdmin
+          .from("orders")
+          .update({ status: "buying_on_bitmart" })
+          .eq("id", o.id);
+        await logOrderEvent(o.id, "state", "buying_on_bitmart", {
+          notional: buyNotional,
+          symbol: dest.bitmartSymbol,
         });
-        await supabaseAdmin.from("orders").update({ withdrawal_id: withdraw_id }).eq("id", o.id);
-        await logOrderEvent(o.id, "bitmart", "withdraw_submitted", { withdraw_id });
-        withdrawing += 1;
+        const { order_id } = await submitMarketBuy({
+          symbol: dest.bitmartSymbol,
+          notionalUsdt: buyNotional,
+        });
+        await supabaseAdmin
+          .from("orders")
+          .update({ bitmart_order_id: order_id })
+          .eq("id", o.id);
+        await logOrderEvent(o.id, "bitmart", "buy_submitted", {
+          bitmart_order_id: order_id,
+          notional: buyNotional,
+        });
+        queuedForBitmart += 1;
       }
     } catch (e) {
       await failOrder(o.id, e instanceof Error ? e.message : "Settlement failed");
     }
   }
-  return { settled, withdrawing };
+  return { sent, queuedForBitmart };
 }
+
+/**
+ * Treasury replenishment — runs AFTER the customer is paid.
+ * For each completed TXC order that has not yet had a Bitmart buy submitted,
+ * submit a market buy to refill our hot wallet. This is best-effort: failures
+ * here do NOT affect the customer order, they just log and retry next tick.
+ */
+async function replenishTreasury() {
+  const { data: orders } = await supabaseAdmin
+    .from("orders")
+    .select("id,public_id,paid_amount_usd,dest_asset")
+    .eq("status", "completed")
+    .eq("dest_asset", "TXC")
+    .is("bitmart_order_id", null)
+    .not("paid_amount_usd", "is", null)
+    .limit(10)
+    .returns<
+      Array<{
+        id: string;
+        public_id: string;
+        paid_amount_usd: number;
+        dest_asset: string;
+      }>
+    >();
+  if (!orders?.length) return { submitted: 0 };
+
+  let submitted = 0;
+  for (const o of orders) {
+    try {
+      const dest = getDestination(o.dest_asset);
+      const buyNotional = +(Number(o.paid_amount_usd) / 1.05).toFixed(2);
+      if (buyNotional <= 0) continue;
+      const { order_id } = await submitMarketBuy({
+        symbol: dest.bitmartSymbol,
+        notionalUsdt: buyNotional,
+      });
+      await supabaseAdmin
+        .from("orders")
+        .update({ bitmart_order_id: order_id })
+        .eq("id", o.id);
+      await logOrderEvent(o.id, "bitmart", "replenish_submitted", {
+        bitmart_order_id: order_id,
+        notional: buyNotional,
+      });
+      submitted += 1;
+    } catch (e) {
+      // Non-fatal: customer is already paid. Log and continue.
+      console.error("[replenish]", o.public_id, e);
+      await logOrderEvent(o.id, "bitmart", "replenish_error", {
+        message: e instanceof Error ? e.message : "submit failed",
+      });
+    }
+  }
+  return { submitted };
+}
+
+/**
+ * Poll Bitmart fills for ANY order with a bitmart_order_id and no recorded
+ * fill yet. Updates bookkeeping (bitmart_filled_txc, bitmart_avg_price) but
+ * does NOT change customer-facing status for TXC orders (already completed).
+ * For ISK$ orders still in buying_on_bitmart, advances to `bought` so the
+ * withdrawal step picks them up.
+ */
+async function pollBitmartFillsDecoupled() {
+  const { data: orders } = await supabaseAdmin
+    .from("orders")
+    .select("id,status,bitmart_order_id,bitmart_filled_txc,dest_asset")
+    .not("bitmart_order_id", "is", null)
+    .is("bitmart_filled_txc", null)
+    .limit(20)
+    .returns<
+      Array<{
+        id: string;
+        status: string;
+        bitmart_order_id: string;
+        bitmart_filled_txc: number | null;
+        dest_asset: string;
+      }>
+    >();
+  if (!orders?.length) return { filled: 0 };
+
+  let filled = 0;
+  for (const o of orders) {
+    try {
+      const detail = await getOrderDetail(o.bitmart_order_id);
+      if (detail.state === "filled") {
+        const txcAmount = Number.parseFloat(detail.filled_size);
+        const avgPrice = Number.parseFloat(detail.price_avg);
+        const update: {
+          bitmart_filled_txc: number;
+          bitmart_avg_price: number;
+          status?: "bought";
+        } = {
+          bitmart_filled_txc: txcAmount,
+          bitmart_avg_price: avgPrice,
+        };
+        // ISK$ flow: advance to `bought` so withdrawal step takes over.
+        if (o.status === "buying_on_bitmart" && o.dest_asset !== "TXC") {
+          update.status = "bought";
+        }
+        await supabaseAdmin.from("orders").update(update).eq("id", o.id);
+        await logOrderEvent(o.id, "bitmart", "filled", {
+          filled: txcAmount,
+          avg_price: avgPrice,
+        });
+        filled += 1;
+      } else if (detail.state === "canceled") {
+        await logOrderEvent(o.id, "bitmart", "canceled", {});
+        // For TXC orders this is just a treasury hiccup, not a customer fail.
+        // For ISK$ in buying state, mark failed (customer still owed).
+        if (o.status === "buying_on_bitmart" && o.dest_asset !== "TXC") {
+          await failOrder(o.id, "Bitmart order canceled");
+        }
+      }
+    } catch (e) {
+      console.error("[poll-fill]", o.bitmart_order_id, e);
+    }
+  }
+  return { filled };
+}
+
+/**
+ * ISK$ withdrawal path — for orders that completed a Bitmart buy and need
+ * a withdrawal to the customer's address.
+ */
+async function settleIskWithdrawal() {
+  const { data: orders } = await supabaseAdmin
+    .from("orders")
+    .select("id,bitmart_filled_txc,dest_txc_address,dest_asset")
+    .eq("status", "bought")
+    .neq("dest_asset", "TXC")
+    .returns<
+      Array<{
+        id: string;
+        bitmart_filled_txc: number;
+        dest_txc_address: string;
+        dest_asset: string;
+      }>
+    >();
+  if (!orders?.length) return { withdrawing: 0 };
+
+  let withdrawing = 0;
+  for (const o of orders) {
+    try {
+      const dest = getDestination(o.dest_asset);
+      await supabaseAdmin.from("orders").update({ status: "withdrawing" }).eq("id", o.id);
+      const { withdraw_id } = await submitWithdrawal({
+        currency: dest.bitmartCurrency,
+        network: dest.bitmartNetwork,
+        amount: o.bitmart_filled_txc,
+        address: o.dest_txc_address,
+      });
+      await supabaseAdmin.from("orders").update({ withdrawal_id: withdraw_id }).eq("id", o.id);
+      await logOrderEvent(o.id, "bitmart", "withdraw_submitted", { withdraw_id });
+      withdrawing += 1;
+    } catch (e) {
+      await failOrder(o.id, e instanceof Error ? e.message : "Withdrawal failed");
+    }
+  }
+  return { withdrawing };
+}
+
 
 async function pollWithdrawals() {
   const { data: orders } = await supabaseAdmin
@@ -393,18 +485,25 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
         const result = {
           expired: 0,
           watch: { detected: 0 },
-          buy: { bought: 0 },
+          
           fills: { filled: 0 },
-          settle: { settled: 0, withdrawing: 0 },
+          settle: { sent: 0, queuedForBitmart: 0 },
+          replenish: { submitted: 0 },
+          isk: { withdrawing: 0 },
           polls: { completed: 0 },
           ms: 0,
         };
         try {
           await expireStale();
           result.watch = await watchDeposits();
-          result.buy = await buyOnBitmart();
-          result.fills = await pollBitmartFills();
-          result.settle = await settleBought();
+          // Pay customer FIRST — never block on Bitmart for TXC orders.
+          result.settle = await settleConfirmed();
+          // Treasury replenishment runs after customer payout, in background.
+          result.replenish = await replenishTreasury();
+          // Bookkeeping for any open Bitmart orders (decoupled from customer).
+          result.fills = await pollBitmartFillsDecoupled();
+          // ISK$ continues through Bitmart withdrawal.
+          result.isk = await settleIskWithdrawal();
           result.polls = await pollWithdrawals();
         } catch (e) {
           console.error("[swap-tick] fatal", e);
