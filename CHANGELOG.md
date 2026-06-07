@@ -4,6 +4,18 @@ All notable changes to this project. Newest entries on top. Dates are UTC.
 
 ## 2026-06-07
 
+- **Telegram notifications for order lifecycle.** Sends messages to a single
+  admin chat (`TELEGRAM_CHAT_ID`) on: order created, deposit detected, deposit
+  confirmed, Bitmart buy filled, completed, failed, and expired. Uses the
+  Lovable Telegram connector gateway — no raw bot token in the codebase.
+  Notifications are best-effort; failures are logged but never break
+  fulfillment.
+  - Files: `src/lib/telegram.server.ts` (new),
+    `src/lib/orders.functions.ts`,
+    `src/routes/api/public/hooks/swap-tick.ts`
+
+
+
 - **Swap fulfillment: buy on actual deposited amount.** The Bitmart market buy
   now uses the summed USD of all on-chain deposits for the order (supports
   multi-transaction payments), not the quoted/intended amount. `paid_amount_usd`
