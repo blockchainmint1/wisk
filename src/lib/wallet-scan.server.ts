@@ -273,8 +273,12 @@ export async function scanHdWallet(opts: {
     orderByAddr.set(row.deposit_address, { public_id: row.public_id, status: row.status });
   }
 
-  // Scan each chain in parallel
-  const scans = await Promise.all(chains.map((c) => scanChain(c, indexes)));
+  // Scan chains sequentially to stay within Alchemy's per-second CU budget.
+  // Parallel scans across 5 chains can spike CU usage and trigger 429s.
+  const scans: Awaited<ReturnType<typeof scanChain>>[] = [];
+  for (const c of chains) {
+    scans.push(await scanChain(c, indexes));
+  }
 
   const addresses: AddressBalance[] = [];
   const chainSummaries: WalletScanResult["chains"] = [];
