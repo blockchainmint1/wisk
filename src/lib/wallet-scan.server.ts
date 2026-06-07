@@ -165,21 +165,23 @@ const NATIVE_SYMBOL: Record<ChainKey, string> = {
 async function scanChain(
   chain: ChainKey,
   addresses: Array<{ index: number; address: string }>,
+  cfg: (typeof CHAINS)[ChainKey],
 ): Promise<{
   blockNumber: number | null;
   latencyMs: number | null;
   error: string | null;
   rows: AddressBalance[];
 }> {
-  const cfg = CHAINS[chain];
   const start = Date.now();
+  // Native pseudo-tokens have no contract; skip them for balanceOf calls.
+  const erc20Tokens = cfg.tokens.filter((t) => !isNativeToken(t));
 
   // Build one batched JSON-RPC payload for the entire chain:
   //   1× eth_blockNumber + N× eth_getBalance + N×T× eth_call (balanceOf)
   const calls: BatchCall[] = [{ method: "eth_blockNumber", params: [] }];
   for (const { address } of addresses) {
     calls.push({ method: "eth_getBalance", params: [address, "latest"] });
-    for (const t of cfg.tokens) {
+    for (const t of erc20Tokens) {
       calls.push({
         method: "eth_call",
         params: [{ to: t.address, data: balanceOfData(address) }, "latest"],
@@ -200,14 +202,14 @@ async function scanChain(
   }
 
   const blockNumber = Number.parseInt(results[0] ?? "0x0", 16);
-  const perAddrCount = 1 + cfg.tokens.length;
+  const perAddrCount = 1 + erc20Tokens.length;
   const rows: AddressBalance[] = [];
   addresses.forEach(({ index, address }, i) => {
     const base = 1 + i * perAddrCount;
     const nativeHex = results[base] ?? "0x0";
     const tokenHexes = results.slice(base + 1, base + perAddrCount);
     const native = fmtUnits(hexToBig(nativeHex), 18);
-    const tokens = cfg.tokens.map((t, j) => ({
+    const tokens = erc20Tokens.map((t, j) => ({
       symbol: t.symbol,
       balance: fmtUnits(hexToBig(tokenHexes[j] ?? "0x0"), t.decimals),
     }));
