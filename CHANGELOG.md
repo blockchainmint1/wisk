@@ -4,6 +4,35 @@ All notable changes to this project. Newest entries on top. Dates are UTC.
 
 ## 2026-06-07
 
+- **Operator console overhaul.** `/admin` now has tabs: Orders, Wallet,
+  Settings, Admins, and Audit.
+  - **Settings** (new `app_settings` table): live-editable spread (bps),
+    order expiry window, min/max order size, kill switch with custom
+    reason shown to users, and minimum order size that fires the
+    Telegram "new order" alert. Replaces the hardcoded `PREMIUM_BPS`
+    constant; quotes and order creation now read from the DB with a 5s
+    server cache.
+  - **Wallet**: scans every derived HD deposit address (across
+    Ethereum, BNB Chain, Base, Arbitrum, Polygon) for native + USDT /
+    USDC / DAI balances. Shows per-chain totals, RPC latency, current
+    block, and a per-address table linking to the originating order.
+    Auto-refreshes every 60s.
+  - **Admins**: list current admin accounts, invite a new one by email
+    (auto-creates the auth user if needed; magic-link sign-in), and
+    revoke. Self-revoke is blocked.
+  - **Audit**: viewer for the existing `admin_audit` table; every
+    setting change, retry, admin invite/revoke, and Telegram test is
+    logged.
+  - **Telegram**: "Send test ping" button in Settings → verifies the
+    bot can post to `TELEGRAM_CHAT_ID`.
+  - Files: `src/routes/admin.tsx`, `src/lib/admin.functions.ts`,
+    `src/lib/settings.server.ts` (new),
+    `src/lib/wallet-scan.server.ts` (new),
+    `src/lib/quote.functions.ts`, `src/lib/orders.functions.ts`,
+    migration `app_settings`.
+
+## 2026-06-07
+
 - **Admin login switched to magic link.** Removed password sign-in from
   `/admin`. Admins now enter their email and receive a one-time magic link.
   Seeded `bobby@blockchainmint.com` as an admin — the role is granted

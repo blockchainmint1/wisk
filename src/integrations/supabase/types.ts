@@ -49,6 +49,45 @@ export type Database = {
           },
         ]
       }
+      app_settings: {
+        Row: {
+          expiry_minutes: number
+          id: number
+          max_usd: number
+          min_usd: number
+          notify_min_usd_created: number
+          paused: boolean
+          paused_reason: string | null
+          premium_bps: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          expiry_minutes?: number
+          id?: number
+          max_usd?: number
+          min_usd?: number
+          notify_min_usd_created?: number
+          paused?: boolean
+          paused_reason?: string | null
+          premium_bps?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          expiry_minutes?: number
+          id?: number
+          max_usd?: number
+          min_usd?: number
+          notify_min_usd_created?: number
+          paused?: boolean
+          paused_reason?: string | null
+          premium_bps?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       deposits: {
         Row: {
           amount_usd: number

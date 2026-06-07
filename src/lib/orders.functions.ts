@@ -3,8 +3,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getTxcSpotPrice } from "./bitmart.server";
-import { CHAINS, PREMIUM_BPS, getChain, getToken, type ChainKey } from "./chains";
+import { CHAINS, getChain, getToken, type ChainKey } from "./chains";
 import { deriveDepositAddress } from "./hd.server";
+import { getSettings } from "./settings.server";
 import { notifyOrderEvent } from "./telegram.server";
 
 const CreateInput = z.object({
@@ -25,9 +26,23 @@ export const createOrder = createServerFn({ method: "POST" })
     // Validate chain/token pairing
     getToken(data.sourceChain as ChainKey, data.sourceToken);
 
+    const settings = await getSettings();
+    if (settings.paused) {
+      throw new Error(
+        settings.paused_reason?.trim() ||
+          "New orders are temporarily paused. Please try again shortly.",
+      );
+    }
+    if (data.usdAmount < settings.min_usd) {
+      throw new Error(`Minimum order is $${settings.min_usd}`);
+    }
+    if (data.usdAmount > settings.max_usd) {
+      throw new Error(`Maximum order is $${settings.max_usd.toLocaleString()}`);
+    }
+
     // Lock the quote at creation time
     const spot = await getTxcSpotPrice();
-    const premiumMultiplier = 1 + PREMIUM_BPS / 10_000;
+    const premiumMultiplier = 1 + settings.premium_bps / 10_000;
     const effectivePrice = spot * premiumMultiplier;
     const txcOut = data.usdAmount / effectivePrice;
     const txcPerUsd = 1 / effectivePrice;
@@ -38,6 +53,8 @@ export const createOrder = createServerFn({ method: "POST" })
       throw new Error("Failed to allocate deposit address: " + (idxErr?.message ?? "no index"));
     }
     const depositAddress = deriveDepositAddress(idxData);
+
+    const expiresAt = new Date(Date.now() + settings.expiry_minutes * 60_000).toISOString();
 
     const { data: order, error } = await supabaseAdmin
       .from("orders")
@@ -50,23 +67,26 @@ export const createOrder = createServerFn({ method: "POST" })
         dest_txc_address: data.destTxcAddress,
         quoted_txc_per_usd: txcPerUsd,
         quoted_txc_out: txcOut,
-        premium_bps: PREMIUM_BPS,
+        premium_bps: settings.premium_bps,
         bitmart_spot_price: spot,
+        expires_at: expiresAt,
       })
       .select("public_id")
       .single();
 
     if (error || !order) throw new Error("Failed to create order: " + (error?.message ?? ""));
 
-    // Fire-and-forget Telegram notification
-    void notifyOrderEvent("created", {
-      public_id: order.public_id,
-      source_chain: data.sourceChain,
-      source_token: data.sourceToken,
-      source_amount_usd: data.usdAmount,
-      quoted_txc_out: txcOut,
-      dest_txc_address: data.destTxcAddress,
-    });
+    // Fire-and-forget Telegram notification (respect notify threshold)
+    if (data.usdAmount >= settings.notify_min_usd_created) {
+      void notifyOrderEvent("created", {
+        public_id: order.public_id,
+        source_chain: data.sourceChain,
+        source_token: data.sourceToken,
+        source_amount_usd: data.usdAmount,
+        quoted_txc_out: txcOut,
+        dest_txc_address: data.destTxcAddress,
+      });
+    }
 
     return { publicId: order.public_id };
   });
