@@ -19,6 +19,21 @@ import {
   weiToUsd,
 } from "@/lib/evm-scan.server";
 import { getChain, getToken, type ChainKey } from "@/lib/chains";
+import { notifyOrderEvent } from "@/lib/telegram.server";
+
+async function notifyById(
+  event: Parameters<typeof notifyOrderEvent>[0],
+  orderId: string,
+) {
+  const { data } = await supabaseAdmin
+    .from("orders")
+    .select(
+      "public_id,source_chain,source_token,source_amount_usd,paid_amount_usd,dest_txc_address,quoted_txc_out,bitmart_filled_txc,bitmart_avg_price,paid_tx_hash,txc_tx_hash,error_message",
+    )
+    .eq("id", orderId)
+    .maybeSingle();
+  if (data) void notifyOrderEvent(event, data);
+}
 
 interface OrderRow {
   id: string;
