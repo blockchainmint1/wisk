@@ -146,10 +146,23 @@ async function scanChain(
 }> {
   const cfg = CHAINS[chain];
   const start = Date.now();
-  let blockNumber: number | null = null;
+
+  // Build one batched JSON-RPC payload for the entire chain:
+  //   1× eth_blockNumber + N× eth_getBalance + N×T× eth_call (balanceOf)
+  const calls: BatchCall[] = [{ method: "eth_blockNumber", params: [] }];
+  for (const { address } of addresses) {
+    calls.push({ method: "eth_getBalance", params: [address, "latest"] });
+    for (const t of cfg.tokens) {
+      calls.push({
+        method: "eth_call",
+        params: [{ to: t.address, data: balanceOfData(address) }, "latest"],
+      });
+    }
+  }
+
+  let results: string[];
   try {
-    const hex = await rpcCall<string>(chain, "eth_blockNumber", []);
-    blockNumber = Number.parseInt(hex, 16);
+    results = await rpcBatch(chain, calls);
   } catch (err) {
     return {
       blockNumber: null,
@@ -159,40 +172,31 @@ async function scanChain(
     };
   }
 
+  const blockNumber = Number.parseInt(results[0] ?? "0x0", 16);
+  const perAddrCount = 1 + cfg.tokens.length;
   const rows: AddressBalance[] = [];
-  for (const { index, address } of addresses) {
-    try {
-      const [nativeHex, ...tokenHexes] = await Promise.all([
-        rpcCall<string>(chain, "eth_getBalance", [address, "latest"]),
-        ...cfg.tokens.map((t) =>
-          rpcCall<string>(chain, "eth_call", [
-            { to: t.address, data: balanceOfData(address) },
-            "latest",
-          ]),
-        ),
-      ]);
-
-      const native = fmtUnits(hexToBig(nativeHex), 18);
-      const tokens = cfg.tokens.map((t, i) => ({
-        symbol: t.symbol,
-        balance: fmtUnits(hexToBig(tokenHexes[i] ?? "0x0"), t.decimals),
-      }));
-      const totalUsd = tokens.reduce((sum, t) => sum + t.balance, 0);
-
-      rows.push({
-        index,
-        address,
-        chain,
-        chainName: cfg.name,
-        native,
-        nativeSymbol: NATIVE_SYMBOL[chain],
-        tokens,
-        totalUsd,
-        linkedOrderId: null,
-      });
-    } catch (err) {
-      console.warn(`[wallet-scan] ${chain} ${address} failed`, err);
-    }
+  addresses.forEach(({ index, address }, i) => {
+    const base = 1 + i * perAddrCount;
+    const nativeHex = results[base] ?? "0x0";
+    const tokenHexes = results.slice(base + 1, base + perAddrCount);
+    const native = fmtUnits(hexToBig(nativeHex), 18);
+    const tokens = cfg.tokens.map((t, j) => ({
+      symbol: t.symbol,
+      balance: fmtUnits(hexToBig(tokenHexes[j] ?? "0x0"), t.decimals),
+    }));
+    const totalUsd = tokens.reduce((sum, t) => sum + t.balance, 0);
+    rows.push({
+      index,
+      address,
+      chain,
+      chainName: cfg.name,
+      native,
+      nativeSymbol: NATIVE_SYMBOL[chain],
+      tokens,
+      totalUsd,
+      linkedOrderId: null,
+    });
+  });
   }
 
   return {
