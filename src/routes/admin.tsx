@@ -28,7 +28,7 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-type Tab = "orders" | "wallet" | "settings" | "admins" | "audit";
+type Tab = "orders" | "treasury" | "wallet" | "settings" | "admins" | "audit";
 
 function AdminPage() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -139,6 +139,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
   const [tab, setTab] = useState<Tab>("orders");
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: "orders", label: "Orders" },
+    { id: "treasury", label: "Treasury" },
     { id: "wallet", label: "Wallet" },
     { id: "settings", label: "Settings" },
     { id: "admins", label: "Admins" },
@@ -172,6 +173,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
       </div>
 
       {tab === "orders" && <OrdersTab />}
+      {tab === "treasury" && <TreasuryTab />}
       {tab === "wallet" && <WalletTab />}
       {tab === "settings" && <SettingsTab />}
       {tab === "admins" && <AdminsTab />}
