@@ -8,9 +8,7 @@ export function SiteHeader({ ticker }: { ticker?: ReactNode }) {
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-8">
           <Link to="/" className="flex items-center gap-2">
-            <div className="size-6 bg-accent flex items-center justify-center font-black text-[10px] tracking-tighter text-accent-foreground">
-              TXC
-            </div>
+            <img src={logoAsset.url} alt="honest.money" className="size-6" loading="lazy" width={24} height={24} />
             <span className="font-mono font-bold tracking-tight text-sm">SWAP</span>
           </Link>
           <div className="hidden md:flex items-center gap-6 text-[11px] font-mono text-muted-foreground uppercase tracking-widest">
