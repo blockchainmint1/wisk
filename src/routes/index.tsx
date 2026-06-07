@@ -34,9 +34,9 @@ function HomePage() {
                 SOVEREIGNTY
               </span>
             </h1>
-            <p className="text-lg text-muted-foreground max-w-[42ch] font-medium leading-relaxed">
-              The bridge to native TEXITcoin. Send USDC, USDT, or DAI from any major EVM chain
-              and receive TXC at live Bitmart spot pricing — settled directly to your wallet.
+            <p className="text-lg text-muted-foreground max-w-[42ch] font-medium leading-relaxed text-balance">
+              The bridge to native TEXITcoin, Iskander Coin & Zero Chill Units. Send USDC, USDT, pyUSD or any stable from any major EVM chain
+              and receive TXC, ISK or ZCU at live Bitmart spot pricing — settled directly to your wallet.
             </p>
             <div className="flex gap-4">
               <Link
