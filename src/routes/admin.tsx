@@ -62,17 +62,45 @@ function AdminPage() {
 
 function LoginForm() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
     setBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/admin`,
+      },
+    });
     setBusy(false);
-    if (error) setErr(error.message);
+    if (error) {
+      setErr(error.message);
+    } else {
+      setSent(true);
+    }
+  }
+
+  if (sent) {
+    return (
+      <div className="max-w-sm space-y-3 bg-secondary/40 border border-border rounded-xl p-6">
+        <div className="text-[10px] font-mono uppercase tracking-widest text-accent">
+          Magic link sent
+        </div>
+        <p className="text-sm font-mono text-muted-foreground leading-relaxed">
+          Check <span className="text-foreground">{email}</span> for a sign-in link. It will return you here.
+        </p>
+        <button
+          onClick={() => { setSent(false); setEmail(""); }}
+          className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground hover:text-foreground"
+        >
+          Use a different email
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -87,26 +115,16 @@ function LoginForm() {
           className="w-full bg-background border border-border rounded p-3 font-mono text-sm focus:outline-none focus:border-accent"
         />
       </div>
-      <div className="space-y-1">
-        <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">Password</label>
-        <input
-          type="password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full bg-background border border-border rounded p-3 font-mono text-sm focus:outline-none focus:border-accent"
-        />
-      </div>
       {err ? <div className="text-xs font-mono text-accent">{err}</div> : null}
       <button
         type="submit"
         disabled={busy}
         className="w-full bg-accent text-accent-foreground py-3 rounded font-mono text-xs uppercase tracking-widest hover:opacity-90 disabled:opacity-50"
       >
-        {busy ? "Signing in…" : "Sign In"}
+        {busy ? "Sending…" : "Send Magic Link"}
       </button>
       <p className="text-[10px] font-mono text-muted-foreground leading-relaxed">
-        Admin role must be granted in the database (user_roles table).
+        Only emails whose accounts have the admin role can access this console.
       </p>
     </form>
   );
