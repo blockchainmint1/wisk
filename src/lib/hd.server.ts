@@ -61,7 +61,8 @@ export function deriveDepositAddress(index: number): `0x${string}` {
   if (!child.publicKey) throw new Error("HD derivation produced no public key");
 
   // Decompress to 65-byte uncompressed pubkey (0x04 || X || Y)
-  const uncompressed = secp256k1.ProjectivePoint.fromHex(child.publicKey).toRawBytes(false);
+  const point = secp256k1.Point.fromBytes(child.publicKey);
+  const uncompressed = point.toBytes(false);
   // Drop the 0x04 prefix, keccak256 the 64-byte (X||Y), take last 20 bytes
   const hash = keccak256(uncompressed.slice(1));
   return ("0x" + hash.slice(-40)) as `0x${string}`;
