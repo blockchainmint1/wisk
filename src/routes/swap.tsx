@@ -4,6 +4,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
 import { LiveTicker } from "@/components/live-ticker";
 import { SiteFooter, SiteHeader } from "@/components/site-shell";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Wallet } from "lucide-react";
 import { createOrder, listChainOptions } from "@/lib/orders.functions";
 import { getQuote } from "@/lib/quote.functions";
 
@@ -139,13 +141,31 @@ function SwapPage() {
               </Field>
 
               <Field label="Recipient TXC Address">
-                <input
-                  type="text"
-                  value={dest}
-                  onChange={(e) => setDest(e.target.value)}
-                  placeholder="Your native TEXITcoin address"
-                  className="w-full bg-secondary border border-border p-4 rounded-lg font-mono text-sm focus:outline-none focus:border-accent"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={dest}
+                    onChange={(e) => setDest(e.target.value)}
+                    placeholder="Your native TEXITcoin address"
+                    className="flex-1 bg-secondary border border-border p-4 rounded-lg font-mono text-sm focus:outline-none focus:border-accent"
+                  />
+                  <TooltipProvider delayDuration={150}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <a
+                          href="https://wallet.texitcoin.org"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label="Get a wallet"
+                          className="shrink-0 flex items-center justify-center px-4 bg-secondary border border-border rounded-lg hover:border-accent hover:text-accent transition-colors"
+                        >
+                          <Wallet className="h-4 w-4" />
+                        </a>
+                      </TooltipTrigger>
+                      <TooltipContent>Get a wallet</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
               </Field>
 
               {/* Quote breakdown */}
