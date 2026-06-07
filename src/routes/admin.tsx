@@ -191,9 +191,12 @@ function OrdersTab() {
   const balFn = useServerFn(adminBitmartBalances);
   const retryFn = useServerFn(adminRetryOrder);
 
+  const [pageSize, setPageSize] = useState<10 | 25 | 50>(25);
+  const [page, setPage] = useState(0);
+
   const orders = useQuery({
     queryKey: ["admin", "orders"],
-    queryFn: () => listFn({ data: { limit: 100 } }),
+    queryFn: () => listFn({ data: { limit: 200 } }),
     refetchInterval: 10_000,
   });
   const balances = useQuery({
