@@ -107,11 +107,29 @@ export interface OrderDetail {
   price_avg: string;
 }
 
+// v4 query order endpoint (v2 is deprecated as of 2024). Body uses camelCase.
+// Response fields are camelCase too — we normalize to our snake_case shape.
+type V4OrderResp = {
+  orderId: string;
+  state: string;
+  filledSize?: string;
+  filledNotional?: string;
+  priceAvg?: string;
+};
+
 export async function getOrderDetail(orderId: string): Promise<OrderDetail> {
-  return signedRequest<OrderDetail>({
-    method: "GET",
-    path: `/spot/v2/order_detail?order_id=${orderId}`,
+  const data = await signedRequest<V4OrderResp>({
+    method: "POST",
+    path: `/spot/v4/query/order`,
+    body: { orderId, queryState: "history" },
   });
+  return {
+    order_id: data.orderId,
+    state: data.state,
+    filled_size: data.filledSize ?? "0",
+    filled_notional: data.filledNotional ?? "0",
+    price_avg: data.priceAvg ?? "0",
+  };
 }
 
 // ===== Withdrawal =====
