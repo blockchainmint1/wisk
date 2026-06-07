@@ -74,17 +74,20 @@ export const adminRetryOrder = createServerFn({ method: "POST" })
   });
 
 // ===== Bitmart balances =====
+const WATCHED_CURRENCIES = ["TXC", "ISKS", "USDT"] as const;
 export const adminBitmartBalances = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertAdmin(context.userId);
     try {
       const wallet = await getBalances();
+      const byCurrency = new Map(wallet.map((w) => [w.currency.toUpperCase(), w.available]));
       return {
         ok: true as const,
-        items: wallet
-          .filter((w) => Number.parseFloat(w.available) > 0)
-          .map((w) => ({ currency: w.currency, available: w.available })),
+        items: WATCHED_CURRENCIES.map((currency) => ({
+          currency,
+          available: byCurrency.get(currency) ?? "0",
+        })),
       };
     } catch (e) {
       return { ok: false as const, error: e instanceof Error ? e.message : "Unknown error" };
