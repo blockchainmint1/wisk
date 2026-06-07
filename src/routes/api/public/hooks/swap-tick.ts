@@ -371,7 +371,11 @@ async function pollBitmartFillsDecoupled() {
       if (detail.state === "filled") {
         const txcAmount = Number.parseFloat(detail.filled_size);
         const avgPrice = Number.parseFloat(detail.price_avg);
-        const update: Record<string, unknown> = {
+        const update: {
+          bitmart_filled_txc: number;
+          bitmart_avg_price: number;
+          status?: "bought";
+        } = {
           bitmart_filled_txc: txcAmount,
           bitmart_avg_price: avgPrice,
         };
