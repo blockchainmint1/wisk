@@ -9,7 +9,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Exit to sovereignty. Swap USDC, USDT, or DAI on Ethereum, Base, Arbitrum, Polygon, or BSC for native TEXITcoin. Live Bitmart pricing, 5% protocol fee.",
+          "Exit to sovereignty. Swap USDC, USDT, pyUSD or any stable on Ethereum, Base, Arbitrum, Polygon, or BSC for native TXC, ISK or ZCU. Live Bitmart pricing, 5% protocol fee.",
       },
       { property: "og:title", content: "TEXIT Runner — Swap stables for native TXC" },
       {
