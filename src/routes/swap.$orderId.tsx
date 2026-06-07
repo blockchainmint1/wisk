@@ -172,7 +172,14 @@ function OrderPage() {
 
             <div className="mt-10 bg-secondary/50 border border-border rounded-xl p-4 font-mono text-xs space-y-2">
               <KV label="Source" value={`${order.chainName} · ${order.source_token}`} />
-              <KV label="Sending" value={`$${Number(order.source_amount_usd).toFixed(2)}`} />
+              <KV
+                label="Sending"
+                value={
+                  order.sourceNativeAmount && order.sourceSpotUsd
+                    ? `≈ ${order.sourceNativeAmount.toFixed(6)} ${order.source_token} ($${Number(order.source_amount_usd).toFixed(2)} @ $${order.sourceSpotUsd.toFixed(2)})`
+                    : `$${Number(order.source_amount_usd).toFixed(2)}`
+                }
+              />
               <KV
                 label="Quote"
                 value={`${Number(order.quoted_dest_out).toFixed(4)} ${destAsset} @ $${Number(order.bitmart_spot_price).toFixed(6)}`}
@@ -224,7 +231,9 @@ function OrderPage() {
               </div>
               <div className="space-y-2">
                 <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
-                  Send {order.source_token} on {order.chainName} to
+                  {order.sourceNativeAmount
+                    ? `Send ≈ ${order.sourceNativeAmount.toFixed(6)} ${order.source_token} on ${order.chainName} to`
+                    : `Send ${order.source_token} on ${order.chainName} to`}
                 </div>
                 <div className="font-mono text-[11px] bg-secondary p-3 rounded border border-border break-all leading-relaxed">
                   {order.deposit_address}

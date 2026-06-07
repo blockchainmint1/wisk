@@ -3,16 +3,18 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getSpotPrice } from "./bitmart.server";
-import { CHAINS, getChain, getToken, type ChainKey } from "./chains";
+import { CHAINS, getChain, getToken, isNativeToken, type ChainKey } from "./chains";
 import { DEST_ASSETS, getDestination, type DestAsset } from "./destinations";
 import { deriveDepositAddress } from "./hd.server";
 import { getSettings } from "./settings.server";
 import { notifyOrderEvent } from "./telegram.server";
 
+const CHAIN_KEYS = Object.keys(CHAINS) as [ChainKey, ...ChainKey[]];
+
 const CreateInput = z
   .object({
-    sourceChain: z.enum(["ethereum", "base", "arbitrum", "polygon", "bsc"]),
-    sourceToken: z.enum(["USDC", "USDT", "DAI"]),
+    sourceChain: z.enum(CHAIN_KEYS),
+    sourceToken: z.string().min(1).max(20),
     usdAmount: z.number().positive().max(1_000_000),
     destAsset: z
       .enum(DEST_ASSETS as [DestAsset, ...DestAsset[]])
@@ -119,10 +121,29 @@ export const getOrder = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!order) return null;
     const chain = getChain(order.source_chain);
+
+    // For non-stable native sources (e.g. ETH), surface a live USD spot so
+    // the UI can render an approximate "send ~X ETH" hint. Stables stay $1.
+    let sourceSpotUsd: number | null = null;
+    let sourceNativeAmount: number | null = null;
+    try {
+      const token = getToken(order.source_chain as ChainKey, order.source_token);
+      if (isNativeToken(token) && token.bitmartSymbol) {
+        sourceSpotUsd = await getSpotPrice(token.bitmartSymbol);
+        if (sourceSpotUsd > 0) {
+          sourceNativeAmount = Number(order.source_amount_usd) / sourceSpotUsd;
+        }
+      }
+    } catch {
+      // Non-fatal: detail page just falls back to USD.
+    }
+
     return {
       ...order,
       chainName: chain.name,
       chainExplorer: chain.explorer,
+      sourceSpotUsd,
+      sourceNativeAmount,
     };
   });
 
@@ -130,6 +151,7 @@ export const listChainOptions = createServerFn({ method: "GET" }).handler(async 
   return Object.values(CHAINS).map((c) => ({
     key: c.key,
     name: c.name,
-    tokens: c.tokens.map((t) => t.symbol),
+    nativeSymbol: c.nativeSymbol,
+    tokens: c.tokens.map((t) => ({ symbol: t.symbol, isNative: !!t.isNative })),
   }));
 });

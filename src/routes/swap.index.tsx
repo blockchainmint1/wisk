@@ -72,7 +72,7 @@ function SwapPage() {
       return createFn({
         data: {
           sourceChain: chain as "ethereum" | "base" | "arbitrum" | "polygon" | "bsc",
-          sourceToken: token as "USDC" | "USDT" | "DAI",
+          sourceToken: token,
           usdAmount,
           destAsset,
           destAddress: dest.trim(),
@@ -95,10 +95,11 @@ function SwapPage() {
   });
 
   const chainOpt = chains?.find((c) => c.key === chain);
-  const tokenOptions = chainOpt?.tokens ?? ["USDC"];
-  if (chainOpt && !(tokenOptions as string[]).includes(token)) {
-    setToken(tokenOptions[0] as string);
+  const tokenOptions = chainOpt?.tokens ?? [{ symbol: "USDC", isNative: false }];
+  if (chainOpt && !tokenOptions.some((t) => t.symbol === token)) {
+    setToken(tokenOptions[0].symbol);
   }
+  const selectedTokenIsNative = tokenOptions.find((t) => t.symbol === token)?.isNative === true;
 
   const formValid = usdAmount >= 10 && addressValid && quote?.ok === true;
 
@@ -155,7 +156,7 @@ function SwapPage() {
                 </select>
               </Field>
 
-              <Field label={`You Send (${token})`}>
+              <Field label={`You Send (${token === "ETH" ? "USD value in ETH" : token})`}>
                 <div className="flex items-center gap-3 bg-secondary border border-border p-4 rounded-lg focus-within:border-accent">
                   <input
                     type="text"
@@ -170,10 +171,18 @@ function SwapPage() {
                     className="bg-background border border-border px-3 py-2 rounded-md font-mono text-xs focus:outline-none"
                   >
                     {tokenOptions.map((t) => (
-                      <option key={t}>{t}</option>
+                      <option key={t.symbol} value={t.symbol}>
+                        {t.symbol}
+                        {t.isNative ? " (native)" : ""}
+                      </option>
                     ))}
                   </select>
                 </div>
+                {selectedTokenIsNative ? (
+                  <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest px-1">
+                    Amount is in USD. We'll show the exact {token} amount to send on the next screen, repriced at deposit.
+                  </div>
+                ) : null}
               </Field>
 
               <Field label={`Recipient ${destConfig.label} Address`}>

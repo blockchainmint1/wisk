@@ -60,47 +60,77 @@ type AlchemyTransfer = {
   category: string;
 };
 
-/** Find ERC-20 Transfers to `toAddress` since `fromBlock` for any of the given token contracts. */
+/**
+ * Find incoming transfers to `toAddress` since `fromBlock`.
+ * - If `tokenAddresses` is non-empty, scans ERC-20 transfers for those tokens.
+ * - If `includeNative` is true, ALSO scans native coin transfers (ETH/etc.)
+ *   via Alchemy's `external` category. Native transfers return with
+ *   `token === "native"` and full 18-decimal `amountWei`.
+ */
 export async function scanIncomingTransfers(opts: {
   chain: ChainKey;
   toAddress: string;
   tokenAddresses: string[];
   fromBlock: number;
   toBlock?: number;
+  includeNative?: boolean;
 }): Promise<DetectedTransfer[]> {
-  const { chain, toAddress, tokenAddresses, fromBlock } = opts;
+  const { chain, toAddress, tokenAddresses, fromBlock, includeNative } = opts;
 
-  const params = [
-    {
-      fromBlock: "0x" + fromBlock.toString(16),
-      toBlock: opts.toBlock !== undefined ? "0x" + opts.toBlock.toString(16) : "latest",
-      toAddress,
-      contractAddresses: tokenAddresses.map((a) => a.toLowerCase()),
-      category: ["erc20"],
-      withMetadata: false,
-      excludeZeroValue: true,
-      maxCount: "0x3e8", // 1000
-      order: "asc",
-    },
-  ];
+  const baseParams = {
+    fromBlock: "0x" + fromBlock.toString(16),
+    toBlock: opts.toBlock !== undefined ? "0x" + opts.toBlock.toString(16) : "latest",
+    toAddress,
+    withMetadata: false,
+    excludeZeroValue: true,
+    maxCount: "0x3e8", // 1000
+    order: "asc",
+  } as const;
 
-  const result = await rpc<{ transfers?: AlchemyTransfer[] }>(
-    chain,
-    "alchemy_getAssetTransfers",
-    params,
-  );
+  const out: DetectedTransfer[] = [];
 
-  const transfers = result.transfers ?? [];
-  return transfers.map((t, i) => ({
-    chain,
-    txHash: t.hash,
-    logIndex: i, // Alchemy doesn't expose logIndex here; use position as stable secondary key
-    blockNumber: Number.parseInt(t.blockNum, 16),
-    token: t.rawContract.address.toLowerCase(),
-    from: t.from.toLowerCase(),
-    to: t.to.toLowerCase(),
-    amountWei: BigInt(t.rawContract.value),
-  }));
+  if (tokenAddresses.length > 0) {
+    const result = await rpc<{ transfers?: AlchemyTransfer[] }>(
+      chain,
+      "alchemy_getAssetTransfers",
+      [{ ...baseParams, contractAddresses: tokenAddresses.map((a) => a.toLowerCase()), category: ["erc20"] }],
+    );
+    (result.transfers ?? []).forEach((t, i) =>
+      out.push({
+        chain,
+        txHash: t.hash,
+        logIndex: i,
+        blockNumber: Number.parseInt(t.blockNum, 16),
+        token: t.rawContract.address.toLowerCase(),
+        from: t.from.toLowerCase(),
+        to: t.to.toLowerCase(),
+        amountWei: BigInt(t.rawContract.value),
+      }),
+    );
+  }
+
+  if (includeNative) {
+    const result = await rpc<{ transfers?: AlchemyTransfer[] }>(
+      chain,
+      "alchemy_getAssetTransfers",
+      [{ ...baseParams, category: ["external"] }],
+    );
+    (result.transfers ?? []).forEach((t, i) =>
+      out.push({
+        chain,
+        txHash: t.hash,
+        // Offset so native indices never collide with ERC-20 indices on the same tx.
+        logIndex: 100000 + i,
+        blockNumber: Number.parseInt(t.blockNum, 16),
+        token: "native",
+        from: t.from.toLowerCase(),
+        to: t.to.toLowerCase(),
+        amountWei: BigInt(t.rawContract.value),
+      }),
+    );
+  }
+
+  return out;
 }
 
 export function weiToUsd(amountWei: bigint, decimals: number): number {

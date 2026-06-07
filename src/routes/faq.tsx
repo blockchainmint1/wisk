@@ -4,15 +4,15 @@ import { SiteFooter, SiteHeader } from "@/components/site-shell";
 const FAQS: Array<{ q: string; a: string }> = [
   {
     q: "What does swapTXC actually do?",
-    a: "You send a stablecoin (USDC, USDT, pyUSD or DAI) on Ethereum, Base, Arbitrum, Polygon or BSC. We deliver the equivalent value in native TXC, ISK$ or ZCU directly to your wallet on its native chain. No bridges, no wrapped tokens.",
+    a: "You send a stablecoin (USDC, USDT, DAI, PYUSD, FRAX, TUSD, USDP, USDe) or native ETH on a supported EVM chain. We deliver the equivalent value in native TXC, ISK$ or ZCU directly to your wallet on its native chain. No bridges, no wrapped tokens.",
   },
   {
     q: "What is the fee?",
     a: "A flat 5% protocol fee is baked into the quote you see at order creation. The quote is locked the moment you confirm — what you see is what you get.",
   },
   {
-    q: "Which networks and stablecoins can I send from?",
-    a: "Ethereum (USDC, USDT, DAI), Base (USDC), Arbitrum (USDC, USDT), Polygon (USDC, USDT), and BNB Chain (USDT, USDC).",
+    q: "Which networks and tokens can I send from?",
+    a: "Ethereum (USDC, USDT, DAI, PYUSD, FRAX, TUSD, USDP, USDe, native ETH), Base (USDC, USDbC, USDT, native ETH), Arbitrum (USDC, USDC.e, USDT, DAI, FRAX, native ETH), Polygon (USDC, USDC.e, USDT, DAI), and BNB Chain (USDT, USDC). Native ETH is priced live at the moment we detect your deposit, so the USD-equivalent floats with the market until then.",
   },
   {
     q: "Which native assets can I receive?",
