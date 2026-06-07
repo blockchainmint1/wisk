@@ -231,7 +231,9 @@ function OrderPage() {
               </div>
               <div className="space-y-2">
                 <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
-                  Send {order.source_token} on {order.chainName} to
+                  {order.sourceNativeAmount
+                    ? `Send ≈ ${order.sourceNativeAmount.toFixed(6)} ${order.source_token} on ${order.chainName} to`
+                    : `Send ${order.source_token} on ${order.chainName} to`}
                 </div>
                 <div className="font-mono text-[11px] bg-secondary p-3 rounded border border-border break-all leading-relaxed">
                   {order.deposit_address}
