@@ -73,6 +73,7 @@ function header(event: OrderNotifyEvent): string {
     case "completed": return "🎉 Order completed";
     case "failed": return "❌ Order failed";
     case "expired": return "⌛ Order expired";
+    case "stuck": return "🚨 Order stuck";
   }
 }
 
