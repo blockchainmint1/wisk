@@ -29,7 +29,8 @@ import {
 import { isNativeToken, type ChainKey } from "@/lib/chains";
 import { getMergedChain, getMergedToken } from "@/lib/chains.server";
 import { getDestination } from "@/lib/destinations";
-import { notifyOrderEvent, logOrderEvent } from "@/lib/telegram.server";
+import { notifyOrderEvent, logOrderEvent, sendAdminAlert } from "@/lib/telegram.server";
+import { getSettings } from "@/lib/settings.server";
 import { sendTxc } from "@/lib/txc-sign.server";
 import { sendIsk } from "@/lib/isk-sign.server";
 import { getSpotPrice } from "@/lib/bitmart.server";
@@ -86,6 +87,39 @@ async function expireStale() {
     await logOrderEvent(row.id, "state", "expired", {});
     await notifyById("expired", row.id);
   }
+}
+
+/**
+ * Detect orders that are still mid-flight (not awaiting_payment, completed,
+ * failed, or expired) past the expiry window + 5 min grace, and alert once.
+ * These are payment_detected / confirmed / sending / buying_on_bitmart /
+ * bought / withdrawing orders that should have finished and didn't.
+ */
+async function detectStuck() {
+  const settings = await getSettings();
+  const cutoffMs = (settings.expiry_minutes + 5) * 60_000;
+  const cutoff = new Date(Date.now() - cutoffMs).toISOString();
+
+  const { data: stuck } = await supabaseAdmin
+    .from("orders")
+    .select("id,status,created_at")
+    .not("status", "in", "(awaiting_payment,completed,failed,expired)")
+    .is("stuck_notified_at", null)
+    .lt("created_at", cutoff)
+    .limit(20)
+    .returns<Array<{ id: string; status: string; created_at: string }>>();
+  if (!stuck?.length) return { stuck: 0 };
+
+  for (const o of stuck) {
+    const ageMin = Math.round((Date.now() - new Date(o.created_at).getTime()) / 60_000);
+    await supabaseAdmin
+      .from("orders")
+      .update({ stuck_notified_at: new Date().toISOString() })
+      .eq("id", o.id);
+    await logOrderEvent(o.id, "error", "stuck", { status: o.status, age_minutes: ageMin });
+    await notifyById("stuck", o.id);
+  }
+  return { stuck: stuck.length };
 }
 
 async function watchDeposits() {
@@ -524,8 +558,8 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
         const started = Date.now();
         const result = {
           expired: 0,
+          stuck: { stuck: 0 },
           watch: { detected: 0 },
-          
           fills: { filled: 0 },
           settle: { sent: 0, queuedForBitmart: 0 },
           replenish: { submitted: 0 },
@@ -533,20 +567,32 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           polls: { completed: 0 },
           ms: 0,
         };
+        // Run each phase independently so one failure doesn't starve the
+        // others. Phase errors fire a deduped admin Telegram alert.
+        async function runPhase<T>(name: string, fn: () => Promise<T>): Promise<T | null> {
+          try {
+            return await fn();
+          } catch (e) {
+            const msg = e instanceof Error ? `${e.message}\n${e.stack ?? ""}` : String(e);
+            console.error(`[swap-tick] ${name} failed`, e);
+            void sendAdminAlert(`swap-tick phase "${name}" failed`, msg, name);
+            return null;
+          }
+        }
+
         try {
-          await expireStale();
-          result.watch = await watchDeposits();
-          // Pay customer FIRST — never block on Bitmart for TXC orders.
-          result.settle = await settleConfirmed();
-          // Treasury replenishment runs after customer payout, in background.
-          result.replenish = await replenishTreasury();
-          // Bookkeeping for any open Bitmart orders (decoupled from customer).
-          result.fills = await pollBitmartFillsDecoupled();
-          // ISK$ continues through Bitmart withdrawal.
-          result.isk = await settleIskWithdrawal();
-          result.polls = await pollWithdrawals();
+          await runPhase("expireStale", expireStale);
+          result.stuck = (await runPhase("detectStuck", detectStuck)) ?? result.stuck;
+          result.watch = (await runPhase("watchDeposits", watchDeposits)) ?? result.watch;
+          result.settle = (await runPhase("settleConfirmed", settleConfirmed)) ?? result.settle;
+          result.replenish = (await runPhase("replenishTreasury", replenishTreasury)) ?? result.replenish;
+          result.fills = (await runPhase("pollBitmartFillsDecoupled", pollBitmartFillsDecoupled)) ?? result.fills;
+          result.isk = (await runPhase("settleIskWithdrawal", settleIskWithdrawal)) ?? result.isk;
+          result.polls = (await runPhase("pollWithdrawals", pollWithdrawals)) ?? result.polls;
         } catch (e) {
+          const msg = e instanceof Error ? `${e.message}\n${e.stack ?? ""}` : String(e);
           console.error("[swap-tick] fatal", e);
+          void sendAdminAlert("swap-tick fatal crash", msg, "fatal");
           return new Response(
             JSON.stringify({ ok: false, error: e instanceof Error ? e.message : "fatal" }),
             { status: 500, headers: { "content-type": "application/json" } },

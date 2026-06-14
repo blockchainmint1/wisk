@@ -15,7 +15,8 @@ export type OrderNotifyEvent =
   | "sending"
   | "completed"
   | "failed"
-  | "expired";
+  | "expired"
+  | "stuck";
 
 interface OrderSummary {
   id?: string | null;
@@ -72,6 +73,7 @@ function header(event: OrderNotifyEvent): string {
     case "completed": return "🎉 Order completed";
     case "failed": return "❌ Order failed";
     case "expired": return "⌛ Order expired";
+    case "stuck": return "🚨 Order stuck";
   }
 }
 
@@ -253,4 +255,57 @@ export async function logOrderEvent(
   details: Record<string, unknown> = {},
 ): Promise<void> {
   await recordEvent(orderId, kind, event, details);
+}
+
+// In-memory dedupe so we don't spam Telegram if the same fatal error happens
+// every cron tick. Re-alert after 15 minutes per unique title+key.
+const adminAlertCooldown = new Map<string, number>();
+const ADMIN_ALERT_COOLDOWN_MS = 15 * 60_000;
+
+/**
+ * Free-form admin alert (not tied to an order). Use for tick crashes,
+ * RPC outages, or other infrastructure problems. Auto-deduped for 15 min
+ * per (title, dedupeKey) pair.
+ */
+export async function sendAdminAlert(
+  title: string,
+  message: string,
+  dedupeKey?: string,
+): Promise<void> {
+  const key = `${title}::${dedupeKey ?? message.slice(0, 120)}`;
+  const last = adminAlertCooldown.get(key) ?? 0;
+  const now = Date.now();
+  if (now - last < ADMIN_ALERT_COOLDOWN_MS) return;
+  adminAlertCooldown.set(key, now);
+
+  const lovableKey = process.env.LOVABLE_API_KEY;
+  const telegramKey = process.env.TELEGRAM_API_KEY;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!lovableKey || !telegramKey || !chatId) {
+    console.warn("[telegram] admin alert skipped; missing config:", title);
+    return;
+  }
+
+  const body = [`<b>🛑 ${escapeHtml(title)}</b>`, `<pre>${escapeHtml(message)}</pre>`].join("\n");
+  try {
+    const res = await fetch(`${GATEWAY_URL}/sendMessage`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${lovableKey}`,
+        "X-Connection-Api-Key": telegramKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: body,
+        parse_mode: "HTML",
+        disable_web_page_preview: true,
+      }),
+    });
+    if (!res.ok) {
+      console.error(`[telegram] admin alert ${res.status}: ${await res.text()}`);
+    }
+  } catch (err) {
+    console.error("[telegram] admin alert failed", err);
+  }
 }
