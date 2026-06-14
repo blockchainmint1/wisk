@@ -29,7 +29,8 @@ import {
 import { isNativeToken, type ChainKey } from "@/lib/chains";
 import { getMergedChain, getMergedToken } from "@/lib/chains.server";
 import { getDestination } from "@/lib/destinations";
-import { notifyOrderEvent, logOrderEvent } from "@/lib/telegram.server";
+import { notifyOrderEvent, logOrderEvent, sendAdminAlert } from "@/lib/telegram.server";
+import { getSettings } from "@/lib/settings.server";
 import { sendTxc } from "@/lib/txc-sign.server";
 import { sendIsk } from "@/lib/isk-sign.server";
 import { getSpotPrice } from "@/lib/bitmart.server";
