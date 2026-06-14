@@ -114,7 +114,6 @@ async function detectStuck() {
     const ageMin = Math.round((Date.now() - new Date(o.created_at).getTime()) / 60_000);
     await supabaseAdmin
       .from("orders")
-      // @ts-expect-error stuck_notified_at column added via migration; types regen async
       .update({ stuck_notified_at: new Date().toISOString() })
       .eq("id", o.id);
     await logOrderEvent(o.id, "error", "stuck", { status: o.status, age_minutes: ageMin });
