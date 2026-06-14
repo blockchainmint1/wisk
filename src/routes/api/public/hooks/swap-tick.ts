@@ -558,8 +558,8 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
         const started = Date.now();
         const result = {
           expired: 0,
+          stuck: { stuck: 0 },
           watch: { detected: 0 },
-          
           fills: { filled: 0 },
           settle: { sent: 0, queuedForBitmart: 0 },
           replenish: { submitted: 0 },
@@ -567,20 +567,32 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           polls: { completed: 0 },
           ms: 0,
         };
+        // Run each phase independently so one failure doesn't starve the
+        // others. Phase errors fire a deduped admin Telegram alert.
+        async function runPhase<T>(name: string, fn: () => Promise<T>): Promise<T | null> {
+          try {
+            return await fn();
+          } catch (e) {
+            const msg = e instanceof Error ? `${e.message}\n${e.stack ?? ""}` : String(e);
+            console.error(`[swap-tick] ${name} failed`, e);
+            void sendAdminAlert(`swap-tick phase "${name}" failed`, msg, name);
+            return null;
+          }
+        }
+
         try {
-          await expireStale();
-          result.watch = await watchDeposits();
-          // Pay customer FIRST — never block on Bitmart for TXC orders.
-          result.settle = await settleConfirmed();
-          // Treasury replenishment runs after customer payout, in background.
-          result.replenish = await replenishTreasury();
-          // Bookkeeping for any open Bitmart orders (decoupled from customer).
-          result.fills = await pollBitmartFillsDecoupled();
-          // ISK$ continues through Bitmart withdrawal.
-          result.isk = await settleIskWithdrawal();
-          result.polls = await pollWithdrawals();
+          await runPhase("expireStale", expireStale);
+          result.stuck = (await runPhase("detectStuck", detectStuck)) ?? result.stuck;
+          result.watch = (await runPhase("watchDeposits", watchDeposits)) ?? result.watch;
+          result.settle = (await runPhase("settleConfirmed", settleConfirmed)) ?? result.settle;
+          result.replenish = (await runPhase("replenishTreasury", replenishTreasury)) ?? result.replenish;
+          result.fills = (await runPhase("pollBitmartFillsDecoupled", pollBitmartFillsDecoupled)) ?? result.fills;
+          result.isk = (await runPhase("settleIskWithdrawal", settleIskWithdrawal)) ?? result.isk;
+          result.polls = (await runPhase("pollWithdrawals", pollWithdrawals)) ?? result.polls;
         } catch (e) {
+          const msg = e instanceof Error ? `${e.message}\n${e.stack ?? ""}` : String(e);
           console.error("[swap-tick] fatal", e);
+          void sendAdminAlert("swap-tick fatal crash", msg, "fatal");
           return new Response(
             JSON.stringify({ ok: false, error: e instanceof Error ? e.message : "fatal" }),
             { status: 500, headers: { "content-type": "application/json" } },
