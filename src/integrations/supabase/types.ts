@@ -255,6 +255,7 @@ export type Database = {
           source_chain: string
           source_token: string
           status: Database["public"]["Enums"]["order_status"]
+          stuck_notified_at: string | null
           updated_at: string
           withdrawal_id: string | null
         }
@@ -284,6 +285,7 @@ export type Database = {
           source_chain: string
           source_token: string
           status?: Database["public"]["Enums"]["order_status"]
+          stuck_notified_at?: string | null
           updated_at?: string
           withdrawal_id?: string | null
         }
@@ -313,6 +315,7 @@ export type Database = {
           source_chain?: string
           source_token?: string
           status?: Database["public"]["Enums"]["order_status"]
+          stuck_notified_at?: string | null
           updated_at?: string
           withdrawal_id?: string | null
         }
