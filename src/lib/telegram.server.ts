@@ -15,7 +15,8 @@ export type OrderNotifyEvent =
   | "sending"
   | "completed"
   | "failed"
-  | "expired";
+  | "expired"
+  | "stuck";
 
 interface OrderSummary {
   id?: string | null;
