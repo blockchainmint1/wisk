@@ -89,6 +89,40 @@ async function expireStale() {
   }
 }
 
+/**
+ * Detect orders that are still mid-flight (not awaiting_payment, completed,
+ * failed, or expired) past the expiry window + 5 min grace, and alert once.
+ * These are payment_detected / confirmed / sending / buying_on_bitmart /
+ * bought / withdrawing orders that should have finished and didn't.
+ */
+async function detectStuck() {
+  const settings = await getSettings();
+  const cutoffMs = (settings.expiry_minutes + 5) * 60_000;
+  const cutoff = new Date(Date.now() - cutoffMs).toISOString();
+
+  const { data: stuck } = await supabaseAdmin
+    .from("orders")
+    .select("id,status,created_at")
+    .not("status", "in", "(awaiting_payment,completed,failed,expired)")
+    .is("stuck_notified_at", null)
+    .lt("created_at", cutoff)
+    .limit(20)
+    .returns<Array<{ id: string; status: string; created_at: string }>>();
+  if (!stuck?.length) return { stuck: 0 };
+
+  for (const o of stuck) {
+    const ageMin = Math.round((Date.now() - new Date(o.created_at).getTime()) / 60_000);
+    await supabaseAdmin
+      .from("orders")
+      // @ts-expect-error stuck_notified_at column added via migration; types regen async
+      .update({ stuck_notified_at: new Date().toISOString() })
+      .eq("id", o.id);
+    await logOrderEvent(o.id, "error", "stuck", { status: o.status, age_minutes: ageMin });
+    await notifyById("stuck", o.id);
+  }
+  return { stuck: stuck.length };
+}
+
 async function watchDeposits() {
   const { data: orders } = await supabaseAdmin
     .from("orders")
