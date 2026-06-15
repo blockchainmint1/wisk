@@ -457,11 +457,21 @@ function OrderRow({
         <td className="p-3">{o.source_chain} · {o.source_token}</td>
         <td className="p-3 text-right">${Number(o.source_amount_usd).toFixed(2)}</td>
         <td className="p-3 text-right">
-          {o.bitmart_filled_dest != null
-            ? Number(o.bitmart_filled_dest).toFixed(4)
-            : Number(o.quoted_dest_out).toFixed(4)}
+          {(o.dest_asset ?? "TXC") === "TXC"
+            ? (o.bitmart_filled_dest != null
+                ? Number(o.bitmart_filled_dest).toFixed(4)
+                : Number(o.quoted_dest_out).toFixed(4))
+            : <span className="text-muted-foreground">—</span>}
+        </td>
+        <td className="p-3 text-right">
+          {(o.dest_asset ?? "TXC") === "ISK"
+            ? (o.bitmart_filled_dest != null
+                ? Number(o.bitmart_filled_dest).toFixed(4)
+                : Number(o.quoted_dest_out).toFixed(4))
+            : <span className="text-muted-foreground">—</span>}
         </td>
         <td className="p-3 truncate max-w-[14ch]">{o.dest_address}</td>
+
         <td className="p-3">{new Date(o.created_at).toLocaleString()}</td>
         <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
           <div className="flex justify-end gap-1 flex-wrap">
