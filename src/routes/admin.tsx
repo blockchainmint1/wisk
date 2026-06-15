@@ -277,9 +277,38 @@ function OrdersTab() {
         </div>
       </div>
 
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[260px]">
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search ID · address · tx hash · withdrawal · bitmart order · chain · status · error…"
+            className="w-full bg-secondary/40 border border-border rounded px-3 py-2 pr-20 text-xs font-mono placeholder:text-muted-foreground focus:outline-none focus:border-foreground/60"
+          />
+          {searchInput ? (
+            <button
+              onClick={() => setSearchInput("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground hover:text-foreground px-2 py-1"
+            >
+              Clear
+            </button>
+          ) : null}
+        </div>
+        {query ? (
+          <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+            {orders.isFetching
+              ? "Searching…"
+              : `${orders.data?.length ?? 0} match${orders.data?.length === 1 ? "" : "es"}`}
+          </span>
+        ) : null}
+      </div>
+
       {ordersErr ? (
         <div className="text-xs font-mono text-accent">{ordersErr.message}</div>
       ) : null}
+
+
 
       <div className="overflow-x-auto border border-border rounded-xl">
         <table className="w-full text-xs font-mono">
