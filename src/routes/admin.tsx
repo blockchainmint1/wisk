@@ -3,6 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { SiteFooter, SiteHeader } from "@/components/site-shell";
+import { ThemeToggle } from "@/components/theme-toggle";
+
 import { supabase } from "@/integrations/supabase/client";
 import {
   adminAuditLog,
