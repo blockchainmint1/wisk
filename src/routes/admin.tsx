@@ -260,6 +260,19 @@ function OrdersTab() {
 
   const ordersErr = orders.error as Error | null;
 
+  const OPEN_STATUSES = new Set([
+    "awaiting_payment", "pending", "paid", "confirmed",
+    "buying_on_bitmart", "paying_out", "withdrawing",
+  ]);
+  const FAILED_STATUSES = new Set(["failed", "expired", "refunded"]);
+  const filteredOrders = (orders.data ?? []).filter((o) => {
+    if (statusFilter === "all") return true;
+    if (statusFilter === "completed") return o.status === "completed";
+    if (statusFilter === "failed") return FAILED_STATUSES.has(o.status);
+    // open = anything not completed and not in a failed/terminal state
+    return !FAILED_STATUSES.has(o.status) && o.status !== "completed";
+  });
+
   return (
     <div className="space-y-6">
       <div>
