@@ -204,6 +204,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
 // ===== Orders Tab =====
 function OrdersTab() {
   const listFn = useServerFn(adminListOrders);
+  const searchFn = useServerFn(adminSearchOrders);
   const balFn = useServerFn(adminBitmartBalances);
   const retryFn = useServerFn(adminRetryOrder);
   const forceCompleteFn = useServerFn(adminForceComplete);
@@ -211,12 +212,28 @@ function OrdersTab() {
 
   const [pageSize, setPageSize] = useState<10 | 25 | 50>(25);
   const [page, setPage] = useState(0);
+  const [searchInput, setSearchInput] = useState("");
+  const [query, setQuery] = useState("");
+
+  // Debounce input → query (300ms).
+  useEffect(() => {
+    const id = setTimeout(() => setQuery(searchInput.trim()), 300);
+    return () => clearTimeout(id);
+  }, [searchInput]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [query]);
 
   const orders = useQuery({
-    queryKey: ["admin", "orders"],
-    queryFn: () => listFn({ data: { limit: 200 } }),
-    refetchInterval: 10_000,
+    queryKey: ["admin", "orders", query],
+    queryFn: () =>
+      query
+        ? searchFn({ data: { query, limit: 200 } })
+        : listFn({ data: { limit: 200 } }),
+    refetchInterval: query ? false : 10_000,
   });
+
   const balances = useQuery({
     queryKey: ["admin", "bitmart-balances"],
     queryFn: () => balFn({}),
