@@ -734,6 +734,7 @@ function TreasuryTab() {
   const scanFn = useServerFn(adminWalletScan);
   const debtFn = useServerFn(adminTreasuryDebt);
   const bulkBuyFn = useServerFn(adminBulkReplenish);
+  const reconcileFn = useServerFn(adminReconcile);
   const qc = useQueryClient();
   const ALL_CHAINS = ["ethereum", "bsc", "base", "arbitrum", "polygon"] as const;
 
@@ -747,6 +748,12 @@ function TreasuryTab() {
     queryKey: ["admin", "treasury-debt"],
     queryFn: () => debtFn(),
     refetchInterval: 30_000,
+  });
+
+  const reconcile = useQuery({
+    queryKey: ["admin", "reconcile"],
+    queryFn: () => reconcileFn({}),
+    refetchInterval: 60_000,
   });
 
   const [bulkAmount, setBulkAmount] = useState("");
