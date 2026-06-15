@@ -36,8 +36,32 @@
   --ease-terminal: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* TEXIT Sovereign Terminal palette — single dark theme by intent. */
-:root,
+/* TEXIT Sovereign Terminal palette — dark by default, light theme opt-in. */
+:root {
+  --radius: 0.625rem;
+  --background: oklch(0.985 0 0);
+  --foreground: oklch(0.18 0.02 240);
+  --muted: oklch(0.94 0.005 240);
+  --muted-foreground: oklch(0.45 0.02 240);
+  --surface: oklch(0.96 0.005 240);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.02 240);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.02 240);
+  --primary: oklch(0.18 0.02 240);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.93 0.005 240);
+  --secondary-foreground: oklch(0.18 0.02 240);
+  --accent: oklch(0.58 0.22 27);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.58 0.22 27);
+  --destructive-foreground: oklch(0.985 0 0);
+  --success: oklch(0.55 0.16 150);
+  --border: oklch(0.18 0.02 240 / 0.14);
+  --input: oklch(0.18 0.02 240 / 0.18);
+  --ring: oklch(0.58 0.22 27);
+}
+
 .dark {
   --radius: 0.625rem;
   --background: oklch(0.13 0.02 240);
@@ -62,6 +86,7 @@
   --input: oklch(1 0 0 / 0.15);
   --ring: oklch(0.58 0.22 27);
 }
+
 
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; transform: scale(1); }
