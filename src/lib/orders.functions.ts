@@ -61,8 +61,12 @@ export const createOrder = createServerFn({ method: "POST" })
     const assetOut = data.usdAmount / effectivePrice;
     const assetPerUsd = 1 / effectivePrice;
 
-    // Allocate next HD address
-    const { data: idxData, error: idxErr } = await supabaseAdmin.rpc("next_hd_index");
+    // Allocate HD address — recycles expired+unpaid indexes (>60min past expiry)
+    // before incrementing the counter.
+    const { data: idxData, error: idxErr } = await supabaseAdmin.rpc(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      "allocate_hd_index" as any,
+    );
     if (idxErr || typeof idxData !== "number") {
       throw new Error("Failed to allocate deposit address: " + (idxErr?.message ?? "no index"));
     }

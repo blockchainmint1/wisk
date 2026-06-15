@@ -347,6 +347,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      allocate_hd_index: { Args: never; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
