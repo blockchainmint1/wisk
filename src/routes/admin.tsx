@@ -155,6 +155,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
     { id: "orders", label: "Orders" },
     { id: "treasury", label: "Treasury" },
     { id: "wallet", label: "Wallet" },
+    { id: "market", label: "Market" },
     { id: "tokens", label: "Tokens" },
     { id: "settings", label: "Settings" },
     { id: "admins", label: "Admins" },
