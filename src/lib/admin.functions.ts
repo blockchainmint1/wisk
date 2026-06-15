@@ -5,7 +5,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getBalances, getSpotPrice, submitMarketBuy } from "./bitmart.server";
 import { invalidateChainsCache } from "./chains.server";
+import { getIskHotAddresses, getIskAddressBalanceSats } from "./isk-sign.server";
 import { getSettings, invalidateSettingsCache } from "./settings.server";
+import { getTxcHotAddress, getTxcAddressBalanceSats } from "./txc-sign.server";
 import { scanHdWallet } from "./wallet-scan.server";
 
 async function assertAdmin(userId: string) {
