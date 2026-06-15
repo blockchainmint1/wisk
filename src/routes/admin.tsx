@@ -237,10 +237,10 @@ function OrdersTab() {
     refetchInterval: query ? false : 10_000,
   });
 
-  const balances = useQuery({
-    queryKey: ["admin", "bitmart-balances"],
-    queryFn: () => balFn({}),
-    refetchInterval: 30_000,
+  const hot = useQuery({
+    queryKey: ["admin", "hot-wallet-balances"],
+    queryFn: () => hotFn({}),
+    refetchInterval: 60_000,
   });
   const retry = useMutation({
     mutationFn: (publicId: string) => retryFn({ data: { publicId } }),
@@ -262,23 +262,39 @@ function OrdersTab() {
     <div className="space-y-6">
       <div>
         <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-2">
-          Bitmart balances
+          Hot wallet balances
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {balances.data?.ok
-            ? balances.data.items.map((b) => (
-                <div key={b.currency} className="bg-secondary/40 border border-border rounded p-4">
-                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                    {b.currency}
-                  </div>
-                  <div className="font-mono text-lg mt-1">{b.available}</div>
-                </div>
-              ))
-            : balances.data?.ok === false
-              ? <div className="col-span-full text-xs font-mono text-accent">Bitmart: {balances.data.error}</div>
-              : <div className="col-span-full text-[10px] font-mono text-muted-foreground">Loading…</div>}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <BalanceCard
+            label="EVM Stables"
+            value={hot.data?.evm.ok ? `$${hot.data.evm.adminUsd.toFixed(2)}` : null}
+            error={hot.data?.evm.ok === false ? hot.data.evm.error : null}
+          />
+          <BalanceCard
+            label="TXC"
+            value={
+              hot.data?.txc.ok
+                ? `${hot.data.txc.confirmed.toFixed(4)}${
+                    hot.data.txc.unconfirmed ? ` (+${hot.data.txc.unconfirmed.toFixed(4)})` : ""
+                  }`
+                : null
+            }
+            error={hot.data?.txc.ok === false ? hot.data.txc.error : null}
+          />
+          <BalanceCard
+            label="ISK"
+            value={
+              hot.data?.isk.ok
+                ? `${hot.data.isk.confirmed.toFixed(4)}${
+                    hot.data.isk.unconfirmed ? ` (+${hot.data.isk.unconfirmed.toFixed(4)})` : ""
+                  }`
+                : null
+            }
+            error={hot.data?.isk.ok === false ? hot.data.isk.error : null}
+          />
         </div>
       </div>
+
 
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[260px]">
