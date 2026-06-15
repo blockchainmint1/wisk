@@ -320,9 +320,11 @@ function OrdersTab() {
               <th className="text-left p-3">Source</th>
               <th className="text-right p-3">USD</th>
               <th className="text-right p-3">TXC</th>
+              <th className="text-right p-3">ISK</th>
               <th className="text-left p-3">Dest</th>
               <th className="text-left p-3">Created</th>
               <th className="text-right p-3">Action</th>
+
             </tr>
           </thead>
           <tbody>
@@ -350,7 +352,7 @@ function OrdersTab() {
               ))}
             {!orders.data?.length && !orders.isLoading ? (
               <tr>
-                <td colSpan={9} className="p-8 text-center text-muted-foreground">
+                <td colSpan={10} className="p-8 text-center text-muted-foreground">
                   No orders yet.
                 </td>
               </tr>
@@ -419,12 +421,14 @@ type OrderRowData = {
   source_token: string;
   source_amount_usd: number;
   dest_address: string;
+  dest_asset: string | null;
   quoted_dest_out: number;
   created_at: string;
   bitmart_filled_dest: number | null;
   dest_tx_hash: string | null;
   error_message: string | null;
 };
+
 
 function OrderRow({
   order: o,
@@ -453,11 +457,21 @@ function OrderRow({
         <td className="p-3">{o.source_chain} · {o.source_token}</td>
         <td className="p-3 text-right">${Number(o.source_amount_usd).toFixed(2)}</td>
         <td className="p-3 text-right">
-          {o.bitmart_filled_dest != null
-            ? Number(o.bitmart_filled_dest).toFixed(4)
-            : Number(o.quoted_dest_out).toFixed(4)}
+          {(o.dest_asset ?? "TXC") === "TXC"
+            ? (o.bitmart_filled_dest != null
+                ? Number(o.bitmart_filled_dest).toFixed(4)
+                : Number(o.quoted_dest_out).toFixed(4))
+            : <span className="text-muted-foreground">—</span>}
+        </td>
+        <td className="p-3 text-right">
+          {(o.dest_asset ?? "TXC") === "ISK"
+            ? (o.bitmart_filled_dest != null
+                ? Number(o.bitmart_filled_dest).toFixed(4)
+                : Number(o.quoted_dest_out).toFixed(4))
+            : <span className="text-muted-foreground">—</span>}
         </td>
         <td className="p-3 truncate max-w-[14ch]">{o.dest_address}</td>
+
         <td className="p-3">{new Date(o.created_at).toLocaleString()}</td>
         <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
           <div className="flex justify-end gap-1 flex-wrap">
@@ -492,7 +506,7 @@ function OrderRow({
       </tr>
       {open ? (
         <tr className="border-t border-border bg-background/40">
-          <td colSpan={9} className="p-0">
+          <td colSpan={10} className="p-0">
             <OrderDetail publicId={o.public_id} />
           </td>
         </tr>

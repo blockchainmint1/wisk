@@ -42,7 +42,7 @@ export const adminListOrders = createServerFn({ method: "POST" })
     const { data: rows, error } = await supabaseAdmin
       .from("orders")
       .select(
-        "public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_address,quoted_dest_out,created_at,paid_amount_usd,bitmart_filled_dest,dest_tx_hash,error_message",
+        "public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_address,quoted_dest_out,created_at,paid_amount_usd,bitmart_filled_dest,dest_tx_hash,dest_asset,error_message",
       )
       .order("created_at", { ascending: false })
       .limit(data.limit);
@@ -67,7 +67,7 @@ export const adminSearchOrders = createServerFn({ method: "POST" })
     const q = data.query.trim();
     const like = `%${q.replace(/[%_]/g, (m) => `\\${m}`)}%`;
     const cols =
-      "public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_address,quoted_dest_out,created_at,paid_amount_usd,bitmart_filled_dest,dest_tx_hash,error_message";
+      "public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_address,quoted_dest_out,created_at,paid_amount_usd,bitmart_filled_dest,dest_tx_hash,dest_asset,error_message";
 
     // 1) Search columns directly on orders.
     const orFilter = [
