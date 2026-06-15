@@ -15,6 +15,7 @@ import {
   adminForceComplete,
   adminForceFail,
   adminGetSettings,
+  adminHotWalletBalances,
   adminInviteAdmin,
   adminListAdmins,
   adminListCustomTokens,
