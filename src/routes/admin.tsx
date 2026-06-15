@@ -174,12 +174,16 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
             </button>
           ))}
         </div>
-        <button
-          onClick={onSignOut}
-          className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-2 rounded hover:bg-foreground hover:text-background transition-colors"
-        >
-          Sign Out
-        </button>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <button
+            onClick={onSignOut}
+            className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-2 rounded hover:bg-foreground hover:text-background transition-colors"
+          >
+            Sign Out
+          </button>
+        </div>
+
       </div>
 
       {tab === "orders" && <OrdersTab />}
