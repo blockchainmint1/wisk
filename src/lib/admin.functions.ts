@@ -102,8 +102,13 @@ export const adminSearchOrders = createServerFn({ method: "POST" })
 
     const seen = new Set((direct.data ?? []).map((r) => (r as { public_id: string }).public_id));
     const extraIds = Array.from(
-      new Set((dep.data ?? []).map((r) => r.order_id).filter(Boolean)),
+      new Set(
+        (dep.data ?? [])
+          .map((r) => r.order_id)
+          .filter((id): id is string => typeof id === "string" && id.length > 0),
+      ),
     );
+
 
     let extras: typeof direct.data = [];
     if (extraIds.length) {
