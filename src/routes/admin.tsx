@@ -3,6 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { SiteFooter, SiteHeader } from "@/components/site-shell";
+import { ThemeToggle } from "@/components/theme-toggle";
+
 import { supabase } from "@/integrations/supabase/client";
 import {
   adminAuditLog,
@@ -17,6 +19,8 @@ import {
   adminListAdmins,
   adminListCustomTokens,
   adminListOrders,
+  adminSearchOrders,
+
   adminOrderDetail,
   adminRetryOrder,
   adminRevokeAdmin,
@@ -174,12 +178,16 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
             </button>
           ))}
         </div>
-        <button
-          onClick={onSignOut}
-          className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-2 rounded hover:bg-foreground hover:text-background transition-colors"
-        >
-          Sign Out
-        </button>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <button
+            onClick={onSignOut}
+            className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-2 rounded hover:bg-foreground hover:text-background transition-colors"
+          >
+            Sign Out
+          </button>
+        </div>
+
       </div>
 
       {tab === "orders" && <OrdersTab />}
@@ -196,6 +204,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
 // ===== Orders Tab =====
 function OrdersTab() {
   const listFn = useServerFn(adminListOrders);
+  const searchFn = useServerFn(adminSearchOrders);
   const balFn = useServerFn(adminBitmartBalances);
   const retryFn = useServerFn(adminRetryOrder);
   const forceCompleteFn = useServerFn(adminForceComplete);
@@ -203,12 +212,28 @@ function OrdersTab() {
 
   const [pageSize, setPageSize] = useState<10 | 25 | 50>(25);
   const [page, setPage] = useState(0);
+  const [searchInput, setSearchInput] = useState("");
+  const [query, setQuery] = useState("");
+
+  // Debounce input → query (300ms).
+  useEffect(() => {
+    const id = setTimeout(() => setQuery(searchInput.trim()), 300);
+    return () => clearTimeout(id);
+  }, [searchInput]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [query]);
 
   const orders = useQuery({
-    queryKey: ["admin", "orders"],
-    queryFn: () => listFn({ data: { limit: 200 } }),
-    refetchInterval: 10_000,
+    queryKey: ["admin", "orders", query],
+    queryFn: () =>
+      query
+        ? searchFn({ data: { query, limit: 200 } })
+        : listFn({ data: { limit: 200 } }),
+    refetchInterval: query ? false : 10_000,
   });
+
   const balances = useQuery({
     queryKey: ["admin", "bitmart-balances"],
     queryFn: () => balFn({}),
@@ -252,9 +277,38 @@ function OrdersTab() {
         </div>
       </div>
 
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[260px]">
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search ID · address · tx hash · withdrawal · bitmart order · chain · status · error…"
+            className="w-full bg-secondary/40 border border-border rounded px-3 py-2 pr-20 text-xs font-mono placeholder:text-muted-foreground focus:outline-none focus:border-foreground/60"
+          />
+          {searchInput ? (
+            <button
+              onClick={() => setSearchInput("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground hover:text-foreground px-2 py-1"
+            >
+              Clear
+            </button>
+          ) : null}
+        </div>
+        {query ? (
+          <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+            {orders.isFetching
+              ? "Searching…"
+              : `${orders.data?.length ?? 0} match${orders.data?.length === 1 ? "" : "es"}`}
+          </span>
+        ) : null}
+      </div>
+
       {ordersErr ? (
         <div className="text-xs font-mono text-accent">{ordersErr.message}</div>
       ) : null}
+
+
 
       <div className="overflow-x-auto border border-border rounded-xl">
         <table className="w-full text-xs font-mono">

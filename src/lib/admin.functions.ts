@@ -50,6 +50,86 @@ export const adminListOrders = createServerFn({ method: "POST" })
     return rows;
   });
 
+// Flexible search across order identifiers, addresses, and tx hashes
+// (incl. deposit-side tx hashes/from-addresses joined via deposits table).
+export const adminSearchOrders = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        query: z.string().trim().min(1).max(200),
+        limit: z.number().int().min(1).max(200).default(100),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const q = data.query.trim();
+    const like = `%${q.replace(/[%_]/g, (m) => `\\${m}`)}%`;
+    const cols =
+      "public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_address,quoted_dest_out,created_at,paid_amount_usd,bitmart_filled_dest,dest_tx_hash,error_message";
+
+    // 1) Search columns directly on orders.
+    const orFilter = [
+      `public_id.ilike.${like}`,
+      `deposit_address.ilike.${like}`,
+      `dest_address.ilike.${like}`,
+      `dest_from_address.ilike.${like}`,
+      `dest_tx_hash.ilike.${like}`,
+      `paid_tx_hash.ilike.${like}`,
+      `bitmart_order_id.ilike.${like}`,
+      `withdrawal_id.ilike.${like}`,
+      `error_message.ilike.${like}`,
+      `source_chain.ilike.${like}`,
+      `source_token.ilike.${like}`,
+    ].join(",");
+
+    const direct = await supabaseAdmin
+      .from("orders")
+      .select(cols)
+      .or(orFilter)
+      .order("created_at", { ascending: false })
+      .limit(data.limit);
+    if (direct.error) throw new Error(direct.error.message);
+
+    // 2) Search deposits (tx hash, from address) → resolve order ids.
+    const dep = await supabaseAdmin
+      .from("deposits")
+      .select("order_id")
+      .or(`tx_hash.ilike.${like},from_address.ilike.${like},to_address.ilike.${like}`)
+      .limit(data.limit);
+    if (dep.error) throw new Error(dep.error.message);
+
+    const seen = new Set((direct.data ?? []).map((r) => (r as { public_id: string }).public_id));
+    const extraIds = Array.from(
+      new Set(
+        (dep.data ?? [])
+          .map((r) => r.order_id)
+          .filter((id): id is string => typeof id === "string" && id.length > 0),
+      ),
+    );
+
+
+    let extras: typeof direct.data = [];
+    if (extraIds.length) {
+      const ex = await supabaseAdmin
+        .from("orders")
+        .select(cols)
+        .in("id", extraIds)
+        .order("created_at", { ascending: false })
+        .limit(data.limit);
+      if (ex.error) throw new Error(ex.error.message);
+      extras = (ex.data ?? []).filter(
+        (r) => !seen.has((r as { public_id: string }).public_id),
+      );
+    }
+
+    return [...(direct.data ?? []), ...extras].slice(0, data.limit);
+  });
+
+
+
+
 // Full detail for one order (for the expandable admin row)
 export const adminOrderDetail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

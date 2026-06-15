@@ -1,6 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import logoAsset from "@/assets/honest-money-logo.png.asset.json";
+import { ThemeToggle } from "@/components/theme-toggle";
+
 
 export function SiteHeader({ ticker }: { ticker?: ReactNode }) {
   return (
@@ -21,12 +23,16 @@ export function SiteHeader({ ticker }: { ticker?: ReactNode }) {
             ) : null}
           </div>
         </div>
-        <Link
-          to="/swap"
-          className="px-4 py-2 border border-border font-mono text-xs hover:bg-foreground hover:text-background transition-colors uppercase tracking-widest"
-        >
-          Launch Swap
-        </Link>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Link
+            to="/swap"
+            className="px-4 py-2 border border-border font-mono text-xs hover:bg-foreground hover:text-background transition-colors uppercase tracking-widest"
+          >
+            Launch Swap
+          </Link>
+        </div>
+
       </div>
     </nav>
   );
