@@ -316,6 +316,21 @@ function OrdersTab() {
             </button>
           ) : null}
         </div>
+        <div className="flex gap-1">
+          {(["all", "open", "completed", "failed"] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => { setStatusFilter(s); setPage(0); }}
+              className={`px-3 py-2 text-[10px] font-mono uppercase tracking-widest rounded border ${
+                statusFilter === s
+                  ? "bg-foreground text-background border-foreground"
+                  : "border-border hover:border-foreground/60"
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
         {query ? (
           <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
             {orders.isFetching
@@ -324,6 +339,7 @@ function OrdersTab() {
           </span>
         ) : null}
       </div>
+
 
       {ordersErr ? (
         <div className="text-xs font-mono text-accent">{ordersErr.message}</div>
