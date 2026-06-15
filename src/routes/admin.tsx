@@ -218,6 +218,7 @@ function OrdersTab() {
   const [page, setPage] = useState(0);
   const [searchInput, setSearchInput] = useState("");
   const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "open" | "completed" | "failed">("all");
 
   // Debounce input → query (300ms).
   useEffect(() => {
