@@ -5,7 +5,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getBalances, getSpotPrice, submitMarketBuy } from "./bitmart.server";
 import { invalidateChainsCache } from "./chains.server";
+import { getIskHotAddresses, getIskAddressBalanceSats } from "./isk-sign.server";
 import { getSettings, invalidateSettingsCache } from "./settings.server";
+import { getTxcHotAddress, getTxcAddressBalanceSats } from "./txc-sign.server";
 import { scanHdWallet } from "./wallet-scan.server";
 
 async function assertAdmin(userId: string) {
@@ -359,6 +361,57 @@ export const adminBitmartBalances = createServerFn({ method: "POST" })
       return { ok: false as const, error: e instanceof Error ? e.message : "Unknown error" };
     }
   });
+
+// ===== Hot wallet balances (EVM stables + TXC + ISK) =====
+export const adminHotWalletBalances = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context.userId);
+
+    const [evmRes, txcRes, iskRes] = await Promise.allSettled([
+      scanHdWallet({ maxAddresses: 1 }),
+      (async () => {
+        const address = getTxcHotAddress();
+        const { confirmed, unconfirmed } = await getTxcAddressBalanceSats(address);
+        return { address, confirmed: confirmed / 1e8, unconfirmed: unconfirmed / 1e8 };
+      })(),
+      (async () => {
+        const { legacy, segwit } = getIskHotAddresses();
+        const [lg, sw] = await Promise.all([
+          getIskAddressBalanceSats(legacy).catch(() => ({ confirmed: 0, unconfirmed: 0 })),
+          getIskAddressBalanceSats(segwit).catch(() => ({ confirmed: 0, unconfirmed: 0 })),
+        ]);
+        return {
+          legacy,
+          segwit,
+          confirmed: (lg.confirmed + sw.confirmed) / 1e8,
+          unconfirmed: (lg.unconfirmed + sw.unconfirmed) / 1e8,
+        };
+      })(),
+    ]);
+
+    const evm =
+      evmRes.status === "fulfilled"
+        ? {
+            ok: true as const,
+            adminUsd: evmRes.value.addresses.find((a) => a.index === 0)?.totalUsd ?? 0,
+            address: evmRes.value.addresses.find((a) => a.index === 0)?.address ?? null,
+          }
+        : { ok: false as const, error: (evmRes.reason as Error)?.message ?? "scan failed" };
+
+    const txc =
+      txcRes.status === "fulfilled"
+        ? { ok: true as const, ...txcRes.value }
+        : { ok: false as const, error: (txcRes.reason as Error)?.message ?? "rpc failed" };
+
+    const isk =
+      iskRes.status === "fulfilled"
+        ? { ok: true as const, ...iskRes.value }
+        : { ok: false as const, error: (iskRes.reason as Error)?.message ?? "rpc failed" };
+
+    return { evm, txc, isk };
+  });
+
 
 // ===== Settings =====
 export const adminGetSettings = createServerFn({ method: "POST" })

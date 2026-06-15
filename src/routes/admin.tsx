@@ -15,6 +15,7 @@ import {
   adminForceComplete,
   adminForceFail,
   adminGetSettings,
+  adminHotWalletBalances,
   adminInviteAdmin,
   adminListAdmins,
   adminListCustomTokens,
@@ -41,7 +42,7 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-type Tab = "orders" | "treasury" | "wallet" | "tokens" | "settings" | "admins" | "audit";
+type Tab = "orders" | "treasury" | "wallet" | "market" | "tokens" | "settings" | "admins" | "audit";
 
 function AdminPage() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -154,6 +155,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
     { id: "orders", label: "Orders" },
     { id: "treasury", label: "Treasury" },
     { id: "wallet", label: "Wallet" },
+    { id: "market", label: "Market" },
     { id: "tokens", label: "Tokens" },
     { id: "settings", label: "Settings" },
     { id: "admins", label: "Admins" },
@@ -193,6 +195,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
       {tab === "orders" && <OrdersTab />}
       {tab === "treasury" && <TreasuryTab />}
       {tab === "wallet" && <WalletTab />}
+      {tab === "market" && <MarketTab />}
       {tab === "tokens" && <TokensTab />}
       {tab === "settings" && <SettingsTab />}
       {tab === "admins" && <AdminsTab />}
@@ -205,7 +208,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
 function OrdersTab() {
   const listFn = useServerFn(adminListOrders);
   const searchFn = useServerFn(adminSearchOrders);
-  const balFn = useServerFn(adminBitmartBalances);
+  const hotFn = useServerFn(adminHotWalletBalances);
   const retryFn = useServerFn(adminRetryOrder);
   const forceCompleteFn = useServerFn(adminForceComplete);
   const forceFailFn = useServerFn(adminForceFail);
@@ -234,10 +237,10 @@ function OrdersTab() {
     refetchInterval: query ? false : 10_000,
   });
 
-  const balances = useQuery({
-    queryKey: ["admin", "bitmart-balances"],
-    queryFn: () => balFn({}),
-    refetchInterval: 30_000,
+  const hot = useQuery({
+    queryKey: ["admin", "hot-wallet-balances"],
+    queryFn: () => hotFn({}),
+    refetchInterval: 60_000,
   });
   const retry = useMutation({
     mutationFn: (publicId: string) => retryFn({ data: { publicId } }),
@@ -259,23 +262,39 @@ function OrdersTab() {
     <div className="space-y-6">
       <div>
         <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-2">
-          Bitmart balances
+          Hot wallet balances
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {balances.data?.ok
-            ? balances.data.items.map((b) => (
-                <div key={b.currency} className="bg-secondary/40 border border-border rounded p-4">
-                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                    {b.currency}
-                  </div>
-                  <div className="font-mono text-lg mt-1">{b.available}</div>
-                </div>
-              ))
-            : balances.data?.ok === false
-              ? <div className="col-span-full text-xs font-mono text-accent">Bitmart: {balances.data.error}</div>
-              : <div className="col-span-full text-[10px] font-mono text-muted-foreground">Loading…</div>}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <BalanceCard
+            label="EVM Stables"
+            value={hot.data?.evm.ok ? `$${hot.data.evm.adminUsd.toFixed(2)}` : null}
+            error={hot.data?.evm.ok === false ? hot.data.evm.error : null}
+          />
+          <BalanceCard
+            label="TXC"
+            value={
+              hot.data?.txc.ok
+                ? `${hot.data.txc.confirmed.toFixed(4)}${
+                    hot.data.txc.unconfirmed ? ` (+${hot.data.txc.unconfirmed.toFixed(4)})` : ""
+                  }`
+                : null
+            }
+            error={hot.data?.txc.ok === false ? hot.data.txc.error : null}
+          />
+          <BalanceCard
+            label="ISK"
+            value={
+              hot.data?.isk.ok
+                ? `${hot.data.isk.confirmed.toFixed(4)}${
+                    hot.data.isk.unconfirmed ? ` (+${hot.data.isk.unconfirmed.toFixed(4)})` : ""
+                  }`
+                : null
+            }
+            error={hot.data?.isk.ok === false ? hot.data.isk.error : null}
+          />
         </div>
       </div>
+
 
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[260px]">
@@ -1741,6 +1760,82 @@ function TokensTab() {
             ) : null}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+// ===== Shared balance card =====
+function BalanceCard({
+  label,
+  value,
+  error,
+}: {
+  label: string;
+  value: string | null;
+  error: string | null;
+}) {
+  return (
+    <div className="bg-secondary/40 border border-border rounded p-4">
+      <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+        {label}
+      </div>
+      {error ? (
+        <div className="font-mono text-xs mt-1 text-accent">{error}</div>
+      ) : (
+        <div className="font-mono text-lg mt-1">{value ?? "…"}</div>
+      )}
+    </div>
+  );
+}
+
+// ===== Market Tab (Bitmart exchange balances) =====
+function MarketTab() {
+  const balFn = useServerFn(adminBitmartBalances);
+  const balances = useQuery({
+    queryKey: ["admin", "bitmart-balances"],
+    queryFn: () => balFn({}),
+    refetchInterval: 30_000,
+  });
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+          Bitmart
+        </div>
+        <p className="text-xs font-mono text-muted-foreground mt-2 max-w-xl leading-relaxed">
+          Live spot balances on the Bitmart exchange account used for
+          replenishment buys and TXC/ISK liquidity.
+        </p>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+            Bitmart balances
+          </div>
+          <button
+            onClick={() => balances.refetch()}
+            className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-1 rounded hover:bg-foreground hover:text-background"
+          >
+            {balances.isFetching ? "…" : "Refresh"}
+          </button>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {balances.data?.ok
+            ? balances.data.items.map((b) => (
+                <div key={b.currency} className="bg-secondary/40 border border-border rounded p-4">
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                    {b.currency}
+                  </div>
+                  <div className="font-mono text-lg mt-1">{b.available}</div>
+                </div>
+              ))
+            : balances.data?.ok === false
+              ? <div className="col-span-full text-xs font-mono text-accent">Bitmart: {balances.data.error}</div>
+              : <div className="col-span-full text-[10px] font-mono text-muted-foreground">Loading…</div>}
+        </div>
       </div>
     </div>
   );
