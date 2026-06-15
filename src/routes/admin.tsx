@@ -20,6 +20,7 @@ import {
   adminListAdmins,
   adminListCustomTokens,
   adminListOrders,
+  adminReconcile,
   adminSearchOrders,
 
   adminOrderDetail,
@@ -217,6 +218,7 @@ function OrdersTab() {
   const [page, setPage] = useState(0);
   const [searchInput, setSearchInput] = useState("");
   const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "open" | "completed" | "failed">("all");
 
   // Debounce input → query (300ms).
   useEffect(() => {
@@ -257,6 +259,19 @@ function OrdersTab() {
   });
 
   const ordersErr = orders.error as Error | null;
+
+  const OPEN_STATUSES = new Set([
+    "awaiting_payment", "pending", "paid", "confirmed",
+    "buying_on_bitmart", "paying_out", "withdrawing",
+  ]);
+  const FAILED_STATUSES = new Set(["failed", "expired", "refunded"]);
+  const filteredOrders = (orders.data ?? []).filter((o) => {
+    if (statusFilter === "all") return true;
+    if (statusFilter === "completed") return o.status === "completed";
+    if (statusFilter === "failed") return FAILED_STATUSES.has(o.status);
+    // open = anything not completed and not in a failed/terminal state
+    return !FAILED_STATUSES.has(o.status) && o.status !== "completed";
+  });
 
   return (
     <div className="space-y-6">
@@ -314,6 +329,21 @@ function OrdersTab() {
             </button>
           ) : null}
         </div>
+        <div className="flex gap-1">
+          {(["all", "open", "completed", "failed"] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => { setStatusFilter(s); setPage(0); }}
+              className={`px-3 py-2 text-[10px] font-mono uppercase tracking-widest rounded border ${
+                statusFilter === s
+                  ? "bg-foreground text-background border-foreground"
+                  : "border-border hover:border-foreground/60"
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
         {query ? (
           <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
             {orders.isFetching
@@ -322,6 +352,7 @@ function OrdersTab() {
           </span>
         ) : null}
       </div>
+
 
       {ordersErr ? (
         <div className="text-xs font-mono text-accent">{ordersErr.message}</div>
@@ -347,7 +378,7 @@ function OrdersTab() {
             </tr>
           </thead>
           <tbody>
-            {(orders.data ?? [])
+            {filteredOrders
               .slice(page * pageSize, page * pageSize + pageSize)
               .map((o) => (
                 <OrderRow
@@ -369,10 +400,10 @@ function OrdersTab() {
                   }}
                 />
               ))}
-            {!orders.data?.length && !orders.isLoading ? (
+            {!filteredOrders.length && !orders.isLoading ? (
               <tr>
                 <td colSpan={10} className="p-8 text-center text-muted-foreground">
-                  No orders yet.
+                  No orders match this filter.
                 </td>
               </tr>
             ) : null}
@@ -381,7 +412,7 @@ function OrdersTab() {
       </div>
 
       {/* Pagination controls */}
-      {orders.data?.length ? (
+      {filteredOrders.length ? (
         <div className="flex items-center justify-between flex-wrap gap-3 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
           <div className="flex items-center gap-2">
             <span>Rows per page</span>
@@ -405,8 +436,8 @@ function OrdersTab() {
           <div className="flex items-center gap-3">
             <span>
               {page * pageSize + 1}–
-              {Math.min((page + 1) * pageSize, orders.data.length)} of{" "}
-              {orders.data.length}
+              {Math.min((page + 1) * pageSize, filteredOrders.length)} of{" "}
+              {filteredOrders.length}
             </span>
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
@@ -418,10 +449,10 @@ function OrdersTab() {
             <button
               onClick={() =>
                 setPage((p) =>
-                  (p + 1) * pageSize < (orders.data?.length ?? 0) ? p + 1 : p,
+                  (p + 1) * pageSize < filteredOrders.length ? p + 1 : p,
                 )
               }
-              disabled={(page + 1) * pageSize >= orders.data.length}
+              disabled={(page + 1) * pageSize >= filteredOrders.length}
               className="px-2 py-1 rounded border border-border hover:border-foreground/60 disabled:opacity-30 disabled:hover:border-border"
             >
               Next
@@ -734,6 +765,7 @@ function TreasuryTab() {
   const scanFn = useServerFn(adminWalletScan);
   const debtFn = useServerFn(adminTreasuryDebt);
   const bulkBuyFn = useServerFn(adminBulkReplenish);
+  const reconcileFn = useServerFn(adminReconcile);
   const qc = useQueryClient();
   const ALL_CHAINS = ["ethereum", "bsc", "base", "arbitrum", "polygon"] as const;
 
@@ -747,6 +779,12 @@ function TreasuryTab() {
     queryKey: ["admin", "treasury-debt"],
     queryFn: () => debtFn(),
     refetchInterval: 30_000,
+  });
+
+  const reconcile = useQuery({
+    queryKey: ["admin", "reconcile"],
+    queryFn: () => reconcileFn({}),
+    refetchInterval: 60_000,
   });
 
   const [bulkAmount, setBulkAmount] = useState("");
@@ -787,6 +825,17 @@ function TreasuryTab() {
           {scan.isFetching ? "Scanning…" : "Refresh"}
         </button>
       </div>
+
+      {/* Reconciliation — are we holding the cash we should? */}
+      {reconcile.data ? (
+        <ReconcilePanel data={reconcile.data} onRefetch={() => reconcile.refetch()} loading={reconcile.isFetching} />
+      ) : reconcile.error ? (
+        <div className="text-xs font-mono text-accent">
+          Reconcile: {(reconcile.error as Error).message}
+        </div>
+      ) : (
+        <div className="text-[10px] font-mono text-muted-foreground">Reconciling…</div>
+      )}
 
       {/* Treasury debt — TXC sold vs TXC re-bought on Bitmart */}
       {debt.data ? (
@@ -1837,6 +1886,155 @@ function MarketTab() {
               : <div className="col-span-full text-[10px] font-mono text-muted-foreground">Loading…</div>}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ===== Reconciliation panel =====
+type ReconcileData = {
+  usdIn: number;
+  usdSpentBuying: number;
+  expectedStablesUsd: number;
+  actualStablesUsd: number;
+  stablesDiff: number;
+  evmStablesUsd: number;
+  bitmartUsdt: number;
+  bitmartTxc: number;
+  bitmartIsk: number;
+  bitmartTxcUsd: number;
+  bitmartIskUsd: number;
+  txcDebt: number;
+  iskDebt: number;
+  txcDebtUsd: number;
+  iskDebtUsd: number;
+  txcPrice: number;
+  iskPrice: number;
+  netPositionUsd: number;
+  orderCount: number;
+  pendingTxcBuys: number;
+  pendingIskBuys: number;
+  bitmartError: string | null;
+  evmError: string | null;
+};
+
+function ReconcilePanel({
+  data: r,
+  onRefetch,
+  loading,
+}: {
+  data: ReconcileData;
+  onRefetch: () => void;
+  loading: boolean;
+}) {
+  const diff = r.stablesDiff;
+  const diffOk = Math.abs(diff) < Math.max(1, r.expectedStablesUsd * 0.02);
+  return (
+    <div className="border border-border bg-secondary/30 rounded-xl p-5 space-y-4">
+      <div className="flex justify-between items-start gap-3 flex-wrap">
+        <div>
+          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+            Reconciliation · do we hold the money?
+          </div>
+          <p className="text-[11px] font-mono text-muted-foreground mt-2 max-w-xl leading-relaxed">
+            <span className="text-foreground">Expected stables</span> = USD paid
+            in by customers − USDT we spent on Bitmart buy-backs.{" "}
+            <span className="text-foreground">Actual</span> = EVM admin stables
+            + Bitmart USDT. A persistent gap means a manual withdrawal,
+            unaccounted fee, or pricing drift.
+          </p>
+        </div>
+        <button
+          onClick={onRefetch}
+          className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-2 rounded hover:bg-foreground hover:text-background"
+        >
+          {loading ? "…" : "Refresh"}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="bg-background/60 border border-border rounded-lg p-3">
+          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+            USD in (completed)
+          </div>
+          <div className="font-mono text-xl mt-1">${r.usdIn.toFixed(2)}</div>
+          <div className="text-[10px] font-mono text-muted-foreground">{r.orderCount} orders</div>
+        </div>
+        <div className="bg-background/60 border border-border rounded-lg p-3">
+          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+            USDT spent rebuying
+          </div>
+          <div className="font-mono text-xl mt-1">${r.usdSpentBuying.toFixed(2)}</div>
+          <div className="text-[10px] font-mono text-muted-foreground">
+            TXC + ISK$ on Bitmart
+          </div>
+        </div>
+        <div className="bg-background/60 border border-border rounded-lg p-3">
+          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+            Expected stables
+          </div>
+          <div className="font-mono text-xl mt-1">${r.expectedStablesUsd.toFixed(2)}</div>
+        </div>
+        <div className="bg-background/60 border border-border rounded-lg p-3">
+          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+            Actual stables
+          </div>
+          <div className="font-mono text-xl mt-1">${r.actualStablesUsd.toFixed(2)}</div>
+          <div className="text-[10px] font-mono text-muted-foreground">
+            EVM ${r.evmStablesUsd.toFixed(0)} · BM USDT ${r.bitmartUsdt.toFixed(0)}
+          </div>
+        </div>
+      </div>
+
+      <div className={`border rounded-lg p-3 ${diffOk ? "border-border bg-background/60" : "border-accent/40 bg-accent/10"}`}>
+        <div className={`text-[10px] font-mono uppercase tracking-widest ${diffOk ? "text-muted-foreground" : "text-accent"}`}>
+          Stables diff (actual − expected)
+        </div>
+        <div className="font-mono text-2xl mt-1">
+          {diff >= 0 ? "+" : ""}${diff.toFixed(2)}
+        </div>
+        <div className="text-[10px] font-mono text-muted-foreground mt-1">
+          {diffOk
+            ? "Within tolerance (≤2% / $1). Looks balanced."
+            : "Outside tolerance — investigate withdrawals, unfilled buys, or pricing drift."}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-border">
+        <div className="bg-background/60 border border-border rounded-lg p-3">
+          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+            TXC debt owed
+          </div>
+          <div className="font-mono text-lg mt-1">{r.txcDebt.toFixed(4)} TXC</div>
+          <div className="text-[10px] font-mono text-muted-foreground">
+            ≈ ${r.txcDebtUsd.toFixed(2)} @ ${r.txcPrice.toFixed(6)} · {r.pendingTxcBuys} pending
+          </div>
+        </div>
+        <div className="bg-background/60 border border-border rounded-lg p-3">
+          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+            ISK$ debt owed
+          </div>
+          <div className="font-mono text-lg mt-1">{r.iskDebt.toFixed(4)} ISK$</div>
+          <div className="text-[10px] font-mono text-muted-foreground">
+            ≈ ${r.iskDebtUsd.toFixed(2)} @ ${r.iskPrice.toFixed(6)} · {r.pendingIskBuys} pending
+          </div>
+        </div>
+        <div className="bg-background/60 border border-border rounded-lg p-3">
+          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+            Net position (mark-to-market)
+          </div>
+          <div className="font-mono text-lg mt-1">${r.netPositionUsd.toFixed(2)}</div>
+          <div className="text-[10px] font-mono text-muted-foreground">
+            stables + BM inventory − asset debt
+          </div>
+        </div>
+      </div>
+
+      {(r.bitmartError || r.evmError) ? (
+        <div className="text-[10px] font-mono text-accent space-y-1">
+          {r.evmError ? <div>EVM scan: {r.evmError}</div> : null}
+          {r.bitmartError ? <div>Bitmart: {r.bitmartError}</div> : null}
+        </div>
+      ) : null}
     </div>
   );
 }
