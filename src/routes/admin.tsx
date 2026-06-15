@@ -19,6 +19,8 @@ import {
   adminListAdmins,
   adminListCustomTokens,
   adminListOrders,
+  adminSearchOrders,
+
   adminOrderDetail,
   adminRetryOrder,
   adminRevokeAdmin,
