@@ -120,6 +120,9 @@ export const adminSearchOrders = createServerFn({ method: "POST" })
     }
 
     return [...(direct.data ?? []), ...extras].slice(0, data.limit);
+  });
+
+
 
 
 // Full detail for one order (for the expandable admin row)
