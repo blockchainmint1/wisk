@@ -1764,3 +1764,79 @@ function TokensTab() {
     </div>
   );
 }
+
+// ===== Shared balance card =====
+function BalanceCard({
+  label,
+  value,
+  error,
+}: {
+  label: string;
+  value: string | null;
+  error: string | null;
+}) {
+  return (
+    <div className="bg-secondary/40 border border-border rounded p-4">
+      <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+        {label}
+      </div>
+      {error ? (
+        <div className="font-mono text-xs mt-1 text-accent">{error}</div>
+      ) : (
+        <div className="font-mono text-lg mt-1">{value ?? "…"}</div>
+      )}
+    </div>
+  );
+}
+
+// ===== Market Tab (Bitmart exchange balances) =====
+function MarketTab() {
+  const balFn = useServerFn(adminBitmartBalances);
+  const balances = useQuery({
+    queryKey: ["admin", "bitmart-balances"],
+    queryFn: () => balFn({}),
+    refetchInterval: 30_000,
+  });
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+          Bitmart
+        </div>
+        <p className="text-xs font-mono text-muted-foreground mt-2 max-w-xl leading-relaxed">
+          Live spot balances on the Bitmart exchange account used for
+          replenishment buys and TXC/ISK liquidity.
+        </p>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+            Bitmart balances
+          </div>
+          <button
+            onClick={() => balances.refetch()}
+            className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-1 rounded hover:bg-foreground hover:text-background"
+          >
+            {balances.isFetching ? "…" : "Refresh"}
+          </button>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {balances.data?.ok
+            ? balances.data.items.map((b) => (
+                <div key={b.currency} className="bg-secondary/40 border border-border rounded p-4">
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                    {b.currency}
+                  </div>
+                  <div className="font-mono text-lg mt-1">{b.available}</div>
+                </div>
+              ))
+            : balances.data?.ok === false
+              ? <div className="col-span-full text-xs font-mono text-accent">Bitmart: {balances.data.error}</div>
+              : <div className="col-span-full text-[10px] font-mono text-muted-foreground">Loading…</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
