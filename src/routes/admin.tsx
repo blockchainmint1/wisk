@@ -42,7 +42,7 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-type Tab = "orders" | "treasury" | "wallet" | "tokens" | "settings" | "admins" | "audit";
+type Tab = "orders" | "treasury" | "wallet" | "market" | "tokens" | "settings" | "admins" | "audit";
 
 function AdminPage() {
   const [userId, setUserId] = useState<string | null>(null);
