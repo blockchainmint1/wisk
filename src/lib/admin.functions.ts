@@ -412,6 +412,124 @@ export const adminHotWalletBalances = createServerFn({ method: "POST" })
     return { evm, txc, isk };
   });
 
+// ===== Reconciliation =====
+// Compare what we *should* hold (USD in − USD spent on Bitmart buybacks)
+// against what we *actually* hold (EVM stables + Bitmart USDT), and surface
+// any unfilled asset debt (TXC + ISK$) at current spot price.
+export const adminReconcile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context.userId);
+
+    // 1) Completed orders — money in + assets sold + USDT spent rebuying.
+    const { data: rows, error } = await supabaseAdmin
+      .from("orders")
+      .select(
+        "dest_asset,quoted_dest_out,bitmart_filled_dest,bitmart_avg_price,paid_amount_usd,status,bitmart_order_id",
+      )
+      .eq("status", "completed");
+    if (error) throw new Error(error.message);
+
+    let usdIn = 0;
+    let usdSpentBuying = 0;
+    const byAsset: Record<"TXC" | "ISK$", { sold: number; bought: number; pendingBuys: number }> = {
+      TXC: { sold: 0, bought: 0, pendingBuys: 0 },
+      "ISK$": { sold: 0, bought: 0, pendingBuys: 0 },
+    };
+    for (const r of rows ?? []) {
+      usdIn += Number(r.paid_amount_usd ?? 0);
+      const bought = Number(r.bitmart_filled_dest ?? 0);
+      const avg = Number(r.bitmart_avg_price ?? 0);
+      if (bought > 0 && avg > 0) usdSpentBuying += bought * avg;
+      const asset = (r.dest_asset ?? "TXC") as "TXC" | "ISK$";
+      if (byAsset[asset]) {
+        byAsset[asset].sold += Number(r.quoted_dest_out ?? 0);
+        byAsset[asset].bought += bought;
+        if (r.bitmart_order_id && r.bitmart_filled_dest == null) byAsset[asset].pendingBuys += 1;
+      }
+    }
+
+    const expectedStablesUsd = usdIn - usdSpentBuying;
+
+    // 2) Actual stables on hand: admin EVM + Bitmart USDT.
+    const [evmRes, bitmartRes, txcSpot, iskSpot] = await Promise.allSettled([
+      scanHdWallet({ maxAddresses: 1 }),
+      getBalances(),
+      getSpotPrice("TXC_USDT"),
+      getSpotPrice("ISK$_USDT"),
+    ]);
+
+    const evmStablesUsd =
+      evmRes.status === "fulfilled"
+        ? evmRes.value.addresses.find((a) => a.index === 0)?.totalUsd ?? 0
+        : 0;
+
+    let bitmartUsdt = 0;
+    let bitmartTxc = 0;
+    let bitmartIsk = 0;
+    if (bitmartRes.status === "fulfilled") {
+      for (const b of bitmartRes.value) {
+        const c = b.currency.toUpperCase();
+        const amt = Number(b.available);
+        if (c === "USDT") bitmartUsdt += amt;
+        else if (c === "TXC") bitmartTxc += amt;
+        else if (c === "ISK$") bitmartIsk += amt;
+      }
+    }
+
+    const txcPrice = txcSpot.status === "fulfilled" ? txcSpot.value : 0;
+    const iskPrice = iskSpot.status === "fulfilled" ? iskSpot.value : 0;
+
+    const actualStablesUsd = evmStablesUsd + bitmartUsdt;
+    const stablesDiff = actualStablesUsd - expectedStablesUsd;
+
+    const txcDebt = Math.max(0, byAsset.TXC.sold - byAsset.TXC.bought);
+    const iskDebt = Math.max(0, byAsset["ISK$"].sold - byAsset["ISK$"].bought);
+    const txcDebtUsd = txcDebt * txcPrice;
+    const iskDebtUsd = iskDebt * iskPrice;
+
+    // Net position: stables we hold + bitmart asset inventory (TXC/ISK) we
+    // already bought back − the still-owed asset debt at current spot.
+    const bitmartTxcUsd = bitmartTxc * txcPrice;
+    const bitmartIskUsd = bitmartIsk * iskPrice;
+    const netPositionUsd =
+      actualStablesUsd + bitmartTxcUsd + bitmartIskUsd - txcDebtUsd - iskDebtUsd;
+
+    return {
+      usdIn: +usdIn.toFixed(2),
+      usdSpentBuying: +usdSpentBuying.toFixed(2),
+      expectedStablesUsd: +expectedStablesUsd.toFixed(2),
+      actualStablesUsd: +actualStablesUsd.toFixed(2),
+      stablesDiff: +stablesDiff.toFixed(2),
+      evmStablesUsd: +evmStablesUsd.toFixed(2),
+      bitmartUsdt: +bitmartUsdt.toFixed(2),
+      bitmartTxc: +bitmartTxc.toFixed(4),
+      bitmartIsk: +bitmartIsk.toFixed(4),
+      bitmartTxcUsd: +bitmartTxcUsd.toFixed(2),
+      bitmartIskUsd: +bitmartIskUsd.toFixed(2),
+      txcDebt: +txcDebt.toFixed(4),
+      iskDebt: +iskDebt.toFixed(4),
+      txcDebtUsd: +txcDebtUsd.toFixed(2),
+      iskDebtUsd: +iskDebtUsd.toFixed(2),
+      txcPrice,
+      iskPrice,
+      netPositionUsd: +netPositionUsd.toFixed(2),
+      orderCount: rows?.length ?? 0,
+      pendingTxcBuys: byAsset.TXC.pendingBuys,
+      pendingIskBuys: byAsset["ISK$"].pendingBuys,
+      bitmartError:
+        bitmartRes.status === "rejected"
+          ? (bitmartRes.reason as Error)?.message ?? "bitmart failed"
+          : null,
+      evmError:
+        evmRes.status === "rejected"
+          ? (evmRes.reason as Error)?.message ?? "evm scan failed"
+          : null,
+    };
+  });
+
+
+
 
 // ===== Settings =====
 export const adminGetSettings = createServerFn({ method: "POST" })
