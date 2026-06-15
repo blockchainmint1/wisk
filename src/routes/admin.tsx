@@ -208,7 +208,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
 function OrdersTab() {
   const listFn = useServerFn(adminListOrders);
   const searchFn = useServerFn(adminSearchOrders);
-  const balFn = useServerFn(adminBitmartBalances);
+  const hotFn = useServerFn(adminHotWalletBalances);
   const retryFn = useServerFn(adminRetryOrder);
   const forceCompleteFn = useServerFn(adminForceComplete);
   const forceFailFn = useServerFn(adminForceFail);
