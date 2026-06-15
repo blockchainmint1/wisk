@@ -796,6 +796,17 @@ function TreasuryTab() {
         </button>
       </div>
 
+      {/* Reconciliation — are we holding the cash we should? */}
+      {reconcile.data ? (
+        <ReconcilePanel data={reconcile.data} onRefetch={() => reconcile.refetch()} loading={reconcile.isFetching} />
+      ) : reconcile.error ? (
+        <div className="text-xs font-mono text-accent">
+          Reconcile: {(reconcile.error as Error).message}
+        </div>
+      ) : (
+        <div className="text-[10px] font-mono text-muted-foreground">Reconciling…</div>
+      )}
+
       {/* Treasury debt — TXC sold vs TXC re-bought on Bitmart */}
       {debt.data ? (
         <div className="border border-border bg-secondary/30 rounded-xl p-5 space-y-4">
