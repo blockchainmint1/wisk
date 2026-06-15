@@ -412,7 +412,7 @@ function OrdersTab() {
       </div>
 
       {/* Pagination controls */}
-      {orders.data?.length ? (
+      {filteredOrders.length ? (
         <div className="flex items-center justify-between flex-wrap gap-3 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
           <div className="flex items-center gap-2">
             <span>Rows per page</span>
