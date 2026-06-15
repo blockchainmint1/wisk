@@ -378,7 +378,7 @@ function OrdersTab() {
             </tr>
           </thead>
           <tbody>
-            {(orders.data ?? [])
+            {filteredOrders
               .slice(page * pageSize, page * pageSize + pageSize)
               .map((o) => (
                 <OrderRow
@@ -400,10 +400,10 @@ function OrdersTab() {
                   }}
                 />
               ))}
-            {!orders.data?.length && !orders.isLoading ? (
+            {!filteredOrders.length && !orders.isLoading ? (
               <tr>
                 <td colSpan={10} className="p-8 text-center text-muted-foreground">
-                  No orders yet.
+                  No orders match this filter.
                 </td>
               </tr>
             ) : null}
