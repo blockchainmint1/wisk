@@ -436,8 +436,8 @@ function OrdersTab() {
           <div className="flex items-center gap-3">
             <span>
               {page * pageSize + 1}–
-              {Math.min((page + 1) * pageSize, orders.data.length)} of{" "}
-              {orders.data.length}
+              {Math.min((page + 1) * pageSize, filteredOrders.length)} of{" "}
+              {filteredOrders.length}
             </span>
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
@@ -449,10 +449,10 @@ function OrdersTab() {
             <button
               onClick={() =>
                 setPage((p) =>
-                  (p + 1) * pageSize < (orders.data?.length ?? 0) ? p + 1 : p,
+                  (p + 1) * pageSize < filteredOrders.length ? p + 1 : p,
                 )
               }
-              disabled={(page + 1) * pageSize >= orders.data.length}
+              disabled={(page + 1) * pageSize >= filteredOrders.length}
               className="px-2 py-1 rounded border border-border hover:border-foreground/60 disabled:opacity-30 disabled:hover:border-border"
             >
               Next
