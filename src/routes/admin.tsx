@@ -352,7 +352,7 @@ function OrdersTab() {
               ))}
             {!orders.data?.length && !orders.isLoading ? (
               <tr>
-                <td colSpan={9} className="p-8 text-center text-muted-foreground">
+                <td colSpan={10} className="p-8 text-center text-muted-foreground">
                   No orders yet.
                 </td>
               </tr>
@@ -506,7 +506,7 @@ function OrderRow({
       </tr>
       {open ? (
         <tr className="border-t border-border bg-background/40">
-          <td colSpan={9} className="p-0">
+          <td colSpan={10} className="p-0">
             <OrderDetail publicId={o.public_id} />
           </td>
         </tr>
