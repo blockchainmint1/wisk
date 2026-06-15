@@ -419,12 +419,14 @@ type OrderRowData = {
   source_token: string;
   source_amount_usd: number;
   dest_address: string;
+  dest_asset: string | null;
   quoted_dest_out: number;
   created_at: string;
   bitmart_filled_dest: number | null;
   dest_tx_hash: string | null;
   error_message: string | null;
 };
+
 
 function OrderRow({
   order: o,
