@@ -195,6 +195,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
       {tab === "orders" && <OrdersTab />}
       {tab === "treasury" && <TreasuryTab />}
       {tab === "wallet" && <WalletTab />}
+      {tab === "market" && <MarketTab />}
       {tab === "tokens" && <TokensTab />}
       {tab === "settings" && <SettingsTab />}
       {tab === "admins" && <AdminsTab />}
