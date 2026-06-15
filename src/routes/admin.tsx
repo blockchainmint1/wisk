@@ -320,9 +320,11 @@ function OrdersTab() {
               <th className="text-left p-3">Source</th>
               <th className="text-right p-3">USD</th>
               <th className="text-right p-3">TXC</th>
+              <th className="text-right p-3">ISK</th>
               <th className="text-left p-3">Dest</th>
               <th className="text-left p-3">Created</th>
               <th className="text-right p-3">Action</th>
+
             </tr>
           </thead>
           <tbody>
