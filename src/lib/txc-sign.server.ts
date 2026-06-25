@@ -24,13 +24,13 @@ export const TXC_NETWORK: bitcoin.networks.Network = {
   wif: 0xc1,
 };
 
-// New mempool.texitcoin.org deployment exposes Esplora-compatible reads only
-// under /api/v1. The legacy /api path now serves the SPA HTML and would cause
-// JSON.parse to fall through to a string, producing
-// "allUtxos.slice(...).sort is not a function" downstream. Override via env
-// when their broadcast endpoint lands.
+// API host is api.mempool.texitcoin.org — the bare mempool.texitcoin.org
+// is the explorer SPA (custom domain on this Lovable project) and returns
+// HTML for any /api path, which is what produced the earlier
+// "allUtxos.slice(...).sort is not a function" red herring. Override via env.
 const ESPLORA =
-  process.env.TXC_MEMPOOL_URL?.trim() || "https://mempool.texitcoin.org/api/v1";
+  process.env.TXC_MEMPOOL_URL?.trim() ||
+  "https://api.mempool.texitcoin.org/api/v1";
 
 // ===== Hot-wallet keypair (lazy, server-only) =====
 function getWif(): string {
