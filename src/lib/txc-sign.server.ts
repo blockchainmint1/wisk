@@ -128,7 +128,7 @@ interface RecommendedFees {
 
 async function getFeeRateSatsPerVb(): Promise<number> {
   try {
-    const fees = await esplora<RecommendedFees>("/v1/fees/recommended");
+    const fees = await esplora<RecommendedFees>("/fees/recommended");
     // halfHourFee is a good default; clamp to a safe range.
     const rate = Math.max(
       Math.min(fees.halfHourFee || fees.hourFee || 2, 200),
