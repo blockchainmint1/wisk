@@ -92,7 +92,20 @@ export async function getTxcAddressBalanceSats(address: string): Promise<{
 }
 
 async function getUtxos(address: string): Promise<EsploraUtxo[]> {
-  return esplora<EsploraUtxo[]>(`/address/${address}/utxo`);
+  // Esplora can transiently return non-JSON (HTML error page) which our
+  // esplora() helper passes through as a string. Retry once, then validate.
+  let last: unknown = null;
+  for (let i = 0; i < 2; i++) {
+    const r = await esplora<unknown>(`/address/${address}/utxo`);
+    if (Array.isArray(r)) return r as EsploraUtxo[];
+    last = r;
+    await new Promise((res) => setTimeout(res, 400));
+  }
+  throw new Error(
+    `Esplora /address/${address}/utxo did not return an array: ${
+      typeof last === "string" ? last.slice(0, 200) : JSON.stringify(last).slice(0, 200)
+    }`,
+  );
 }
 
 async function getRawTxHex(txid: string): Promise<string> {
