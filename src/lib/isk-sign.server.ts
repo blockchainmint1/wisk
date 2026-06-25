@@ -28,7 +28,10 @@ export const ISK_NETWORK: bitcoin.networks.Network = {
   wif: 0xad,
 };
 
-const ESPLORA = "https://mempool.iskandercoin.com/api";
+// Override via ISK_MEMPOOL_URL when the explorer moves reads to /api/v1
+// (mirrors the TXC switch). Default stays on /api until ISK's mempool flips.
+const ESPLORA =
+  process.env.ISK_MEMPOOL_URL?.trim() || "https://mempool.iskandercoin.com/api";
 
 // ===== Hot-wallet keypair (lazy, server-only) =====
 function getWif(): string {
