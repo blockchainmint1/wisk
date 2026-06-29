@@ -554,7 +554,19 @@ async function pollWithdrawals() {
 export const Route = createFileRoute("/api/public/hooks/swap-tick")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        // Auth: this endpoint triggers real on-chain payouts, Bitmart orders,
+        // and Alchemy quota usage. Only the pg_cron job (which sends the
+        // project's publishable/anon key in the `apikey` header) may invoke it.
+        const expected = process.env.SUPABASE_PUBLISHABLE_KEY;
+        const provided =
+          request.headers.get("apikey") ??
+          request.headers.get("x-cron-key") ??
+          request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
+          "";
+        if (!expected || provided !== expected) {
+          return new Response("Unauthorized", { status: 401 });
+        }
         const started = Date.now();
         const result = {
           expired: 0,
