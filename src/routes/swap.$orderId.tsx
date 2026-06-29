@@ -3,12 +3,15 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
+import { z } from "zod";
+import { EmbedResize } from "@/components/embed-resize";
 import { LiveTicker } from "@/components/live-ticker";
 import { SiteFooter, SiteHeader } from "@/components/site-shell";
 import { getOrder } from "@/lib/orders.functions";
 import { recordSwap } from "@/lib/swap-history";
 
 export const Route = createFileRoute("/swap/$orderId")({
+  validateSearch: (s) => z.object({ embed: z.coerce.number().optional() }).parse(s),
   loader: ({ params }) => getOrder({ data: { publicId: params.orderId } }),
   head: ({ params }) => ({
     meta: [
@@ -48,6 +51,8 @@ function makeSteps(asset: string) {
 
 function OrderPage() {
   const { orderId } = Route.useParams();
+  const search = Route.useSearch();
+  const isEmbed = search.embed === 1;
   const initialOrder = Route.useLoaderData();
   const fn = useServerFn(getOrder);
   const { data: order, error, isError, isPending } = useQuery({
@@ -84,7 +89,7 @@ function OrderPage() {
   if (isPending) {
     return (
       <div className="min-h-screen">
-        <SiteHeader ticker={<LiveTicker />} />
+        {isEmbed ? <EmbedResize /> : <SiteHeader ticker={<LiveTicker />} />}
         <div className="max-w-4xl mx-auto px-4 py-20 font-mono text-sm text-muted-foreground">
           Loading order…
         </div>
@@ -95,7 +100,7 @@ function OrderPage() {
   if (isError || !order) {
     return (
       <div className="min-h-screen">
-        <SiteHeader ticker={<LiveTicker />} />
+        {isEmbed ? <EmbedResize /> : <SiteHeader ticker={<LiveTicker />} />}
         <main className="max-w-4xl mx-auto px-4 py-20 font-mono text-sm">
           <div className="text-accent mb-2">Order not found</div>
           <div className="text-muted-foreground break-all">
@@ -105,7 +110,7 @@ function OrderPage() {
             Start a new swap
           </Link>
         </main>
-        <SiteFooter />
+        {isEmbed ? null : <SiteFooter />}
       </div>
     );
   }
@@ -120,7 +125,7 @@ function OrderPage() {
 
   return (
     <div className="min-h-screen">
-      <SiteHeader ticker={<LiveTicker />} />
+      {isEmbed ? <EmbedResize /> : <SiteHeader ticker={<LiveTicker />} />}
       <main className="max-w-5xl mx-auto px-4 py-12 md:py-16">
         <div className="flex items-center justify-between mb-10">
           <div>
@@ -250,7 +255,7 @@ function OrderPage() {
           </div>
         </div>
       </main>
-      <SiteFooter />
+      {isEmbed ? null : <SiteFooter />}
     </div>
   );
 }

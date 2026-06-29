@@ -14,6 +14,8 @@ import { Route as SwapRouteImport } from './routes/swap'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as FaqRouteImport } from './routes/faq'
+import { Route as EmbedBuilderRouteImport } from './routes/embed-builder'
+import { Route as EmbedRouteImport } from './routes/embed'
 import { Route as ChangeLogRouteImport } from './routes/change-log'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
@@ -44,6 +46,16 @@ const PrivacyRoute = PrivacyRouteImport.update({
 const FaqRoute = FaqRouteImport.update({
   id: '/faq',
   path: '/faq',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmbedBuilderRoute = EmbedBuilderRouteImport.update({
+  id: '/embed-builder',
+  path: '/embed-builder',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmbedRoute = EmbedRouteImport.update({
+  id: '/embed',
+  path: '/embed',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChangeLogRoute = ChangeLogRouteImport.update({
@@ -81,6 +93,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/change-log': typeof ChangeLogRoute
+  '/embed': typeof EmbedRoute
+  '/embed-builder': typeof EmbedBuilderRoute
   '/faq': typeof FaqRoute
   '/privacy': typeof PrivacyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -94,6 +108,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/change-log': typeof ChangeLogRoute
+  '/embed': typeof EmbedRoute
+  '/embed-builder': typeof EmbedBuilderRoute
   '/faq': typeof FaqRoute
   '/privacy': typeof PrivacyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -107,6 +123,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/change-log': typeof ChangeLogRoute
+  '/embed': typeof EmbedRoute
+  '/embed-builder': typeof EmbedBuilderRoute
   '/faq': typeof FaqRoute
   '/privacy': typeof PrivacyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -122,6 +140,8 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/change-log'
+    | '/embed'
+    | '/embed-builder'
     | '/faq'
     | '/privacy'
     | '/sitemap.xml'
@@ -135,6 +155,8 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/change-log'
+    | '/embed'
+    | '/embed-builder'
     | '/faq'
     | '/privacy'
     | '/sitemap.xml'
@@ -147,6 +169,8 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/change-log'
+    | '/embed'
+    | '/embed-builder'
     | '/faq'
     | '/privacy'
     | '/sitemap.xml'
@@ -161,6 +185,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   ChangeLogRoute: typeof ChangeLogRoute
+  EmbedRoute: typeof EmbedRoute
+  EmbedBuilderRoute: typeof EmbedBuilderRoute
   FaqRoute: typeof FaqRoute
   PrivacyRoute: typeof PrivacyRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -204,6 +230,20 @@ declare module '@tanstack/react-router' {
       path: '/faq'
       fullPath: '/faq'
       preLoaderRoute: typeof FaqRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/embed-builder': {
+      id: '/embed-builder'
+      path: '/embed-builder'
+      fullPath: '/embed-builder'
+      preLoaderRoute: typeof EmbedBuilderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/embed': {
+      id: '/embed'
+      path: '/embed'
+      fullPath: '/embed'
+      preLoaderRoute: typeof EmbedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/change-log': {
@@ -267,6 +307,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   ChangeLogRoute: ChangeLogRoute,
+  EmbedRoute: EmbedRoute,
+  EmbedBuilderRoute: EmbedBuilderRoute,
   FaqRoute: FaqRoute,
   PrivacyRoute: PrivacyRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
