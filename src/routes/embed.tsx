@@ -58,8 +58,6 @@ function EmbedPage() {
     );
     return filtered.length > 0 ? filtered : ["TXC"];
   }, [search.assets, search.asset]);
-    return filtered.length > 0 ? filtered : ["TXC"];
-  }, [search.assets, search.asset]);
 
   const [destAsset, setDestAsset] = useState<DestAsset>(allowedAssets[0]);
   if (!allowedAssets.includes(destAsset)) {
