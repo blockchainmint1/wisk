@@ -12,6 +12,7 @@ import { getQuote } from "@/lib/quote.functions";
 
 const EmbedSearch = z.object({
   asset: z.enum(DEST_ASSETS as [DestAsset, ...DestAsset[]]).optional(),
+  assets: z.string().optional(), // comma-separated, e.g. "TXC,ISK$"
   amount: z.coerce.number().positive().optional(),
   chain: z.string().optional(),
   token: z.string().optional(),
@@ -45,7 +46,23 @@ function EmbedPage() {
   const [chain, setChain] = useState<string>(search.chain ?? "ethereum");
   const [token, setToken] = useState<string>(search.token ?? "USDC");
   const [amount, setAmount] = useState<string>(String(search.amount ?? 1000));
-  const destAsset: DestAsset = search.asset ?? "TXC";
+
+  const allowedAssets: DestAsset[] = useMemo(() => {
+    const raw: string[] = search.assets
+      ? search.assets.split(",").map((s: string) => s.trim()).filter(Boolean)
+      : search.asset
+        ? [search.asset]
+        : ["TXC"];
+    const filtered = raw.filter((a: string): a is DestAsset =>
+      (DEST_ASSETS as string[]).includes(a),
+    );
+    return filtered.length > 0 ? filtered : ["TXC"];
+  }, [search.assets, search.asset]);
+
+  const [destAsset, setDestAsset] = useState<DestAsset>(allowedAssets[0]);
+  if (!allowedAssets.includes(destAsset)) {
+    setDestAsset(allowedAssets[0]);
+  }
 
 
 
@@ -135,7 +152,28 @@ function EmbedPage() {
         </div>
 
         <div className="bg-background border border-border rounded-xl p-5 space-y-4">
-          {/* Embed is TXC-only */}
+          {allowedAssets.length > 1 ? (
+            <Field label="Destination Asset">
+              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${allowedAssets.length}, minmax(0, 1fr))` }}>
+                {allowedAssets.map((a) => (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => { setDestAsset(a); setDest(""); }}
+                    className={`p-3 rounded-lg font-mono text-sm border transition-colors ${
+                      a === destAsset
+                        ? "border-accent text-accent bg-accent/10"
+                        : "border-border bg-secondary text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {DESTINATIONS[a].label}
+                  </button>
+                ))}
+              </div>
+            </Field>
+          ) : null}
+
+
 
 
           <Field label="Source Chain">
