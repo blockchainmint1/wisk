@@ -84,8 +84,21 @@ function EmbedBuilder() {
             </h2>
 
             <Field label="Destination asset">
-              <div className="p-3 rounded-lg font-mono text-sm border border-accent text-accent bg-accent/10">
-                {DESTINATIONS.TXC.label} — TEXITcoin (only asset supported in embed)
+              <div className="grid grid-cols-2 gap-2">
+                {(["TXC", "ISK$"] as const).map((a) => (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => setAsset(a)}
+                    className={`p-3 rounded-lg font-mono text-sm border transition-colors ${
+                      a === asset
+                        ? "border-accent text-accent bg-accent/10"
+                        : "border-border bg-secondary text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {DESTINATIONS[a].label}
+                  </button>
+                ))}
               </div>
             </Field>
 
