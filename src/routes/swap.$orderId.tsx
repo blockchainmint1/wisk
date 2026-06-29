@@ -89,7 +89,7 @@ function OrderPage() {
   if (isPending) {
     return (
       <div className="min-h-screen">
-        <SiteHeader ticker={<LiveTicker />} />
+        {isEmbed ? <EmbedResize /> : <SiteHeader ticker={<LiveTicker />} />}
         <div className="max-w-4xl mx-auto px-4 py-20 font-mono text-sm text-muted-foreground">
           Loading order…
         </div>
@@ -100,7 +100,7 @@ function OrderPage() {
   if (isError || !order) {
     return (
       <div className="min-h-screen">
-        <SiteHeader ticker={<LiveTicker />} />
+        {isEmbed ? <EmbedResize /> : <SiteHeader ticker={<LiveTicker />} />}
         <main className="max-w-4xl mx-auto px-4 py-20 font-mono text-sm">
           <div className="text-accent mb-2">Order not found</div>
           <div className="text-muted-foreground break-all">
@@ -110,7 +110,7 @@ function OrderPage() {
             Start a new swap
           </Link>
         </main>
-        <SiteFooter />
+        {isEmbed ? null : <SiteFooter />}
       </div>
     );
   }
@@ -125,7 +125,7 @@ function OrderPage() {
 
   return (
     <div className="min-h-screen">
-      <SiteHeader ticker={<LiveTicker />} />
+      {isEmbed ? <EmbedResize /> : <SiteHeader ticker={<LiveTicker />} />}
       <main className="max-w-5xl mx-auto px-4 py-12 md:py-16">
         <div className="flex items-center justify-between mb-10">
           <div>
