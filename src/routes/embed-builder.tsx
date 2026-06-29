@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { SiteFooter, SiteHeader } from "@/components/site-shell";
-import { DEST_ASSETS, type DestAsset } from "@/lib/destinations";
+import { DESTINATIONS } from "@/lib/destinations";
 
 export const Route = createFileRoute("/embed-builder")({
   head: () => ({
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/embed-builder")({
 const ORIGIN = "https://swap.honest.money";
 
 function EmbedBuilder() {
-  const [asset, setAsset] = useState<DestAsset>("TXC");
+  const asset = "TXC" as const;
   const [amount, setAmount] = useState<string>("1000");
   const [chain, setChain] = useState<string>("");
   const [token, setToken] = useState<string>("");
@@ -82,24 +82,12 @@ function EmbedBuilder() {
               1 · Configure defaults
             </h2>
 
-            <Field label="Default destination asset">
-              <div className="grid grid-cols-2 gap-2">
-                {DEST_ASSETS.map((a) => (
-                  <button
-                    key={a}
-                    type="button"
-                    onClick={() => setAsset(a)}
-                    className={`p-3 rounded-lg font-mono text-sm border transition-colors ${
-                      a === asset
-                        ? "border-accent text-accent bg-accent/10"
-                        : "border-border bg-secondary text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {a}
-                  </button>
-                ))}
+            <Field label="Destination asset">
+              <div className="p-3 rounded-lg font-mono text-sm border border-accent text-accent bg-accent/10">
+                {DESTINATIONS.TXC.label} — TEXITcoin (only asset supported in embed)
               </div>
             </Field>
+
 
             <Field label="Default USD amount">
               <input
