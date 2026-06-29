@@ -20,7 +20,7 @@ export const Route = createFileRoute("/embed-builder")({
 const ORIGIN = "https://swap.honest.money";
 
 function EmbedBuilder() {
-  const asset = "TXC" as const;
+  const [asset, setAsset] = useState<"TXC" | "ISK">("TXC");
   const [amount, setAmount] = useState<string>("1000");
   const [chain, setChain] = useState<string>("");
   const [token, setToken] = useState<string>("");
@@ -43,12 +43,13 @@ function EmbedBuilder() {
   const snippet = useMemo(() => {
     const widthAttr = /^\d+$/.test(width) ? `${width}` : width;
     const heightAttr = /^\d+$/.test(height) ? `${height}` : height;
-    const iframe = `<iframe id="swap-honest-money" src="${url}" style="width:${widthAttr === "100%" ? "100%" : `${widthAttr}px`};height:${/^\d+$/.test(heightAttr) ? `${heightAttr}px` : heightAttr};border:0;background:transparent" allow="clipboard-write" loading="lazy" title="Swap to ${asset} — honest.money"></iframe>`;
+    const iframe = `<iframe id="swap-honest-money" src="${url}" style="width:${widthAttr === "100%" ? "100%" : `${widthAttr}px`};height:${/^\d+$/.test(heightAttr) ? `${heightAttr}px` : heightAttr};border:0;background:transparent" allow="clipboard-write" loading="lazy" title="Swap to ${DESTINATIONS[asset].label} — honest.money"></iframe>`;
     const resizer = autoResize
       ? `\n<script>(function(){window.addEventListener("message",function(e){if(!e.data||e.data.type!=="swap-embed:height")return;var f=document.getElementById("swap-honest-money");if(f&&typeof e.data.height==="number")f.style.height=e.data.height+"px"});})();</script>`
       : "";
     return iframe + resizer;
   }, [url, width, height, autoResize, asset]);
+
 
   const copy = async () => {
     try {
