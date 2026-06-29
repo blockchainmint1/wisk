@@ -152,7 +152,28 @@ function EmbedPage() {
         </div>
 
         <div className="bg-background border border-border rounded-xl p-5 space-y-4">
-          {/* Embed is TXC-only */}
+          {allowedAssets.length > 1 ? (
+            <Field label="Destination Asset">
+              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${allowedAssets.length}, minmax(0, 1fr))` }}>
+                {allowedAssets.map((a) => (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => { setDestAsset(a); setDest(""); }}
+                    className={`p-3 rounded-lg font-mono text-sm border transition-colors ${
+                      a === destAsset
+                        ? "border-accent text-accent bg-accent/10"
+                        : "border-border bg-secondary text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {DESTINATIONS[a].label}
+                  </button>
+                ))}
+              </div>
+            </Field>
+          ) : null}
+
+
 
 
           <Field label="Source Chain">
