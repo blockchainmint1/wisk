@@ -242,7 +242,7 @@ function EmbedBuilder() {
             </h2>
             <div className="border border-border rounded-lg overflow-hidden bg-secondary/30">
               <iframe
-                src={url}
+                src={previewUrl}
                 title="Swap embed preview"
                 style={{ width: "100%", height: `${Number(height) || 760}px`, border: 0 }}
                 allow="clipboard-write"
