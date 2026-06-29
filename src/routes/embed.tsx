@@ -12,6 +12,7 @@ import { getQuote } from "@/lib/quote.functions";
 
 const EmbedSearch = z.object({
   asset: z.enum(DEST_ASSETS as [DestAsset, ...DestAsset[]]).optional(),
+  assets: z.string().optional(), // comma-separated, e.g. "TXC,ISK$"
   amount: z.coerce.number().positive().optional(),
   chain: z.string().optional(),
   token: z.string().optional(),
