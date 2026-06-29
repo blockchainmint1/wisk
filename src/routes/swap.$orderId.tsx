@@ -51,6 +51,8 @@ function makeSteps(asset: string) {
 
 function OrderPage() {
   const { orderId } = Route.useParams();
+  const search = Route.useSearch();
+  const isEmbed = search.embed === 1;
   const initialOrder = Route.useLoaderData();
   const fn = useServerFn(getOrder);
   const { data: order, error, isError, isPending } = useQuery({
