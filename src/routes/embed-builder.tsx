@@ -20,7 +20,7 @@ export const Route = createFileRoute("/embed-builder")({
 const ORIGIN = "https://swap.honest.money";
 
 function EmbedBuilder() {
-  const [asset, setAsset] = useState<DestAsset>("TXC");
+  const asset = "TXC" as const;
   const [amount, setAmount] = useState<string>("1000");
   const [chain, setChain] = useState<string>("");
   const [token, setToken] = useState<string>("");
