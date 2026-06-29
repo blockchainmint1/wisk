@@ -255,7 +255,7 @@ function OrderPage() {
           </div>
         </div>
       </main>
-      <SiteFooter />
+      {isEmbed ? null : <SiteFooter />}
     </div>
   );
 }
