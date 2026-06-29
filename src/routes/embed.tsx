@@ -48,14 +48,16 @@ function EmbedPage() {
   const [amount, setAmount] = useState<string>(String(search.amount ?? 1000));
 
   const allowedAssets: DestAsset[] = useMemo(() => {
-    const raw = search.assets
-      ? search.assets.split(",").map((s) => s.trim()).filter(Boolean)
+    const raw: string[] = search.assets
+      ? search.assets.split(",").map((s: string) => s.trim()).filter(Boolean)
       : search.asset
         ? [search.asset]
         : ["TXC"];
-    const filtered = raw.filter((a): a is DestAsset =>
+    const filtered = raw.filter((a: string): a is DestAsset =>
       (DEST_ASSETS as string[]).includes(a),
     );
+    return filtered.length > 0 ? filtered : ["TXC"];
+  }, [search.assets, search.asset]);
     return filtered.length > 0 ? filtered : ["TXC"];
   }, [search.assets, search.asset]);
 
