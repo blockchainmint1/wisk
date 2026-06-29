@@ -3,12 +3,15 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
+import { z } from "zod";
+import { EmbedResize } from "@/components/embed-resize";
 import { LiveTicker } from "@/components/live-ticker";
 import { SiteFooter, SiteHeader } from "@/components/site-shell";
 import { getOrder } from "@/lib/orders.functions";
 import { recordSwap } from "@/lib/swap-history";
 
 export const Route = createFileRoute("/swap/$orderId")({
+  validateSearch: (s) => z.object({ embed: z.coerce.number().optional() }).parse(s),
   loader: ({ params }) => getOrder({ data: { publicId: params.orderId } }),
   head: ({ params }) => ({
     meta: [

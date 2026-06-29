@@ -14,6 +14,7 @@ import { Route as SwapRouteImport } from './routes/swap'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as FaqRouteImport } from './routes/faq'
+import { Route as EmbedRouteImport } from './routes/embed'
 import { Route as ChangeLogRouteImport } from './routes/change-log'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
@@ -44,6 +45,11 @@ const PrivacyRoute = PrivacyRouteImport.update({
 const FaqRoute = FaqRouteImport.update({
   id: '/faq',
   path: '/faq',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmbedRoute = EmbedRouteImport.update({
+  id: '/embed',
+  path: '/embed',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChangeLogRoute = ChangeLogRouteImport.update({
@@ -81,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/change-log': typeof ChangeLogRoute
+  '/embed': typeof EmbedRoute
   '/faq': typeof FaqRoute
   '/privacy': typeof PrivacyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -94,6 +101,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/change-log': typeof ChangeLogRoute
+  '/embed': typeof EmbedRoute
   '/faq': typeof FaqRoute
   '/privacy': typeof PrivacyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -107,6 +115,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/change-log': typeof ChangeLogRoute
+  '/embed': typeof EmbedRoute
   '/faq': typeof FaqRoute
   '/privacy': typeof PrivacyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -122,6 +131,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/change-log'
+    | '/embed'
     | '/faq'
     | '/privacy'
     | '/sitemap.xml'
@@ -135,6 +145,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/change-log'
+    | '/embed'
     | '/faq'
     | '/privacy'
     | '/sitemap.xml'
@@ -147,6 +158,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/change-log'
+    | '/embed'
     | '/faq'
     | '/privacy'
     | '/sitemap.xml'
@@ -161,6 +173,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   ChangeLogRoute: typeof ChangeLogRoute
+  EmbedRoute: typeof EmbedRoute
   FaqRoute: typeof FaqRoute
   PrivacyRoute: typeof PrivacyRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -204,6 +217,13 @@ declare module '@tanstack/react-router' {
       path: '/faq'
       fullPath: '/faq'
       preLoaderRoute: typeof FaqRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/embed': {
+      id: '/embed'
+      path: '/embed'
+      fullPath: '/embed'
+      preLoaderRoute: typeof EmbedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/change-log': {
@@ -267,6 +287,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   ChangeLogRoute: ChangeLogRoute,
+  EmbedRoute: EmbedRoute,
   FaqRoute: FaqRoute,
   PrivacyRoute: PrivacyRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
@@ -277,13 +298,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
