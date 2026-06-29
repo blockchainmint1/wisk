@@ -46,7 +46,23 @@ function EmbedPage() {
   const [chain, setChain] = useState<string>(search.chain ?? "ethereum");
   const [token, setToken] = useState<string>(search.token ?? "USDC");
   const [amount, setAmount] = useState<string>(String(search.amount ?? 1000));
-  const destAsset: DestAsset = search.asset ?? "TXC";
+
+  const allowedAssets: DestAsset[] = useMemo(() => {
+    const raw = search.assets
+      ? search.assets.split(",").map((s) => s.trim()).filter(Boolean)
+      : search.asset
+        ? [search.asset]
+        : ["TXC"];
+    const filtered = raw.filter((a): a is DestAsset =>
+      (DEST_ASSETS as string[]).includes(a),
+    );
+    return filtered.length > 0 ? filtered : ["TXC"];
+  }, [search.assets, search.asset]);
+
+  const [destAsset, setDestAsset] = useState<DestAsset>(allowedAssets[0]);
+  if (!allowedAssets.includes(destAsset)) {
+    setDestAsset(allowedAssets[0]);
+  }
 
 
 
