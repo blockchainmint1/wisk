@@ -38,15 +38,30 @@ function EmbedBuilder() {
     });
   };
 
-  const url = useMemo(() => {
-    const u = new URL(`${ORIGIN}/embed`);
+  const buildUrl = (origin: string) => {
+    const u = new URL(`${origin}/embed`);
     if (assets.length > 0) u.searchParams.set("assets", assets.join(","));
     if (amount) u.searchParams.set("amount", amount);
     if (chain) u.searchParams.set("chain", chain);
     if (token) u.searchParams.set("token", token);
     if (theme) u.searchParams.set("theme", theme);
     return u.toString();
-  }, [assets, amount, chain, token, theme]);
+  };
+
+  // Snippet always points at the canonical production origin.
+  const url = useMemo(
+    () => buildUrl(ORIGIN),
+    [assets, amount, chain, token, theme],
+  );
+
+  // Live preview uses the current origin so unpublished changes are visible.
+  const previewUrl = useMemo(
+    () =>
+      buildUrl(
+        typeof window !== "undefined" ? window.location.origin : ORIGIN,
+      ),
+    [assets, amount, chain, token, theme],
+  );
 
   const titleAssets = assets.map((a) => DESTINATIONS[a].label).join(" / ");
 
