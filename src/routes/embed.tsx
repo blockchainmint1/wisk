@@ -131,27 +131,8 @@ function EmbedPage() {
         </div>
 
         <div className="bg-background border border-border rounded-xl p-5 space-y-4">
-          <Field label="Destination Asset">
-            <div className="grid grid-cols-2 gap-2">
-              {DEST_ASSETS.map((a) => {
-                const active = a === destAsset;
-                return (
-                  <button
-                    key={a}
-                    type="button"
-                    onClick={() => setDestAsset(a)}
-                    className={`p-3 rounded-lg font-mono text-sm border transition-colors ${
-                      active
-                        ? "border-accent text-accent bg-accent/10"
-                        : "border-border bg-secondary text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {DESTINATIONS[a].label}
-                  </button>
-                );
-              })}
-            </div>
-          </Field>
+          {/* Embed is TXC-only */}
+
 
           <Field label="Source Chain">
             <select
