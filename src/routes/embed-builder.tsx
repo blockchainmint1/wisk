@@ -20,7 +20,7 @@ export const Route = createFileRoute("/embed-builder")({
 const ORIGIN = "https://swap.honest.money";
 
 function EmbedBuilder() {
-  const [asset, setAsset] = useState<"TXC" | "ISK$">("TXC");
+  const [assets, setAssets] = useState<Array<"TXC" | "ISK$">>(["TXC"]);
   const [amount, setAmount] = useState<string>("1000");
   const [chain, setChain] = useState<string>("");
   const [token, setToken] = useState<string>("");
@@ -30,25 +30,35 @@ function EmbedBuilder() {
   const [autoResize, setAutoResize] = useState<boolean>(true);
   const [copied, setCopied] = useState(false);
 
+  const toggleAsset = (a: "TXC" | "ISK$") => {
+    setAssets((prev) => {
+      const has = prev.includes(a);
+      if (has && prev.length === 1) return prev; // require at least one
+      return has ? prev.filter((x) => x !== a) : [...prev, a];
+    });
+  };
+
   const url = useMemo(() => {
     const u = new URL(`${ORIGIN}/embed`);
-    if (asset) u.searchParams.set("asset", asset);
+    if (assets.length > 0) u.searchParams.set("assets", assets.join(","));
     if (amount) u.searchParams.set("amount", amount);
     if (chain) u.searchParams.set("chain", chain);
     if (token) u.searchParams.set("token", token);
     if (theme) u.searchParams.set("theme", theme);
     return u.toString();
-  }, [asset, amount, chain, token, theme]);
+  }, [assets, amount, chain, token, theme]);
+
+  const titleAssets = assets.map((a) => DESTINATIONS[a].label).join(" / ");
 
   const snippet = useMemo(() => {
     const widthAttr = /^\d+$/.test(width) ? `${width}` : width;
     const heightAttr = /^\d+$/.test(height) ? `${height}` : height;
-    const iframe = `<iframe id="swap-honest-money" src="${url}" style="width:${widthAttr === "100%" ? "100%" : `${widthAttr}px`};height:${/^\d+$/.test(heightAttr) ? `${heightAttr}px` : heightAttr};border:0;background:transparent" allow="clipboard-write" loading="lazy" title="Swap to ${DESTINATIONS[asset].label} — honest.money"></iframe>`;
+    const iframe = `<iframe id="swap-honest-money" src="${url}" style="width:${widthAttr === "100%" ? "100%" : `${widthAttr}px`};height:${/^\d+$/.test(heightAttr) ? `${heightAttr}px` : heightAttr};border:0;background:transparent" allow="clipboard-write" loading="lazy" title="Swap to ${titleAssets} — honest.money"></iframe>`;
     const resizer = autoResize
       ? `\n<script>(function(){window.addEventListener("message",function(e){if(!e.data||e.data.type!=="swap-embed:height")return;var f=document.getElementById("swap-honest-money");if(f&&typeof e.data.height==="number")f.style.height=e.data.height+"px"});})();</script>`
       : "";
     return iframe + resizer;
-  }, [url, width, height, autoResize, asset]);
+  }, [url, width, height, autoResize, titleAssets]);
 
 
   const copy = async () => {
