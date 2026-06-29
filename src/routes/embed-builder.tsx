@@ -93,22 +93,30 @@ function EmbedBuilder() {
               1 · Configure defaults
             </h2>
 
-            <Field label="Destination asset">
+            <Field label="Destination assets (pick one or more)">
               <div className="grid grid-cols-2 gap-2">
-                {(["TXC", "ISK$"] as const).map((a) => (
-                  <button
-                    key={a}
-                    type="button"
-                    onClick={() => setAsset(a)}
-                    className={`p-3 rounded-lg font-mono text-sm border transition-colors ${
-                      a === asset
-                        ? "border-accent text-accent bg-accent/10"
-                        : "border-border bg-secondary text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {DESTINATIONS[a].label}
-                  </button>
-                ))}
+                {(["TXC", "ISK$"] as const).map((a) => {
+                  const active = assets.includes(a);
+                  return (
+                    <button
+                      key={a}
+                      type="button"
+                      onClick={() => toggleAsset(a)}
+                      className={`p-3 rounded-lg font-mono text-sm border transition-colors ${
+                        active
+                          ? "border-accent text-accent bg-accent/10"
+                          : "border-border bg-secondary text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {active ? "✓ " : ""}{DESTINATIONS[a].label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest px-1">
+                {assets.length > 1
+                  ? "Widget shows an in-place picker for visitors."
+                  : "Single-asset widget — no picker shown."}
               </div>
             </Field>
 
