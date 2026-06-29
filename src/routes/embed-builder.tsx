@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { SiteFooter, SiteHeader } from "@/components/site-shell";
-import { DEST_ASSETS, type DestAsset } from "@/lib/destinations";
+import { DESTINATIONS } from "@/lib/destinations";
 
 export const Route = createFileRoute("/embed-builder")({
   head: () => ({
