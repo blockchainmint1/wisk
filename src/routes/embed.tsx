@@ -45,7 +45,10 @@ function EmbedPage() {
   const [chain, setChain] = useState<string>(search.chain ?? "ethereum");
   const [token, setToken] = useState<string>(search.token ?? "USDC");
   const [amount, setAmount] = useState<string>(String(search.amount ?? 1000));
-  const [destAsset, setDestAsset] = useState<DestAsset>(search.asset ?? "TXC");
+  const destAsset: DestAsset = "TXC";
+  const setDestAsset = (_: DestAsset) => {};
+  void setDestAsset;
+
   const [dest, setDest] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
