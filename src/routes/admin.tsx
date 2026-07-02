@@ -297,15 +297,9 @@ function OrdersTab() {
             error={hot.data?.txc.ok === false ? hot.data.txc.error : null}
           />
           <BalanceCard
-            label="ISK"
-            value={
-              hot.data?.isk.ok
-                ? `${hot.data.isk.confirmed.toFixed(4)}${
-                    hot.data.isk.unconfirmed ? ` (+${hot.data.isk.unconfirmed.toFixed(4)})` : ""
-                  }`
-                : null
-            }
-            error={hot.data?.isk.ok === false ? hot.data.isk.error : null}
+            label="wTXC"
+            value={hot.data?.wtxc.ok ? hot.data.wtxc.balance.toFixed(4) : null}
+            error={hot.data?.wtxc.ok === false ? hot.data.wtxc.error : null}
           />
         </div>
       </div>

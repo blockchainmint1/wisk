@@ -12,7 +12,7 @@ import { getQuote } from "@/lib/quote.functions";
 
 const EmbedSearch = z.object({
   asset: z.enum(DEST_ASSETS as [DestAsset, ...DestAsset[]]).optional(),
-  assets: z.string().optional(), // comma-separated, e.g. "TXC,ISK$"
+  assets: z.string().optional(), // comma-separated, e.g. "TXC,wTXC"
   amount: z.coerce.number().positive().optional(),
   chain: z.string().optional(),
   token: z.string().optional(),
@@ -25,7 +25,7 @@ export const Route = createFileRoute("/embed")({
     meta: [
       { title: "Swap embed" },
       { name: "robots", content: "noindex" },
-      { name: "description", content: "Embeddable swap widget for stablecoins → TXC / ISK$." },
+      { name: "description", content: "Embeddable swap widget for stablecoins → TXC / wTXC." },
     ],
   }),
   component: EmbedPage,

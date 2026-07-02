@@ -10,6 +10,8 @@ export interface AppSettings {
   paused: boolean;
   paused_reason: string | null;
   notify_min_usd_created: number;
+  wrap_fee_bps: number;
+  unwrap_fee_bps: number;
   updated_at: string;
 }
 
@@ -21,6 +23,8 @@ const DEFAULTS: AppSettings = {
   paused: false,
   paused_reason: null,
   notify_min_usd_created: 0,
+  wrap_fee_bps: 0,
+  unwrap_fee_bps: 100,
   updated_at: new Date(0).toISOString(),
 };
 
@@ -34,7 +38,7 @@ export async function getSettings(): Promise<AppSettings> {
   const { data, error } = await supabaseAdmin
     .from("app_settings")
     .select(
-      "premium_bps,expiry_minutes,min_usd,max_usd,paused,paused_reason,notify_min_usd_created,updated_at",
+      "premium_bps,expiry_minutes,min_usd,max_usd,paused,paused_reason,notify_min_usd_created,wrap_fee_bps,unwrap_fee_bps,updated_at",
     )
     .eq("id", 1)
     .maybeSingle();
@@ -45,15 +49,29 @@ export async function getSettings(): Promise<AppSettings> {
     return DEFAULTS;
   }
 
+  const row = data as unknown as {
+    premium_bps: number;
+    expiry_minutes: number;
+    min_usd: number | string;
+    max_usd: number | string;
+    paused: boolean;
+    paused_reason: string | null;
+    notify_min_usd_created: number | string;
+    wrap_fee_bps?: number | null;
+    unwrap_fee_bps?: number | null;
+    updated_at: string;
+  };
   const value: AppSettings = {
-    premium_bps: data.premium_bps,
-    expiry_minutes: data.expiry_minutes,
-    min_usd: Number(data.min_usd),
-    max_usd: Number(data.max_usd),
-    paused: data.paused,
-    paused_reason: data.paused_reason,
-    notify_min_usd_created: Number(data.notify_min_usd_created),
-    updated_at: data.updated_at,
+    premium_bps: row.premium_bps,
+    expiry_minutes: row.expiry_minutes,
+    min_usd: Number(row.min_usd),
+    max_usd: Number(row.max_usd),
+    paused: row.paused,
+    paused_reason: row.paused_reason,
+    notify_min_usd_created: Number(row.notify_min_usd_created),
+    wrap_fee_bps: row.wrap_fee_bps ?? 0,
+    unwrap_fee_bps: row.unwrap_fee_bps ?? 100,
+    updated_at: row.updated_at,
   };
   cache = { value, expires: now + TTL_MS };
   return value;

@@ -5,7 +5,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getBalances, getSpotPrice, submitMarketBuy } from "./bitmart.server";
 import { invalidateChainsCache } from "./chains.server";
-import { getIskHotAddresses, getIskAddressBalanceSats } from "./isk-sign.server";
+import { getOperatorEvmAddress } from "./bridge-wallet.server";
+import { getWtxcBalance } from "./wtxc.server";
 import { getSettings, invalidateSettingsCache } from "./settings.server";
 import { getTxcHotAddress, getTxcAddressBalanceSats } from "./txc-sign.server";
 import { scanHdWallet } from "./wallet-scan.server";
@@ -211,22 +212,14 @@ export const adminOrderDetail = createServerFn({ method: "POST" })
       } catch {
         hotBalance = null;
       }
-    } else if (destAsset === "ISK$") {
+    } else if (destAsset === "wTXC") {
       try {
-        const { getIskHotAddresses, getIskAddressBalanceSats } = await import(
-          "./isk-sign.server"
-        );
-        const { legacy, segwit } = getIskHotAddresses();
-        const [sw, lg] = await Promise.all([
-          getIskAddressBalanceSats(segwit).catch(() => ({ confirmed: 0, unconfirmed: 0 })),
-          getIskAddressBalanceSats(legacy).catch(() => ({ confirmed: 0, unconfirmed: 0 })),
-        ]);
-        const useSegwit = sw.confirmed + sw.unconfirmed >= lg.confirmed + lg.unconfirmed;
-        const bal = useSegwit ? sw : lg;
+        const address = getOperatorEvmAddress();
+        const bal = await getWtxcBalance(address);
         hotBalance = {
-          address: useSegwit ? segwit : legacy,
-          confirmedTxc: bal.confirmed / 1e8,
-          unconfirmedTxc: bal.unconfirmed / 1e8,
+          address,
+          confirmedTxc: bal,
+          unconfirmedTxc: 0,
         };
       } catch {
         hotBalance = null;
@@ -362,13 +355,13 @@ export const adminBitmartBalances = createServerFn({ method: "POST" })
     }
   });
 
-// ===== Hot wallet balances (EVM stables + TXC + ISK) =====
+// ===== Hot wallet balances (EVM stables + TXC + wTXC) =====
 export const adminHotWalletBalances = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertAdmin(context.userId);
 
-    const [evmRes, txcRes, iskRes] = await Promise.allSettled([
+    const [evmRes, txcRes, wtxcRes] = await Promise.allSettled([
       scanHdWallet({ maxAddresses: 1 }),
       (async () => {
         const address = getTxcHotAddress();
@@ -376,17 +369,9 @@ export const adminHotWalletBalances = createServerFn({ method: "POST" })
         return { address, confirmed: confirmed / 1e8, unconfirmed: unconfirmed / 1e8 };
       })(),
       (async () => {
-        const { legacy, segwit } = getIskHotAddresses();
-        const [lg, sw] = await Promise.all([
-          getIskAddressBalanceSats(legacy).catch(() => ({ confirmed: 0, unconfirmed: 0 })),
-          getIskAddressBalanceSats(segwit).catch(() => ({ confirmed: 0, unconfirmed: 0 })),
-        ]);
-        return {
-          legacy,
-          segwit,
-          confirmed: (lg.confirmed + sw.confirmed) / 1e8,
-          unconfirmed: (lg.unconfirmed + sw.unconfirmed) / 1e8,
-        };
+        const address = getOperatorEvmAddress();
+        const balance = await getWtxcBalance(address);
+        return { address, balance };
       })(),
     ]);
 
@@ -404,13 +389,14 @@ export const adminHotWalletBalances = createServerFn({ method: "POST" })
         ? { ok: true as const, ...txcRes.value }
         : { ok: false as const, error: (txcRes.reason as Error)?.message ?? "rpc failed" };
 
-    const isk =
-      iskRes.status === "fulfilled"
-        ? { ok: true as const, ...iskRes.value }
-        : { ok: false as const, error: (iskRes.reason as Error)?.message ?? "rpc failed" };
+    const wtxc =
+      wtxcRes.status === "fulfilled"
+        ? { ok: true as const, ...wtxcRes.value }
+        : { ok: false as const, error: (wtxcRes.reason as Error)?.message ?? "rpc failed" };
 
-    return { evm, txc, isk };
+    return { evm, txc, wtxc };
   });
+
 
 // ===== Reconciliation =====
 // Compare what we *should* hold (USD in − USD spent on Bitmart buybacks)

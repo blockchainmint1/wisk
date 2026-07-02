@@ -1,24 +1,20 @@
 // Fulfillment cron tick — called by pg_cron every minute.
-// Customer flow (TXC and ISK$):
+// Customer flow (TXC and wTXC):
 //   awaiting_payment → payment_detected → confirmed → sending → completed
-//   Payout is signed + broadcast locally from our hot wallet using the
-//   quoted amount. Bitmart is NEVER on the critical path.
+//   Payout is signed + broadcast locally from our hot/operator wallet using
+//   the quoted amount. Bitmart is NEVER on the critical path.
 // Treasury replenishment (background, decoupled):
-//   For completed TXC/ISK$ orders, submit a market buy on Bitmart to refill
-//   our hot wallet. The bitmart_order_id / bitmart_filled_dest columns track
-//   this but never gate customer payout.
-// Legacy ISK$ Bitmart withdrawal path (settleIskWithdrawal / pollWithdrawals)
-// is retained only so in-flight orders from before the local-sign migration
-// can drain to `completed`.
+//   For completed on-ramp orders (stables/ETH → TXC or wTXC), submit a
+//   market buy on Bitmart to refill the TXC hot wallet. For unwrap orders
+//   (wTXC → TXC) we skip Bitmart entirely — the user gave us wTXC which
+//   we already hold; re-wrapping TXC back to wTXC is a manual admin op.
 // Auth: route lives under /api/public/* which bypasses Lovable's site auth.
 
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   getOrderDetail,
-  getWithdrawDetail,
   submitMarketBuy,
-  submitWithdrawal,
 } from "@/lib/bitmart.server";
 import {
   chainStartScanBlock,
@@ -26,13 +22,13 @@ import {
   scanIncomingTransfers,
   weiToUsd,
 } from "@/lib/evm-scan.server";
-import { isNativeToken, type ChainKey } from "@/lib/chains";
+import { isNativeToken, isWtxcSource, type ChainKey } from "@/lib/chains";
 import { getMergedChain, getMergedToken } from "@/lib/chains.server";
 import { getDestination } from "@/lib/destinations";
 import { notifyOrderEvent, logOrderEvent, sendAdminAlert } from "@/lib/telegram.server";
 import { getSettings } from "@/lib/settings.server";
 import { sendTxc } from "@/lib/txc-sign.server";
-import { sendIsk } from "@/lib/isk-sign.server";
+import { sendWtxc } from "@/lib/wtxc.server";
 import { getSpotPrice } from "@/lib/bitmart.server";
 
 async function notifyById(
@@ -319,7 +315,6 @@ async function settleConfirmed() {
   for (const o of orders) {
     const asset = o.dest_asset || "TXC";
     try {
-      // ---- Pay customer locally, no Bitmart dependency (TXC + ISK$) ----
       await supabaseAdmin.from("orders").update({ status: "sending" }).eq("id", o.id);
       await logOrderEvent(o.id, "state", "sending", { asset, amount: o.quoted_dest_out });
       await notifyById("sending", o.id);
@@ -330,11 +325,18 @@ async function settleConfirmed() {
               toAddress: o.dest_address,
               amountTxc: Number(o.quoted_dest_out),
             })
-          : asset === "ISK$"
-            ? await sendIsk({
-                toAddress: o.dest_address,
-                amountIsk: Number(o.quoted_dest_out),
-              })
+          : asset === "wTXC"
+            ? await (async () => {
+                const r = await sendWtxc({
+                  toAddress: o.dest_address,
+                  amountWtxc: Number(o.quoted_dest_out),
+                });
+                return {
+                  txid: r.txid,
+                  fromAddress: r.fromAddress,
+                  feeSats: r.feeSats,
+                };
+              })()
             : (() => {
                 throw new Error(`Unsupported dest_asset: ${asset}`);
               })();
@@ -368,7 +370,7 @@ async function settleConfirmed() {
 async function replenishTreasury() {
   const { data: orders } = await supabaseAdmin
     .from("orders")
-    .select("id,public_id,paid_amount_usd,dest_asset")
+    .select("id,public_id,paid_amount_usd,dest_asset,source_chain,source_token")
     .eq("status", "completed")
     .is("bitmart_order_id", null)
     .not("paid_amount_usd", "is", null)
@@ -379,6 +381,8 @@ async function replenishTreasury() {
         public_id: string;
         paid_amount_usd: number;
         dest_asset: string;
+        source_chain: string;
+        source_token: string;
       }>
     >();
   if (!orders?.length) return { submitted: 0 };
@@ -386,11 +390,17 @@ async function replenishTreasury() {
   let submitted = 0;
   for (const o of orders) {
     try {
+      // Skip unwrap direction (wTXC → TXC): user gave us wTXC, we paid
+      // TXC out. No stables involved; refilling TXC via Bitmart would
+      // waste money. Admin can manually re-wrap accumulated wTXC → TXC.
+      if (isWtxcSource(o.source_chain as ChainKey, o.source_token)) continue;
       const dest = getDestination(o.dest_asset);
+      // For wTXC on-ramp, buy TXC on Bitmart (we'll re-wrap manually).
+      const buySymbol = dest.key === "wTXC" ? "TXC_USDT" : dest.bitmartSymbol;
       const buyNotional = +(Number(o.paid_amount_usd) / 1.05).toFixed(2);
       if (buyNotional <= 0) continue;
       const { order_id } = await submitMarketBuy({
-        symbol: dest.bitmartSymbol,
+        symbol: buySymbol,
         notionalUsdt: buyNotional,
       });
       await supabaseAdmin
@@ -448,15 +458,10 @@ async function pollBitmartFillsDecoupled() {
         const update: {
           bitmart_filled_dest: number;
           bitmart_avg_price: number;
-          status?: "bought";
         } = {
           bitmart_filled_dest: txcAmount,
           bitmart_avg_price: avgPrice,
         };
-        // ISK$ flow: advance to `bought` so withdrawal step takes over.
-        if (o.status === "buying_on_bitmart" && o.dest_asset !== "TXC") {
-          update.status = "bought";
-        }
         await supabaseAdmin.from("orders").update(update).eq("id", o.id);
         await logOrderEvent(o.id, "bitmart", "filled", {
           filled: txcAmount,
@@ -465,11 +470,7 @@ async function pollBitmartFillsDecoupled() {
         filled += 1;
       } else if (detail.state === "canceled") {
         await logOrderEvent(o.id, "bitmart", "canceled", {});
-        // For TXC orders this is just a treasury hiccup, not a customer fail.
-        // For ISK$ in buying state, mark failed (customer still owed).
-        if (o.status === "buying_on_bitmart" && o.dest_asset !== "TXC") {
-          await failOrder(o.id, "Bitmart order canceled");
-        }
+        // Treasury hiccup only; customer is already paid.
       }
     } catch (e) {
       console.error("[poll-fill]", o.bitmart_order_id, e);
@@ -478,78 +479,6 @@ async function pollBitmartFillsDecoupled() {
   return { filled };
 }
 
-/**
- * ISK$ withdrawal path — for orders that completed a Bitmart buy and need
- * a withdrawal to the customer's address.
- */
-async function settleIskWithdrawal() {
-  const { data: orders } = await supabaseAdmin
-    .from("orders")
-    .select("id,bitmart_filled_dest,dest_address,dest_asset")
-    .eq("status", "bought")
-    .neq("dest_asset", "TXC")
-    .returns<
-      Array<{
-        id: string;
-        bitmart_filled_dest: number;
-        dest_address: string;
-        dest_asset: string;
-      }>
-    >();
-  if (!orders?.length) return { withdrawing: 0 };
-
-  let withdrawing = 0;
-  for (const o of orders) {
-    try {
-      const dest = getDestination(o.dest_asset);
-      await supabaseAdmin.from("orders").update({ status: "withdrawing" }).eq("id", o.id);
-      const { withdraw_id } = await submitWithdrawal({
-        currency: dest.bitmartCurrency,
-        network: dest.bitmartNetwork,
-        amount: o.bitmart_filled_dest,
-        address: o.dest_address,
-      });
-      await supabaseAdmin.from("orders").update({ withdrawal_id: withdraw_id }).eq("id", o.id);
-      await logOrderEvent(o.id, "bitmart", "withdraw_submitted", { withdraw_id });
-      withdrawing += 1;
-    } catch (e) {
-      await failOrder(o.id, e instanceof Error ? e.message : "Withdrawal failed");
-    }
-  }
-  return { withdrawing };
-}
-
-
-async function pollWithdrawals() {
-  const { data: orders } = await supabaseAdmin
-    .from("orders")
-    .select("id,withdrawal_id")
-    .eq("status", "withdrawing")
-    .not("withdrawal_id", "is", null)
-    .returns<Array<{ id: string; withdrawal_id: string }>>();
-  if (!orders?.length) return { completed: 0 };
-
-  let completed = 0;
-  for (const o of orders) {
-    try {
-      const detail = await getWithdrawDetail(o.withdrawal_id);
-      if (detail.status === 3 && detail.tx_id) {
-        await supabaseAdmin
-          .from("orders")
-          .update({ status: "completed", dest_tx_hash: detail.tx_id })
-          .eq("id", o.id);
-        await logOrderEvent(o.id, "bitmart", "withdraw_completed", { tx_id: detail.tx_id });
-        await notifyById("completed", o.id);
-        completed += 1;
-      } else if (detail.status === 4 || detail.status === 5) {
-        await failOrder(o.id, `Withdrawal failed (status ${detail.status})`);
-      }
-    } catch (e) {
-      console.error("[poll-wd]", o.withdrawal_id, e);
-    }
-  }
-  return { completed };
-}
 
 export const Route = createFileRoute("/api/public/hooks/swap-tick")({
   server: {
@@ -575,8 +504,6 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           fills: { filled: 0 },
           settle: { sent: 0, queuedForBitmart: 0 },
           replenish: { submitted: 0 },
-          isk: { withdrawing: 0 },
-          polls: { completed: 0 },
           ms: 0,
         };
         // Run each phase independently so one failure doesn't starve the
@@ -599,8 +526,6 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           result.settle = (await runPhase("settleConfirmed", settleConfirmed)) ?? result.settle;
           result.replenish = (await runPhase("replenishTreasury", replenishTreasury)) ?? result.replenish;
           result.fills = (await runPhase("pollBitmartFillsDecoupled", pollBitmartFillsDecoupled)) ?? result.fills;
-          result.isk = (await runPhase("settleIskWithdrawal", settleIskWithdrawal)) ?? result.isk;
-          result.polls = (await runPhase("pollWithdrawals", pollWithdrawals)) ?? result.polls;
         } catch (e) {
           const msg = e instanceof Error ? `${e.message}\n${e.stack ?? ""}` : String(e);
           console.error("[swap-tick] fatal", e);
