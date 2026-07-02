@@ -3,50 +3,55 @@ import { SiteFooter, SiteHeader } from "@/components/site-shell";
 
 const FAQS: Array<{ q: string; a: string }> = [
   {
-    q: "What does swapTXC actually do?",
-    a: "You send a stablecoin (USDC, USDT, DAI, PYUSD, FRAX, TUSD, USDP, USDe) or native ETH on a supported EVM chain. We deliver the equivalent value in native TXC or wTXC directly to your wallet on its native chain. No bridges, no wrapped tokens.",
+    q: "What is this?",
+    a: "A custodial bridge between native TEXITcoin (TXC) and its ERC-20 twin on Ethereum, wTXC (0x9FC65df3997073B8551Ffd617154B5102fACbb88). It also runs a stablecoin/ETH on-ramp into either side. One operator wallet holds real TXC 1:1 against every wTXC in circulation.",
   },
   {
-    q: "What is the fee?",
-    a: "A flat 5% protocol fee is baked into the quote you see at order creation. The quote is locked the moment you confirm — what you see is what you get.",
+    q: "How much does it cost?",
+    a: "Wrap (TXC → wTXC) is free. Unwrap (wTXC → TXC) is 1%. On-ramp swaps (USDC/USDT/pyUSD/DAI/ETH → TXC or wTXC) are quoted at live Bitmart TXC/USDT spot price plus a 5% protocol fee, locked when you confirm.",
+  },
+  {
+    q: "Why custodial and not a smart contract?",
+    a: "By choice. A one-operator hot wallet with a public reconciliation dashboard is simpler, cheaper to run, and easier to audit than a contract we'd have to trust ourselves to secure. TXC held by the bridge matches wTXC in circulation — publicly checkable at any time.",
   },
   {
     q: "Which networks and tokens can I send from?",
-    a: "Ethereum (USDC, USDT, DAI, PYUSD, FRAX, TUSD, USDP, USDe, native ETH), Base (USDC, USDbC, USDT, native ETH), Arbitrum (USDC, USDC.e, USDT, DAI, FRAX, native ETH), Polygon (USDC, USDC.e, USDT, DAI), and BNB Chain (USDT, USDC). Native ETH is priced live at the moment we detect your deposit, so the USD-equivalent floats with the market until then.",
+    a: "Ethereum (USDC, USDT, DAI, PYUSD, FRAX, TUSD, USDP, USDe, native ETH, wTXC), Base (USDC, USDbC, USDT, ETH), Arbitrum (USDC, USDC.e, USDT, DAI, FRAX, ETH), Polygon (USDC, USDC.e, USDT, DAI), and BNB Chain (USDT, USDC). Native ETH is priced live when we detect your deposit.",
   },
   {
-    q: "Which native assets can I receive?",
-    a: "TEXITcoin (TXC) — native on the TXC chain — and wTXC — the 1:1 wrapped ERC-20 on Ethereum. Each is paid out to the native address you provide at order creation.",
+    q: "Which assets can I receive?",
+    a: "Native TXC (paid to any TXC address — legacy T… or SegWit txc1q…) or wTXC (paid to any Ethereum 0x… address).",
   },
   {
     q: "How long does a swap take?",
-    a: "Typical end-to-end time is around 5 minutes. We wait for chain-specific confirmations on your deposit, then sign and broadcast the native payout from our hot wallet. Slower source chains (Ethereum mainnet) take longer than fast L2s.",
+    a: "Around 5 minutes end-to-end. We wait for chain-specific confirmations on your deposit, then sign and broadcast the payout from the hot wallet. Slower source chains (Ethereum mainnet) take longer than L2s.",
   },
   {
     q: "What if I send the wrong token or wrong chain?",
-    a: "Funds sent on an unsupported chain or with an unsupported token will not be picked up automatically. Contact us via the Help Center with your order ID and the deposit transaction hash — manual recovery may be possible.",
+    a: "Funds sent on an unsupported chain or with an unsupported token aren't picked up automatically. Contact the Help Center with your order ID and deposit tx hash — manual recovery may be possible.",
   },
   {
     q: "What if my destination address is wrong?",
-    a: "We can only send to the address you provided at order creation. Double-check it before confirming. Once a native withdrawal is broadcast it cannot be reversed.",
+    a: "We can only send to the address you provided at order creation. Double-check before confirming — payouts can't be reversed.",
   },
   {
     q: "What happens if the quote expires before I pay?",
-    a: "Each quote is valid for the expiry window shown on the order page (15 minutes by default). If you pay after expiry, the order is marked expired and the deposit waits for manual reconciliation — contact support with your order ID.",
+    a: "Each quote is valid for the expiry window shown on the order page (15 minutes by default). Late deposits are held for manual reconciliation — contact support with your order ID.",
   },
   {
     q: "Do you take custody of my funds?",
-    a: "Only for the brief window between your deposit confirming and the native payout being broadcast. We do not hold funds on your behalf beyond that swap window.",
+    a: "Yes — that's the model. The bridge is custodial by design. TXC backing wTXC lives in the operator wallet full-time; on-ramp deposits are held only for the brief window between confirmation and payout.",
   },
   {
     q: "Where can I track my swap?",
-    a: "After creating an order you are redirected to a live status page. The page auto-refreshes through every stage and remains accessible — your browser also keeps a local history of recent swaps on /swap.",
+    a: "After creating an order you're redirected to a live status page that auto-refreshes through every stage. Your browser also keeps a local history of recent swaps on /swap.",
   },
   {
     q: "Is there a minimum or maximum order size?",
     a: "Yes. The current minimum is $10 and maximum is $50,000 per order. These limits are shown live on the swap form.",
   },
 ];
+
 
 export const Route = createFileRoute("/faq")({
   head: () => ({
