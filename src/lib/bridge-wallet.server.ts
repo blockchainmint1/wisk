@@ -70,8 +70,9 @@ let cachedTxcRoot: HDKey | null = null;
 function getTxcRoot(): HDKey {
   if (cachedTxcRoot) return cachedTxcRoot;
   const seed = mnemonicToSeedSync(getMnemonic());
-  // BIP44 TXC: coin_type 0 (piggyback on BTC path family for simplicity)
-  cachedTxcRoot = HDKey.fromMasterSeed(seed).derive("m/44'/0'/0'/0");
+  // BIP44 TXC: registered coin_type 696969 (matches the TXC Web Wallet
+  // derivation so the same seed yields the same T… address everywhere).
+  cachedTxcRoot = HDKey.fromMasterSeed(seed).derive("m/44'/696969'/0'/0");
   return cachedTxcRoot;
 }
 
