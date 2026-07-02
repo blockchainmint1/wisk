@@ -18,10 +18,10 @@ export const Route = createFileRoute("/")({
           "Wrap free. Unwrap 1%. On-ramp from stables or ETH. The bridge for TEXITcoin.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://swap.honest.money/" },
+      { property: "og:url", content: "https://swap.texitcoin.org/" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
-    links: [{ rel: "canonical", href: "https://swap.honest.money/" }],
+    links: [{ rel: "canonical", href: "https://swap.texitcoin.org/" }],
     scripts: [
       {
         type: "application/ld+json",
@@ -29,7 +29,7 @@ export const Route = createFileRoute("/")({
           "@context": "https://schema.org",
           "@type": "WebSite",
           name: "SWAP",
-          url: "https://swap.honest.money/",
+          url: "https://swap.texitcoin.org/",
           description:
             "TXC ↔ wTXC bridge with a stablecoin on-ramp across 5 EVM chains.",
         }),

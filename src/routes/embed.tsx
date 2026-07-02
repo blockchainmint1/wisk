@@ -120,7 +120,7 @@ function EmbedPage() {
           {
             type: "swap-embed:order-created",
             orderId: id,
-            url: `https://wtxc.texitcoin.org/swap/${id}`,
+            url: `https://swap.texitcoin.org/swap/${id}`,
           },
           "*",
         );
@@ -145,12 +145,12 @@ function EmbedPage() {
             {isUnwrap ? "Unwrap wTXC → TXC" : "Wrap TXC → wTXC"}
           </div>
           <a
-            href="https://wtxc.texitcoin.org/swap"
+            href="https://swap.texitcoin.org/swap"
             target="_blank"
             rel="noopener noreferrer"
             className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground hover:text-accent"
           >
-            wtxc.texitcoin.org ↗
+            swap.texitcoin.org ↗
           </a>
         </div>
 
@@ -281,7 +281,7 @@ function EmbedPage() {
           </button>
 
           <p className="mt-3 text-center text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
-            Powered by wtxc.texitcoin.org · quote locks 15 min
+            Powered by swap.texitcoin.org · quote locks 15 min
           </p>
         </div>
       </div>
