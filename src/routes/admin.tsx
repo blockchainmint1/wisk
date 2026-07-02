@@ -508,10 +508,8 @@ function OrderRow({
             : <span className="text-muted-foreground">—</span>}
         </td>
         <td className="p-3 text-right">
-          {(o.dest_asset ?? "TXC") === "ISK$"
-            ? (o.bitmart_filled_dest != null
-                ? Number(o.bitmart_filled_dest).toFixed(4)
-                : Number(o.quoted_dest_out).toFixed(4))
+          {(o.dest_asset ?? "TXC") === "wTXC"
+            ? Number(o.quoted_dest_out).toFixed(4)
             : <span className="text-muted-foreground">—</span>}
         </td>
         <td className="p-3 truncate max-w-[14ch]">{o.dest_address}</td>
