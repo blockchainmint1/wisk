@@ -169,24 +169,14 @@ async function getHotBalance(
       const low = expectedPayout > 0 && confirmedTxc < expectedPayout * 2;
       return { asset: "TXC", address, confirmedTxc, unconfirmedTxc, low };
     }
-    if (asset === "ISK$") {
-      const { getIskHotAddresses, getIskAddressBalanceSats } = await import(
-        "./isk-sign.server"
-      );
-      const { legacy, segwit } = getIskHotAddresses();
-      const [sw, lg] = await Promise.all([
-        getIskAddressBalanceSats(segwit).catch(() => ({ confirmed: 0, unconfirmed: 0 })),
-        getIskAddressBalanceSats(legacy).catch(() => ({ confirmed: 0, unconfirmed: 0 })),
-      ]);
-      // Pick the address actually holding funds; prefer SegWit on ties.
-      const useSegwit = sw.confirmed + sw.unconfirmed >= lg.confirmed + lg.unconfirmed;
-      const bal = useSegwit ? sw : lg;
-      const address = useSegwit ? segwit : legacy;
-      const confirmedTxc = bal.confirmed / 1e8;
-      const unconfirmedTxc = bal.unconfirmed / 1e8;
+    if (asset === "wTXC") {
+      const { getOperatorEvmAddress } = await import("./bridge-wallet.server");
+      const { getWtxcBalance } = await import("./wtxc.server");
+      const address = getOperatorEvmAddress();
+      const balance = await getWtxcBalance(address);
       const expectedPayout = Number(order.quoted_dest_out ?? 0);
-      const low = expectedPayout > 0 && confirmedTxc < expectedPayout * 2;
-      return { asset: "ISK$", address, confirmedTxc, unconfirmedTxc, low };
+      const low = expectedPayout > 0 && balance < expectedPayout * 2;
+      return { asset: "wTXC", address, confirmedTxc: balance, unconfirmedTxc: 0, low };
     }
     return null;
   } catch (err) {

@@ -1,4 +1,8 @@
 // Public quote endpoint: current Bitmart spot price + configurable premium.
+// Bridge unwrap (source = wTXC → dest = TXC) applies a fixed fee instead
+// of the Bitmart premium; that quote is computed at order-creation time
+// inside orders.functions.ts. This endpoint stays a simple USD→dest quote
+// used by the live rate display on the swap form.
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getSpotPrice } from "./bitmart.server";
@@ -37,6 +41,8 @@ export const getQuote = createServerFn({ method: "POST" })
         maxUsd: settings.max_usd,
         paused: settings.paused,
         pausedReason: settings.paused_reason,
+        wrapFeeBps: settings.wrap_fee_bps,
+        unwrapFeeBps: settings.unwrap_fee_bps,
         timestamp: new Date().toISOString(),
       };
     } catch (e) {

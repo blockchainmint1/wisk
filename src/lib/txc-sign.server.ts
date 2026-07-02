@@ -8,6 +8,7 @@
 import * as bitcoin from "bitcoinjs-lib";
 import { ECPairFactory } from "ecpair";
 import * as ecc from "@bitcoinerlab/secp256k1";
+import { getTxcHotKeypair } from "./bridge-wallet.server";
 
 bitcoin.initEccLib(ecc);
 const ECPair = ECPairFactory(ecc);
@@ -33,14 +34,15 @@ const ESPLORA =
   "https://api.mempool.texitcoin.org/api/v1";
 
 // ===== Hot-wallet keypair (lazy, server-only) =====
-function getWif(): string {
-  const wif = process.env.TXC_WIF?.trim();
-  if (!wif) throw new Error("TXC_WIF is not configured");
-  return wif;
-}
-
+// Preferred: BRIDGE_MNEMONIC → derived TXC keypair (m/44'/0'/0'/0/0).
+// Fallback: TXC_WIF for backwards compatibility.
 function getKeyPair() {
-  return ECPair.fromWIF(getWif(), TXC_NETWORK);
+  if (process.env.BRIDGE_MNEMONIC?.trim()) {
+    return getTxcHotKeypair();
+  }
+  const wif = process.env.TXC_WIF?.trim();
+  if (!wif) throw new Error("Neither BRIDGE_MNEMONIC nor TXC_WIF is configured");
+  return ECPair.fromWIF(wif, TXC_NETWORK);
 }
 
 export function getTxcHotAddress(): string {

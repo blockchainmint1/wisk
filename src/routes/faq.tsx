@@ -4,7 +4,7 @@ import { SiteFooter, SiteHeader } from "@/components/site-shell";
 const FAQS: Array<{ q: string; a: string }> = [
   {
     q: "What does swapTXC actually do?",
-    a: "You send a stablecoin (USDC, USDT, DAI, PYUSD, FRAX, TUSD, USDP, USDe) or native ETH on a supported EVM chain. We deliver the equivalent value in native TXC, ISK$ or ZCU directly to your wallet on its native chain. No bridges, no wrapped tokens.",
+    a: "You send a stablecoin (USDC, USDT, DAI, PYUSD, FRAX, TUSD, USDP, USDe) or native ETH on a supported EVM chain. We deliver the equivalent value in native TXC or wTXC directly to your wallet on its native chain. No bridges, no wrapped tokens.",
   },
   {
     q: "What is the fee?",
@@ -16,7 +16,7 @@ const FAQS: Array<{ q: string; a: string }> = [
   },
   {
     q: "Which native assets can I receive?",
-    a: "TEXITcoin (TXC) on the TXC network, Iskander Coin (ISK$) on the ISK network, and Zero Chill Units (ZCU) when listed. Each is paid out to the native address you provide at order creation.",
+    a: "TEXITcoin (TXC) — native on the TXC chain — and wTXC — the 1:1 wrapped ERC-20 on Ethereum. Each is paid out to the native address you provide at order creation.",
   },
   {
     q: "How long does a swap take?",
@@ -55,13 +55,13 @@ export const Route = createFileRoute("/faq")({
       {
         name: "description",
         content:
-          "Common questions about swapping stablecoins for native TXC, ISK$ or ZCU on swapTXC — fees, timing, supported networks, and recovery.",
+          "Common questions about swapping stablecoins for native TXC or wTXC on swapTXC — fees, timing, supported networks, and recovery.",
       },
       { property: "og:title", content: "FAQ — swapTXC" },
       {
         property: "og:description",
         content:
-          "Common questions about swapping stablecoins for native TXC, ISK$ or ZCU.",
+          "Common questions about swapping stablecoins for native TXC or wTXC.",
       },
       { property: "og:url", content: "https://swap.honest.money/faq" },
     ],

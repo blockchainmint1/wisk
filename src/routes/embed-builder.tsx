@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { SiteFooter, SiteHeader } from "@/components/site-shell";
-import { DESTINATIONS } from "@/lib/destinations";
+import { DESTINATIONS, type DestAsset } from "@/lib/destinations";
 
 export const Route = createFileRoute("/embed-builder")({
   head: () => ({
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/embed-builder")({
 const ORIGIN = "https://swap.honest.money";
 
 function EmbedBuilder() {
-  const [assets, setAssets] = useState<Array<"TXC" | "ISK$">>(["TXC"]);
+  const [assets, setAssets] = useState<Array<DestAsset>>(["TXC"]);
   const [amount, setAmount] = useState<string>("1000");
   const [chain, setChain] = useState<string>("");
   const [token, setToken] = useState<string>("");
@@ -30,7 +30,7 @@ function EmbedBuilder() {
   const [autoResize, setAutoResize] = useState<boolean>(true);
   const [copied, setCopied] = useState(false);
 
-  const toggleAsset = (a: "TXC" | "ISK$") => {
+  const toggleAsset = (a: DestAsset) => {
     setAssets((prev) => {
       const has = prev.includes(a);
       if (has && prev.length === 1) return prev; // require at least one
@@ -98,7 +98,7 @@ function EmbedBuilder() {
             Embed the swap <span className="text-accent">anywhere</span>
           </h1>
           <p className="mt-4 text-muted-foreground max-w-2xl font-mono text-sm">
-            Drop this iframe on any site — blog, wallet docs, project page — and your visitors can swap stablecoins for native TXC or ISK$ without leaving. No keys, no SDK, no signup.
+            Drop this iframe on any site — blog, wallet docs, project page — and your visitors can swap stablecoins for native TXC or wTXC without leaving. No keys, no SDK, no signup.
           </p>
         </div>
 
@@ -110,7 +110,7 @@ function EmbedBuilder() {
 
             <Field label="Destination assets (pick one or more)">
               <div className="grid grid-cols-2 gap-2">
-                {(["TXC", "ISK$"] as const).map((a) => {
+                {(["TXC", "wTXC"] as const).map((a) => {
                   const active = assets.includes(a);
                   return (
                     <button

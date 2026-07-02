@@ -297,15 +297,9 @@ function OrdersTab() {
             error={hot.data?.txc.ok === false ? hot.data.txc.error : null}
           />
           <BalanceCard
-            label="ISK"
-            value={
-              hot.data?.isk.ok
-                ? `${hot.data.isk.confirmed.toFixed(4)}${
-                    hot.data.isk.unconfirmed ? ` (+${hot.data.isk.unconfirmed.toFixed(4)})` : ""
-                  }`
-                : null
-            }
-            error={hot.data?.isk.ok === false ? hot.data.isk.error : null}
+            label="wTXC"
+            value={hot.data?.wtxc.ok ? hot.data.wtxc.balance.toFixed(4) : null}
+            error={hot.data?.wtxc.ok === false ? hot.data.wtxc.error : null}
           />
         </div>
       </div>
@@ -370,7 +364,7 @@ function OrdersTab() {
               <th className="text-left p-3">Source</th>
               <th className="text-right p-3">USD</th>
               <th className="text-right p-3">TXC</th>
-              <th className="text-right p-3">ISK</th>
+              <th className="text-right p-3">wTXC</th>
               <th className="text-left p-3">Dest</th>
               <th className="text-left p-3">Created</th>
               <th className="text-right p-3">Action</th>
@@ -514,10 +508,8 @@ function OrderRow({
             : <span className="text-muted-foreground">—</span>}
         </td>
         <td className="p-3 text-right">
-          {(o.dest_asset ?? "TXC") === "ISK$"
-            ? (o.bitmart_filled_dest != null
-                ? Number(o.bitmart_filled_dest).toFixed(4)
-                : Number(o.quoted_dest_out).toFixed(4))
+          {(o.dest_asset ?? "TXC") === "wTXC"
+            ? Number(o.quoted_dest_out).toFixed(4)
             : <span className="text-muted-foreground">—</span>}
         </td>
         <td className="p-3 truncate max-w-[14ch]">{o.dest_address}</td>
@@ -584,9 +576,9 @@ function OrderDetail({ publicId }: { publicId: string }) {
   const { order, deposits, events, audit, bitmartLive, hotBalance } = q.data;
   const asset = order.dest_asset ?? "TXC";
   const explorer = (txid: string) =>
-    asset === "ISK$"
-      ? `https://mempool.iskandercoin.com/tx/${txid}`
-      : `https://explorer.texitcoin.org/tx/${txid}`;
+    asset === "wTXC"
+      ? `https://etherscan.io/tx/${txid}`
+      : `https://mempool.texitcoin.org/tx/${txid}`;
 
   return (
     <div className="p-5 space-y-5">
@@ -1855,7 +1847,7 @@ function MarketTab() {
         </div>
         <p className="text-xs font-mono text-muted-foreground mt-2 max-w-xl leading-relaxed">
           Live spot balances on the Bitmart exchange account used for
-          replenishment buys and TXC/ISK liquidity.
+          replenishment buys and TXC/wTXC liquidity.
         </p>
       </div>
 
@@ -1900,19 +1892,18 @@ type ReconcileData = {
   evmStablesUsd: number;
   bitmartUsdt: number;
   bitmartTxc: number;
-  bitmartIsk: number;
+  operatorWtxc: number;
   bitmartTxcUsd: number;
-  bitmartIskUsd: number;
+  operatorWtxcUsd: number;
   txcDebt: number;
-  iskDebt: number;
+  wtxcDebt: number;
   txcDebtUsd: number;
-  iskDebtUsd: number;
+  wtxcDebtUsd: number;
   txcPrice: number;
-  iskPrice: number;
   netPositionUsd: number;
   orderCount: number;
   pendingTxcBuys: number;
-  pendingIskBuys: number;
+  pendingWtxcBuys: number;
   bitmartError: string | null;
   evmError: string | null;
 };
@@ -1965,7 +1956,7 @@ function ReconcilePanel({
           </div>
           <div className="font-mono text-xl mt-1">${r.usdSpentBuying.toFixed(2)}</div>
           <div className="text-[10px] font-mono text-muted-foreground">
-            TXC + ISK$ on Bitmart
+            TXC (Bitmart) + wTXC (operator)
           </div>
         </div>
         <div className="bg-background/60 border border-border rounded-lg p-3">
@@ -2011,11 +2002,11 @@ function ReconcilePanel({
         </div>
         <div className="bg-background/60 border border-border rounded-lg p-3">
           <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-            ISK$ debt owed
+            wTXC debt owed
           </div>
-          <div className="font-mono text-lg mt-1">{r.iskDebt.toFixed(4)} ISK$</div>
+          <div className="font-mono text-lg mt-1">{r.wtxcDebt.toFixed(4)} wTXC</div>
           <div className="text-[10px] font-mono text-muted-foreground">
-            ≈ ${r.iskDebtUsd.toFixed(2)} @ ${r.iskPrice.toFixed(6)} · {r.pendingIskBuys} pending
+            ≈ ${r.wtxcDebtUsd.toFixed(2)} @ ${r.txcPrice.toFixed(6)} · {r.pendingWtxcBuys} pending
           </div>
         </div>
         <div className="bg-background/60 border border-border rounded-lg p-3">

@@ -3,7 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getSpotPrice } from "./bitmart.server";
-import { CHAINS, isNativeToken, type ChainKey } from "./chains";
+import { CHAINS, isWtxcSource, type ChainKey } from "./chains";
 import { getMergedChain, getMergedChains, getMergedToken } from "./chains.server";
 import { DEST_ASSETS, getDestination, type DestAsset } from "./destinations";
 import { deriveDepositAddress } from "./hd.server";
@@ -31,6 +31,15 @@ const CreateInput = z
         message: `Invalid ${dest.label} address`,
       });
     }
+    // Guard against nonsensical pairs. wTXC → wTXC and TXC → wTXC-from-wTXC
+    // would be a no-op or self-loop.
+    if (isWtxcSource(data.sourceChain, data.sourceToken) && data.destAsset === "wTXC") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["destAsset"],
+        message: "wTXC → wTXC is not a valid swap",
+      });
+    }
   });
 
 export const createOrder = createServerFn({ method: "POST" })
@@ -54,12 +63,28 @@ export const createOrder = createServerFn({ method: "POST" })
       throw new Error(`Maximum order is $${settings.max_usd.toLocaleString()}`);
     }
 
-    // Lock the quote at creation time
+    // Quote calculation:
+    //  - Bridge unwrap (source = wTXC, dest = TXC): 1 wTXC = (1 - fee) TXC.
+    //    We still fetch the TXC spot to convert USD → wTXC-to-send on the UI,
+    //    but the *payout ratio* is fee-adjusted, not premium-adjusted.
+    //  - Everything else (stables/ETH → TXC or wTXC): standard Bitmart spot
+    //    + 5% protocol premium.
     const spot = await getSpotPrice(dest.bitmartSymbol);
-    const premiumMultiplier = 1 + settings.premium_bps / 10_000;
-    const effectivePrice = spot * premiumMultiplier;
-    const assetOut = data.usdAmount / effectivePrice;
-    const assetPerUsd = 1 / effectivePrice;
+    const isUnwrap = isWtxcSource(data.sourceChain as ChainKey, data.sourceToken);
+
+    let assetPerUsd: number;
+    let assetOut: number;
+    if (isUnwrap) {
+      const feeMul = 1 - settings.unwrap_fee_bps / 10_000;
+      // 1 USD of wTXC in → (1/spot) TXC worth, then apply unwrap fee.
+      assetPerUsd = (1 / spot) * feeMul;
+      assetOut = data.usdAmount * assetPerUsd;
+    } else {
+      const premiumMultiplier = 1 + settings.premium_bps / 10_000;
+      const effectivePrice = spot * premiumMultiplier;
+      assetOut = data.usdAmount / effectivePrice;
+      assetPerUsd = 1 / effectivePrice;
+    }
 
     // Allocate HD address — recycles expired+unpaid indexes (>60min past expiry)
     // before incrementing the counter.
@@ -86,7 +111,7 @@ export const createOrder = createServerFn({ method: "POST" })
         dest_address: data.destAddress,
         quoted_dest_per_usd: assetPerUsd,
         quoted_dest_out: assetOut,
-        premium_bps: settings.premium_bps,
+        premium_bps: isUnwrap ? -settings.unwrap_fee_bps : settings.premium_bps,
         bitmart_spot_price: spot,
         expires_at: expiresAt,
       })
@@ -127,13 +152,14 @@ export const getOrder = createServerFn({ method: "POST" })
     if (!order) return null;
     const chain = await getMergedChain(order.source_chain);
 
-    // For non-stable native sources (e.g. ETH), surface a live USD spot so
-    // the UI can render an approximate "send ~X ETH" hint. Stables stay $1.
+    // For any priced (non-$1) source token — native ETH, or wTXC in the
+    // unwrap direction — surface a live USD spot so the UI can render an
+    // approximate "send ~X TOKEN" hint. Stables stay $1.
     let sourceSpotUsd: number | null = null;
     let sourceNativeAmount: number | null = null;
     try {
       const token = await getMergedToken(order.source_chain as ChainKey, order.source_token);
-      if (isNativeToken(token) && token.bitmartSymbol) {
+      if (token.bitmartSymbol) {
         sourceSpotUsd = await getSpotPrice(token.bitmartSymbol);
         if (sourceSpotUsd > 0) {
           sourceNativeAmount = Number(order.source_amount_usd) / sourceSpotUsd;

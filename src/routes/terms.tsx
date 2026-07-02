@@ -43,7 +43,7 @@ function TermsPage() {
 
           <Section title="2. Service Description">
             <p>
-              swapTXC operates a non-custodial swap service allowing users to exchange ERC-20 stablecoins (USDC, USDT, pyUSD, DAI, and others) on supported EVM chains for native TXC, ISK$, or ZCU assets on the TEXITcoin / IskanderCoin chain. The Protocol sources liquidity from Bitmart and applies a fixed 5% protocol premium above the live spot price.
+              swapTXC operates a non-custodial swap service allowing users to exchange ERC-20 stablecoins (USDC, USDT, pyUSD, DAI, and others) on supported EVM chains for native TXC or wTXC assets on the TEXITcoin chain. The Protocol sources liquidity from Bitmart and applies a fixed 5% protocol premium above the live spot price.
             </p>
           </Section>
 

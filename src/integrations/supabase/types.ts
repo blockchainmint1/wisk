@@ -59,8 +59,10 @@ export type Database = {
           paused: boolean
           paused_reason: string | null
           premium_bps: number
+          unwrap_fee_bps: number
           updated_at: string
           updated_by: string | null
+          wrap_fee_bps: number
         }
         Insert: {
           expiry_minutes?: number
@@ -71,8 +73,10 @@ export type Database = {
           paused?: boolean
           paused_reason?: string | null
           premium_bps?: number
+          unwrap_fee_bps?: number
           updated_at?: string
           updated_by?: string | null
+          wrap_fee_bps?: number
         }
         Update: {
           expiry_minutes?: number
@@ -83,8 +87,10 @@ export type Database = {
           paused?: boolean
           paused_reason?: string | null
           premium_bps?: number
+          unwrap_fee_bps?: number
           updated_at?: string
           updated_by?: string | null
+          wrap_fee_bps?: number
         }
         Relationships: []
       }
