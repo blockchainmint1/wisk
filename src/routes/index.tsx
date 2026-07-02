@@ -59,12 +59,6 @@ function HomePage() {
               Move native TXC onto Ethereum as wTXC, or bring it home again. Or on-ramp from any major stablecoin — or ETH itself — on five EVM chains. Custodial, fast, and settled straight to your wallet.
             </p>
             <div className="flex gap-4">
-              <Link
-                to="/swap"
-                className="px-8 py-4 bg-accent text-accent-foreground font-mono font-bold uppercase tracking-widest text-sm hover:brightness-110 transition-all shadow-[0_0_30px_hsl(0_84%_50%/0.3)]"
-              >
-                Start Swap
-              </Link>
               <a
                 href="#how"
                 className="px-8 py-4 border border-border font-mono text-sm uppercase tracking-widest hover:bg-foreground hover:text-background transition-colors"
