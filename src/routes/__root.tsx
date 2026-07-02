@@ -77,7 +77,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "swapTXC — Sovereign stablecoin → native swaps" },
+      { title: "wTXC — wrapped TEXITcoin Swap Service" },
       {
         name: "description",
         content:
@@ -87,6 +87,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@honestmoney_xyz" },
+      { property: "og:title", content: "wTXC — wrapped TEXITcoin Swap Service" },
+      { name: "twitter:title", content: "wTXC — wrapped TEXITcoin Swap Service" },
+      { name: "description", content: "wTXC Swap facilitates the exchange of stablecoins on EVM chains for TXC or wTXC." },
+      { property: "og:description", content: "wTXC Swap facilitates the exchange of stablecoins on EVM chains for TXC or wTXC." },
+      { name: "twitter:description", content: "wTXC Swap facilitates the exchange of stablecoins on EVM chains for TXC or wTXC." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/f67a89c2-6927-46cc-8792-7e52ad6c191b/id-preview-d7ee4f4d--37e0fc25-49e9-44a1-af26-373478d95e3b.lovable.app-1782982183469.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/f67a89c2-6927-46cc-8792-7e52ad6c191b/id-preview-d7ee4f4d--37e0fc25-49e9-44a1-af26-373478d95e3b.lovable.app-1782982183469.png" },
     ],
     links: [
       {
