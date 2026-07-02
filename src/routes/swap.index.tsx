@@ -70,14 +70,16 @@ function SwapPage() {
 
   const txcPriceUsd = quote?.ok ? quote.spotPriceUsd : null;
   const unwrapFeeBps = quote?.ok ? (quote.unwrapFeeBps ?? 100) : 100;
+  const wrapFeeBps = quote?.ok ? (quote.wrapFeeBps ?? 0) : 0;
   const unwrapFeePct = unwrapFeeBps / 100;
+  const wrapFeePct = wrapFeeBps / 100;
 
-  // wTXC ↔ TXC is 1:1. Unwrap takes a fee. Wrap is free.
+  // wTXC ↔ TXC is 1:1 minus whichever direction fee applies.
   const wantAmount = useMemo(() => {
     if (haveAmount <= 0) return 0;
     if (isUnwrap) return haveAmount * (1 - unwrapFeeBps / 10_000);
-    return haveAmount; // wrap 1:1
-  }, [haveAmount, isUnwrap, unwrapFeeBps]);
+    return haveAmount * (1 - wrapFeeBps / 10_000);
+  }, [haveAmount, isUnwrap, unwrapFeeBps, wrapFeeBps]);
 
   const usdAmount = useMemo(() => {
     if (!txcPriceUsd || haveAmount <= 0) return 0;
