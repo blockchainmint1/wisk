@@ -401,7 +401,7 @@ export const adminHotWalletBalances = createServerFn({ method: "POST" })
 // ===== Reconciliation =====
 // Compare what we *should* hold (USD in − USD spent on Bitmart buybacks)
 // against what we *actually* hold (EVM stables + Bitmart USDT), and surface
-// any unfilled asset debt (TXC + ISK$) at current spot price.
+// any unfilled asset debt (TXC + wTXC) at current spot price.
 export const adminReconcile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -418,16 +418,16 @@ export const adminReconcile = createServerFn({ method: "POST" })
 
     let usdIn = 0;
     let usdSpentBuying = 0;
-    const byAsset: Record<"TXC" | "ISK$", { sold: number; bought: number; pendingBuys: number }> = {
+    const byAsset: Record<"TXC" | "wTXC", { sold: number; bought: number; pendingBuys: number }> = {
       TXC: { sold: 0, bought: 0, pendingBuys: 0 },
-      "ISK$": { sold: 0, bought: 0, pendingBuys: 0 },
+      wTXC: { sold: 0, bought: 0, pendingBuys: 0 },
     };
     for (const r of rows ?? []) {
       usdIn += Number(r.paid_amount_usd ?? 0);
       const bought = Number(r.bitmart_filled_dest ?? 0);
       const avg = Number(r.bitmart_avg_price ?? 0);
       if (bought > 0 && avg > 0) usdSpentBuying += bought * avg;
-      const asset = (r.dest_asset ?? "TXC") as "TXC" | "ISK$";
+      const asset = (r.dest_asset ?? "TXC") as "TXC" | "wTXC";
       if (byAsset[asset]) {
         byAsset[asset].sold += Number(r.quoted_dest_out ?? 0);
         byAsset[asset].bought += bought;
@@ -437,12 +437,13 @@ export const adminReconcile = createServerFn({ method: "POST" })
 
     const expectedStablesUsd = usdIn - usdSpentBuying;
 
-    // 2) Actual stables on hand: admin EVM + Bitmart USDT.
-    const [evmRes, bitmartRes, txcSpot, iskSpot] = await Promise.allSettled([
+    // 2) Actual stables on hand: admin EVM + Bitmart USDT.  wTXC held in
+    // the operator wallet is counted as asset inventory at TXC spot.
+    const [evmRes, bitmartRes, txcSpot, wtxcBalRes] = await Promise.allSettled([
       scanHdWallet({ maxAddresses: 1 }),
       getBalances(),
       getSpotPrice("TXC_USDT"),
-      getSpotPrice("ISK$_USDT"),
+      getWtxcBalance(getOperatorEvmAddress()),
     ]);
 
     const evmStablesUsd =
@@ -452,34 +453,32 @@ export const adminReconcile = createServerFn({ method: "POST" })
 
     let bitmartUsdt = 0;
     let bitmartTxc = 0;
-    let bitmartIsk = 0;
     if (bitmartRes.status === "fulfilled") {
       for (const b of bitmartRes.value) {
         const c = b.currency.toUpperCase();
         const amt = Number(b.available);
         if (c === "USDT") bitmartUsdt += amt;
         else if (c === "TXC") bitmartTxc += amt;
-        else if (c === "ISK$") bitmartIsk += amt;
       }
     }
 
     const txcPrice = txcSpot.status === "fulfilled" ? txcSpot.value : 0;
-    const iskPrice = iskSpot.status === "fulfilled" ? iskSpot.value : 0;
+    const operatorWtxc = wtxcBalRes.status === "fulfilled" ? wtxcBalRes.value : 0;
 
     const actualStablesUsd = evmStablesUsd + bitmartUsdt;
     const stablesDiff = actualStablesUsd - expectedStablesUsd;
 
     const txcDebt = Math.max(0, byAsset.TXC.sold - byAsset.TXC.bought);
-    const iskDebt = Math.max(0, byAsset["ISK$"].sold - byAsset["ISK$"].bought);
+    const wtxcDebt = Math.max(0, byAsset.wTXC.sold - byAsset.wTXC.bought);
     const txcDebtUsd = txcDebt * txcPrice;
-    const iskDebtUsd = iskDebt * iskPrice;
+    const wtxcDebtUsd = wtxcDebt * txcPrice;
 
-    // Net position: stables we hold + bitmart asset inventory (TXC/ISK) we
-    // already bought back − the still-owed asset debt at current spot.
+    // Net position: stables we hold + bitmart TXC inventory + operator wTXC
+    // − the still-owed asset debt at current spot.
     const bitmartTxcUsd = bitmartTxc * txcPrice;
-    const bitmartIskUsd = bitmartIsk * iskPrice;
+    const operatorWtxcUsd = operatorWtxc * txcPrice;
     const netPositionUsd =
-      actualStablesUsd + bitmartTxcUsd + bitmartIskUsd - txcDebtUsd - iskDebtUsd;
+      actualStablesUsd + bitmartTxcUsd + operatorWtxcUsd - txcDebtUsd - wtxcDebtUsd;
 
     return {
       usdIn: +usdIn.toFixed(2),
@@ -490,19 +489,18 @@ export const adminReconcile = createServerFn({ method: "POST" })
       evmStablesUsd: +evmStablesUsd.toFixed(2),
       bitmartUsdt: +bitmartUsdt.toFixed(2),
       bitmartTxc: +bitmartTxc.toFixed(4),
-      bitmartIsk: +bitmartIsk.toFixed(4),
+      operatorWtxc: +operatorWtxc.toFixed(4),
       bitmartTxcUsd: +bitmartTxcUsd.toFixed(2),
-      bitmartIskUsd: +bitmartIskUsd.toFixed(2),
+      operatorWtxcUsd: +operatorWtxcUsd.toFixed(2),
       txcDebt: +txcDebt.toFixed(4),
-      iskDebt: +iskDebt.toFixed(4),
+      wtxcDebt: +wtxcDebt.toFixed(4),
       txcDebtUsd: +txcDebtUsd.toFixed(2),
-      iskDebtUsd: +iskDebtUsd.toFixed(2),
+      wtxcDebtUsd: +wtxcDebtUsd.toFixed(2),
       txcPrice,
-      iskPrice,
       netPositionUsd: +netPositionUsd.toFixed(2),
       orderCount: rows?.length ?? 0,
       pendingTxcBuys: byAsset.TXC.pendingBuys,
-      pendingIskBuys: byAsset["ISK$"].pendingBuys,
+      pendingWtxcBuys: byAsset.wTXC.pendingBuys,
       bitmartError:
         bitmartRes.status === "rejected"
           ? (bitmartRes.reason as Error)?.message ?? "bitmart failed"
@@ -513,6 +511,7 @@ export const adminReconcile = createServerFn({ method: "POST" })
           : null,
     };
   });
+
 
 
 
