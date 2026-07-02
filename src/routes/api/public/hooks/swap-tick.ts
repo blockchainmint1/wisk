@@ -126,6 +126,7 @@ async function watchDeposits() {
       "id,public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_address,quoted_dest_out,quoted_dest_per_usd,expires_at,paid_amount_usd,bitmart_order_id,bitmart_filled_dest,withdrawal_id",
     )
     .in("status", ["awaiting_payment", "payment_detected"])
+    .neq("source_chain", "txc")
     .returns<OrderRow[]>();
   if (!orders?.length) return { detected: 0 };
 
