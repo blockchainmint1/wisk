@@ -1958,7 +1958,7 @@ function ReconcilePanel({
           </div>
           <div className="font-mono text-xl mt-1">${r.usdSpentBuying.toFixed(2)}</div>
           <div className="text-[10px] font-mono text-muted-foreground">
-            TXC + ISK$ on Bitmart
+            TXC (Bitmart) + wTXC (operator)
           </div>
         </div>
         <div className="bg-background/60 border border-border rounded-lg p-3">
