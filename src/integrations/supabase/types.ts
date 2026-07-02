@@ -207,6 +207,27 @@ export type Database = {
         }
         Relationships: []
       }
+      hot_wallet_locks: {
+        Row: {
+          locked_by: string | null
+          locked_until: string
+          updated_at: string
+          wallet_key: string
+        }
+        Insert: {
+          locked_by?: string | null
+          locked_until?: string
+          updated_at?: string
+          wallet_key: string
+        }
+        Update: {
+          locked_by?: string | null
+          locked_until?: string
+          updated_at?: string
+          wallet_key?: string
+        }
+        Relationships: []
+      }
       order_events: {
         Row: {
           created_at: string
@@ -362,6 +383,14 @@ export type Database = {
         Returns: boolean
       }
       next_hd_index: { Args: never; Returns: number }
+      release_wallet_lock: {
+        Args: { _holder: string; _wallet_key: string }
+        Returns: undefined
+      }
+      try_acquire_wallet_lock: {
+        Args: { _holder: string; _ttl_seconds: number; _wallet_key: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin"
