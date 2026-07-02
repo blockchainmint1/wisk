@@ -1,8 +1,8 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ChevronDown, Wallet } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowDownUp, Wallet } from "lucide-react";
 import { LiveTicker } from "@/components/live-ticker";
 import { SiteFooter, SiteHeader } from "@/components/site-shell";
 import { SwapHistory } from "@/components/swap-history";
@@ -13,7 +13,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { DESTINATIONS, type DestAsset } from "@/lib/destinations";
-import { createOrder, listChainOptions } from "@/lib/orders.functions";
+import { createOrder } from "@/lib/orders.functions";
 import { getQuote } from "@/lib/quote.functions";
 
 export const Route = createFileRoute("/swap/")({
@@ -23,126 +23,79 @@ export const Route = createFileRoute("/swap/")({
       {
         name: "description",
         content:
-          "Swap wTXC ↔ TXC or on-ramp from stables/ETH. Locked quote, direct payout to the address you choose.",
+          "Swap wTXC ↔ TXC 1:1. Locked quote, direct payout to the address you choose.",
       },
       { property: "og:title", content: "Swap — wTXC ↔ TXC Bridge" },
       {
         property: "og:description",
-        content: "Bidirectional wTXC ↔ TXC swap with a stablecoin on-ramp.",
+        content: "Bidirectional wTXC ↔ TXC bridge.",
       },
     ],
   }),
   component: SwapPage,
 });
 
-interface SourceOption {
-  id: string;
-  chain: string;
-  chainName: string;
-  symbol: string;
-  isNative: boolean;
-  isWtxc: boolean;
-}
+type Side = "wTXC" | "TXC";
 
-const PRESETS = [100, 500, 1000] as const;
+const PRESETS = [100, 1000, 10000] as const;
 
 function SwapPage() {
-  const listChains = useServerFn(listChainOptions);
   const quoteFn = useServerFn(getQuote);
   const createFn = useServerFn(createOrder);
 
-  const { data: chains } = useQuery({
-    queryKey: ["chains"],
-    queryFn: () => listChains(),
-    staleTime: Infinity,
-  });
-
-  const sourceOptions = useMemo<SourceOption[]>(() => {
-    if (!chains) return [];
-    const opts: SourceOption[] = [];
-    for (const c of chains) {
-      for (const t of c.tokens) {
-        opts.push({
-          id: `${c.key}:${t.symbol}`,
-          chain: c.key,
-          chainName: c.name,
-          symbol: t.symbol,
-          isNative: !!t.isNative,
-          isWtxc: c.key === "ethereum" && t.symbol === "wTXC",
-        });
-      }
-    }
-    // wTXC first (primary bridge inflow)
-    opts.sort((a, b) => (a.isWtxc === b.isWtxc ? 0 : a.isWtxc ? -1 : 1));
-    return opts;
-  }, [chains]);
-
-  const [sourceId, setSourceId] = useState<string>("ethereum:wTXC");
-  const [destAsset, setDestAsset] = useState<DestAsset>("TXC");
+  // Default: unwrap (wTXC → TXC)
+  const [have, setHave] = useState<Side>("wTXC");
   const [amount, setAmount] = useState<string>("100");
   const [dest, setDest] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
-  const source = sourceOptions.find((s) => s.id === sourceId) ?? sourceOptions[0];
+  const want: Side = have === "wTXC" ? "TXC" : "wTXC";
+  const isUnwrap = have === "wTXC" && want === "TXC";
+  const isWrap = have === "TXC" && want === "wTXC";
 
-  useEffect(() => {
-    if (sourceOptions.length && !sourceOptions.find((s) => s.id === sourceId)) {
-      setSourceId(sourceOptions[0].id);
-    }
-  }, [sourceOptions, sourceId]);
-
-  // wTXC → wTXC is a no-op; force TXC.
-  useEffect(() => {
-    if (source?.isWtxc && destAsset === "wTXC") setDestAsset("TXC");
-  }, [source?.isWtxc, destAsset]);
-
+  const destAsset: DestAsset = want;
   const destConfig = DESTINATIONS[destAsset];
-  const isUnwrap = !!source?.isWtxc && destAsset === "TXC";
 
-  const usdAmount = useMemo(() => {
+  const haveAmount = useMemo(() => {
     const n = Number.parseFloat(amount.replace(/,/g, ""));
     return Number.isFinite(n) && n > 0 ? n : 0;
   }, [amount]);
 
+  // Live TXC price for the exchange-rate line and USD conversion.
   const { data: quote } = useQuery({
-    queryKey: ["quote", usdAmount, destAsset],
-    queryFn: () => quoteFn({ data: { usdAmount: Math.max(usdAmount, 1), destAsset } }),
+    queryKey: ["quote", destAsset],
+    queryFn: () => quoteFn({ data: { usdAmount: 100, destAsset } }),
     refetchInterval: 15_000,
   });
 
-  const effectivePriceUsd = useMemo(() => {
-    if (!quote?.ok) return null;
-    if (isUnwrap) {
-      const feeMul = 1 - (quote.unwrapFeeBps ?? 100) / 10_000;
-      return quote.spotPriceUsd / feeMul;
-    }
-    return quote.effectivePriceUsd;
-  }, [quote, isUnwrap]);
+  const txcPriceUsd = quote?.ok ? quote.spotPriceUsd : null;
+  const unwrapFeeBps = quote?.ok ? (quote.unwrapFeeBps ?? 100) : 100;
+  const unwrapFeePct = unwrapFeeBps / 100;
 
-  const assetOut =
-    effectivePriceUsd && usdAmount > 0 ? usdAmount / effectivePriceUsd : 0;
+  // wTXC ↔ TXC is 1:1. Unwrap takes a fee. Wrap is free.
+  const wantAmount = useMemo(() => {
+    if (haveAmount <= 0) return 0;
+    if (isUnwrap) return haveAmount * (1 - unwrapFeeBps / 10_000);
+    return haveAmount; // wrap 1:1
+  }, [haveAmount, isUnwrap, unwrapFeeBps]);
 
-  const sourceIsPriced = source?.isNative || source?.isWtxc;
-
-  // For priced sources, show approx source-token amount using the source's
-  // own spot (approx via quote spot if source is wTXC). Stables = USD 1:1.
-  const sourceTokenAmount = useMemo(() => {
-    if (!source) return null;
-    if (!sourceIsPriced) return usdAmount; // stables
-    if (source.isWtxc && quote?.ok) return usdAmount / quote.spotPriceUsd;
-    return null; // ETH etc — final amount shown on next screen
-  }, [source, sourceIsPriced, usdAmount, quote]);
+  const usdAmount = useMemo(() => {
+    if (!txcPriceUsd || haveAmount <= 0) return 0;
+    return haveAmount * txcPriceUsd;
+  }, [haveAmount, txcPriceUsd]);
 
   const addressValid = destConfig.addressRegex.test(dest.trim());
 
   const mutation = useMutation({
     mutationFn: async () => {
       setError(null);
-      if (!source) throw new Error("Pick a source asset");
+      if (isWrap) {
+        throw new Error("Wrap (TXC → wTXC) is coming soon.");
+      }
       return createFn({
         data: {
-          sourceChain: source.chain as "ethereum" | "base" | "arbitrum" | "polygon" | "bsc",
-          sourceToken: source.symbol,
+          sourceChain: "ethereum",
+          sourceToken: "wTXC",
           usdAmount,
           destAsset,
           destAddress: dest.trim(),
@@ -161,23 +114,10 @@ function SwapPage() {
   });
 
   const formValid =
-    !!source && usdAmount >= 10 && addressValid && quote?.ok === true;
+    isUnwrap && haveAmount > 0 && addressValid && quote?.ok === true && usdAmount >= 10;
 
-  // Flip handler: switch between wTXC (unwrap) and a default onramp (USDC/eth).
   function flip() {
-    if (source?.isWtxc) {
-      // Unwrap → onramp default
-      setSourceId("ethereum:USDC");
-      setDestAsset("wTXC");
-    } else if (destAsset === "wTXC") {
-      // Onramp to wTXC → unwrap
-      setSourceId("ethereum:wTXC");
-      setDestAsset("TXC");
-    } else {
-      // Onramp to TXC → unwrap
-      setSourceId("ethereum:wTXC");
-      setDestAsset("TXC");
-    }
+    setHave((h) => (h === "wTXC" ? "TXC" : "wTXC"));
   }
 
   return (
@@ -190,19 +130,19 @@ function SwapPage() {
           </h1>
           <p className="mt-4 text-sm text-muted-foreground font-mono">
             {isUnwrap
-              ? "Unwrap wTXC → native TXC. 1% bridge fee."
-              : "Live Bitmart price + 5% protocol premium."}
+              ? `Unwrap wTXC → native TXC · ${unwrapFeePct.toFixed(unwrapFeePct % 1 === 0 ? 0 : 2)}% bridge fee`
+              : "Wrap native TXC → wTXC on Ethereum · free"}
           </p>
         </div>
 
         <div className="relative animate-slide-up">
           <div className="absolute -inset-8 bg-accent/10 blur-3xl rounded-[3rem] -z-10" />
 
-          {/* SELL */}
+          {/* HAVE */}
           <div className="bg-secondary/60 border border-border rounded-2xl p-5">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-mono text-muted-foreground uppercase tracking-widest">
-                Sell
+                Have
               </span>
               <div className="flex gap-1.5">
                 {PRESETS.map((p) => (
@@ -212,7 +152,7 @@ function SwapPage() {
                     onClick={() => setAmount(String(p))}
                     className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-background border border-border text-muted-foreground hover:text-foreground hover:border-accent/40 transition-colors"
                   >
-                    ${p >= 1000 ? `${p / 1000}k` : p}
+                    {p >= 1000 ? `${p / 1000}k` : p}
                   </button>
                 ))}
               </div>
@@ -227,26 +167,7 @@ function SwapPage() {
                 placeholder="0"
                 className="bg-transparent border-none outline-none font-mono text-4xl md:text-5xl w-full text-foreground placeholder:text-muted-foreground/40"
               />
-              <TokenPill
-                value={sourceId}
-                onChange={setSourceId}
-                options={sourceOptions.map((o) => ({
-                  value: o.id,
-                  label: `${o.symbol}${o.isNative ? " (native)" : ""} · ${o.chainName}`,
-                  short: o.symbol,
-                }))}
-              />
-            </div>
-
-            <div className="mt-3 flex items-center justify-between text-xs font-mono text-muted-foreground">
-              <span>${usdAmount ? usdAmount.toLocaleString() : "0"}</span>
-              <span>
-                {sourceTokenAmount != null
-                  ? `${sourceTokenAmount.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${source?.symbol}`
-                  : source?.isNative
-                    ? `≈ USD value in ${source.symbol}`
-                    : ""}
-              </span>
+              <SidePill side={have} />
             </div>
           </div>
 
@@ -258,40 +179,38 @@ function SwapPage() {
               aria-label="Flip direction"
               className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 w-11 h-11 rounded-xl bg-background border-4 border-background shadow-lg flex items-center justify-center hover:bg-accent hover:text-accent-foreground transition-colors z-10 ring-1 ring-border"
             >
-              <ArrowDown className="h-4 w-4" />
+              <ArrowDownUp className="h-4 w-4" />
             </button>
           </div>
 
-          {/* BUY */}
+          {/* WANT */}
           <div className="bg-secondary/60 border border-border rounded-2xl p-5 mt-1">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-mono text-muted-foreground uppercase tracking-widest">
-                Buy
+                Want
               </span>
             </div>
 
             <div className="flex items-center gap-3">
               <div className="font-mono text-4xl md:text-5xl w-full text-foreground truncate">
-                {assetOut > 0
-                  ? assetOut.toLocaleString(undefined, { maximumFractionDigits: 6 })
+                {wantAmount > 0
+                  ? wantAmount.toLocaleString(undefined, { maximumFractionDigits: 6 })
                   : "0"}
               </div>
-              <DestPill
-                value={destAsset}
-                onChange={setDestAsset}
-                disableWtxc={!!source?.isWtxc}
-              />
+              <SidePill side={want} />
             </div>
 
             <div className="mt-3 text-xs font-mono text-muted-foreground">
-              {effectivePriceUsd
-                ? `1 ${destConfig.label} ≈ $${effectivePriceUsd.toFixed(6)}`
-                : "Fetching rate…"}
-              {quote?.ok ? (
+              {txcPriceUsd
+                ? `1 TXC ≈ $${txcPriceUsd.toFixed(6)}`
+                : "Fetching TXC price…"}
+              {isUnwrap ? (
                 <span className="ml-2 opacity-70">
-                  · {isUnwrap ? "1% fee" : "+5% premium"}
+                  · {unwrapFeePct.toFixed(unwrapFeePct % 1 === 0 ? 0 : 2)}% fee
                 </span>
-              ) : null}
+              ) : (
+                <span className="ml-2 opacity-70">· 1:1, no fee</span>
+              )}
             </div>
           </div>
 
@@ -346,17 +265,21 @@ function SwapPage() {
           >
             {mutation.isPending
               ? "Creating Order…"
-              : !source || usdAmount < 10
-                ? "Enter an amount (min $10)"
-                : !addressValid
-                  ? `Enter ${destConfig.label} address`
-                  : !quote?.ok
-                    ? "Waiting for quote…"
-                    : "Get started"}
+              : isWrap
+                ? "Wrap coming soon"
+                : haveAmount <= 0
+                  ? "Enter an amount"
+                  : usdAmount > 0 && usdAmount < 10
+                    ? "Minimum $10 equivalent"
+                    : !addressValid
+                      ? `Enter ${destConfig.label} address`
+                      : !quote?.ok
+                        ? "Waiting for quote…"
+                        : "Get started"}
           </button>
 
           <p className="mt-4 text-center text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
-            Quote locks for 15 min once confirmed · Minimum $10
+            Quote locks for 15 min once confirmed
           </p>
         </div>
 
@@ -369,69 +292,10 @@ function SwapPage() {
   );
 }
 
-function TokenPill({
-  value,
-  onChange,
-  options,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string; short: string }[];
-}) {
-  const current = options.find((o) => o.value === value);
+function SidePill({ side }: { side: Side }) {
   return (
-    <div className="relative shrink-0">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="absolute inset-0 opacity-0 cursor-pointer"
-        aria-label="Select token"
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      <div className="flex items-center gap-2 bg-background border border-border rounded-full pl-3 pr-2 py-2 font-mono text-sm hover:border-accent transition-colors">
-        <span className="font-bold">{current?.short ?? "—"}</span>
-        <ChevronDown className="h-4 w-4 opacity-60" />
-      </div>
-    </div>
-  );
-}
-
-function DestPill({
-  value,
-  onChange,
-  disableWtxc,
-}: {
-  value: DestAsset;
-  onChange: (v: DestAsset) => void;
-  disableWtxc: boolean;
-}) {
-  return (
-    <div className="shrink-0 flex bg-background border border-border rounded-full p-1 font-mono text-xs">
-      {(["TXC", "wTXC"] as DestAsset[]).map((a) => {
-        const active = value === a;
-        const disabled = disableWtxc && a === "wTXC";
-        return (
-          <button
-            key={a}
-            type="button"
-            disabled={disabled}
-            onClick={() => onChange(a)}
-            title={disabled ? "wTXC → wTXC is a no-op" : undefined}
-            className={`px-3 py-1.5 rounded-full uppercase tracking-widest transition-colors ${
-              active
-                ? "bg-accent text-accent-foreground font-bold"
-                : "text-muted-foreground hover:text-foreground"
-            } disabled:opacity-30 disabled:cursor-not-allowed`}
-          >
-            {a}
-          </button>
-        );
-      })}
+    <div className="shrink-0 flex items-center gap-2 bg-background border border-border rounded-full pl-3 pr-3 py-2 font-mono text-sm">
+      <span className="font-bold">{side}</span>
     </div>
   );
 }
