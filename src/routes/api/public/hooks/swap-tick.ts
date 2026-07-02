@@ -314,7 +314,10 @@ async function watchTxcDeposits() {
     >();
   if (!orders?.length) return { detected: 0 };
 
-  const REQUIRED_CONFIRMATIONS = 1;
+  // TXC deposits: pay out on mempool sighting (0-conf). The bridge hot
+  // wallet is the only signer on the deposit address, so we can safely
+  // spend the incoming UTXO before it confirms.
+  const REQUIRED_CONFIRMATIONS = 0;
   let detected = 0;
   let tip = 0;
   try {
