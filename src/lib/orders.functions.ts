@@ -185,20 +185,32 @@ export const getOrder = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!order) return null;
-    const chain = await getMergedChain(order.source_chain);
 
-    // For any priced (non-$1) source token — native ETH, or wTXC in the
-    // unwrap direction — surface a live USD spot so the UI can render an
+    const isTxcSource = order.source_chain === "txc";
+    let chainName = "TEXITcoin";
+    let chainExplorer = "https://mempool.texitcoin.org";
+    if (!isTxcSource) {
+      const chain = await getMergedChain(order.source_chain);
+      chainName = chain.name;
+      chainExplorer = chain.explorer;
+    }
+
+    // For any priced (non-$1) source token — native ETH, wTXC (unwrap),
+    // native TXC (wrap) — surface a live USD spot so the UI can render an
     // approximate "send ~X TOKEN" hint. Stables stay $1.
     let sourceSpotUsd: number | null = null;
     let sourceNativeAmount: number | null = null;
     try {
-      const token = await getMergedToken(order.source_chain as ChainKey, order.source_token);
-      if (token.bitmartSymbol) {
-        sourceSpotUsd = await getSpotPrice(token.bitmartSymbol);
-        if (sourceSpotUsd > 0) {
-          sourceNativeAmount = Number(order.source_amount_usd) / sourceSpotUsd;
+      if (isTxcSource) {
+        sourceSpotUsd = await getSpotPrice("TXC_USDT");
+      } else {
+        const token = await getMergedToken(order.source_chain as ChainKey, order.source_token);
+        if (token.bitmartSymbol) {
+          sourceSpotUsd = await getSpotPrice(token.bitmartSymbol);
         }
+      }
+      if (sourceSpotUsd && sourceSpotUsd > 0) {
+        sourceNativeAmount = Number(order.source_amount_usd) / sourceSpotUsd;
       }
     } catch {
       // Non-fatal: detail page just falls back to USD.
@@ -206,8 +218,8 @@ export const getOrder = createServerFn({ method: "POST" })
 
     return {
       ...order,
-      chainName: chain.name,
-      chainExplorer: chain.explorer,
+      chainName,
+      chainExplorer,
       sourceSpotUsd,
       sourceNativeAmount,
     };
