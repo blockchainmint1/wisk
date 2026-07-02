@@ -13,7 +13,7 @@ import * as bitcoin from "bitcoinjs-lib";
 import { ECPairFactory, type ECPairInterface } from "ecpair";
 import * as ecc from "@bitcoinerlab/secp256k1";
 import { keccak256 } from "viem";
-import { secp256k1 } from "@noble/curves/secp256k1.js";
+
 
 bitcoin.initEccLib(ecc);
 const ECPair = ECPairFactory(ecc);
@@ -118,5 +118,3 @@ export function pubkeyToEvmAddress(uncompressed64: Uint8Array): `0x${string}` {
   return ("0x" + hash.slice(-40)) as `0x${string}`;
 }
 
-// Re-export for callers that still want the point-based derivation
-export { secp256k1 };
