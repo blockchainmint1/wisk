@@ -143,35 +143,6 @@ function Stat({ label, value, sub }: { label: string; value: string; sub: string
   );
 }
 
-function FlowRow({
-  num,
-  title,
-  detail,
-  active,
-}: {
-  num: string;
-  title: string;
-  detail: string;
-  active?: boolean;
-}) {
-  return (
-    <div className="flex items-start gap-4">
-      <div
-        className={`font-mono text-lg leading-none pt-0.5 ${
-          active ? "text-accent" : "text-muted-foreground"
-        }`}
-      >
-        {num}
-      </div>
-      <div className="flex-1 border-l border-border pl-4">
-        <div className="text-sm font-bold">{title}</div>
-        <div className="text-xs text-muted-foreground font-mono mt-1 leading-relaxed">
-          {detail}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function Principle({ n, title, body }: { n: string; title: string; body: string }) {
   return (
