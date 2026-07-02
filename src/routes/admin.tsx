@@ -2004,11 +2004,11 @@ function ReconcilePanel({
         </div>
         <div className="bg-background/60 border border-border rounded-lg p-3">
           <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-            ISK$ debt owed
+            wTXC debt owed
           </div>
-          <div className="font-mono text-lg mt-1">{r.iskDebt.toFixed(4)} ISK$</div>
+          <div className="font-mono text-lg mt-1">{r.wtxcDebt.toFixed(4)} wTXC</div>
           <div className="text-[10px] font-mono text-muted-foreground">
-            ≈ ${r.iskDebtUsd.toFixed(2)} @ ${r.iskPrice.toFixed(6)} · {r.pendingIskBuys} pending
+            ≈ ${r.wtxcDebtUsd.toFixed(2)} @ ${r.txcPrice.toFixed(6)} · {r.pendingWtxcBuys} pending
           </div>
         </div>
         <div className="bg-background/60 border border-border rounded-lg p-3">
