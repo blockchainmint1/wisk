@@ -73,31 +73,8 @@ function HomePage() {
             </div>
           </div>
 
-          <div className="relative animate-slide-up [animation-delay:150ms]">
-            <div className="absolute -inset-1 bg-accent/20 blur-3xl rounded-3xl -z-10" />
-            <div className="bg-secondary border border-border p-1 rounded-2xl">
-              <div className="bg-background border border-border rounded-xl p-8 space-y-6">
-                <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-                  Three ways in, three ways out
-                </div>
-                <FlowRow
-                  num="→"
-                  title="Wrap"
-                  detail="Send native TXC · receive wTXC (ERC-20) on Ethereum. Free."
-                />
-                <FlowRow
-                  num="←"
-                  title="Unwrap"
-                  detail="Send wTXC on Ethereum · receive native TXC. 1% fee."
-                />
-                <FlowRow
-                  num="$"
-                  title="On-ramp"
-                  detail="Send USDC/USDT/pyUSD/DAI/ETH · receive TXC or wTXC at live Bitmart pricing +5%."
-                  active
-                />
-              </div>
-            </div>
+          <div className="animate-slide-up [animation-delay:150ms]">
+            <SwapForm compact />
           </div>
         </div>
 
