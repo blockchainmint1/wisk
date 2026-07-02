@@ -538,9 +538,10 @@ async function replenishTreasury() {
   let submitted = 0;
   for (const o of orders) {
     try {
-      // Skip unwrap direction (wTXC → TXC): user gave us wTXC, we paid
-      // TXC out. No stables involved; refilling TXC via Bitmart would
-      // waste money. Admin can manually re-wrap accumulated wTXC → TXC.
+      // Skip both bridge directions (they never touch stables):
+      //   • unwrap (wTXC → TXC): user gave us wTXC, we paid TXC out.
+      //   • wrap   (TXC  → wTXC): user gave us native TXC, we paid wTXC.
+      if (o.source_chain === "txc") continue;
       if (isWtxcSource(o.source_chain as ChainKey, o.source_token)) continue;
       const dest = getDestination(o.dest_asset);
       // For wTXC on-ramp, buy TXC on Bitmart (we'll re-wrap manually).
