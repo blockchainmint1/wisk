@@ -1,11 +1,11 @@
 {
-  "version": 1,
   "asset_id": "5cf82ecf-f471-4255-baf4-ed63be24709e",
-  "project_id": "9fa74c59-6726-48bb-a5bf-a6cc868c7787",
-  "url": "/__l5e/assets-v1/5cf82ecf-f471-4255-baf4-ed63be24709e/honest-money-logo.png",
-  "r2_key": "a/v1/9fa74c59-6726-48bb-a5bf-a6cc868c7787/5cf82ecf-f471-4255-baf4-ed63be24709e/honest-money-logo.png",
-  "original_filename": "honest-money-logo.png",
-  "size": 58981,
   "content_type": "image/png",
-  "created_at": "2026-06-07T11:08:09Z"
+  "created_at": "2026-06-07T11:08:09Z",
+  "original_filename": "honest-money-logo.png",
+  "project_id": "37e0fc25-49e9-44a1-af26-373478d95e3b",
+  "r2_key": "a/v1/37e0fc25-49e9-44a1-af26-373478d95e3b/5cf82ecf-f471-4255-baf4-ed63be24709e/honest-money-logo.png",
+  "size": 58981,
+  "url": "/__l5e/assets-v1/5cf82ecf-f471-4255-baf4-ed63be24709e/honest-money-logo.png",
+  "version": 1
 }
