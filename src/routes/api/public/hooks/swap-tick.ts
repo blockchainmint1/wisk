@@ -288,6 +288,152 @@ async function watchDeposits() {
 }
 
 /**
+ * Wrap direction (source = native TXC → dest = wTXC).
+ * Scan each awaiting/detected TXC-source order's deposit address on the
+ * TEXITcoin chain, price the sats at the live spot, and advance the order
+ * state exactly like watchDeposits() does for EVM.
+ */
+async function watchTxcDeposits() {
+  const { data: orders } = await supabaseAdmin
+    .from("orders")
+    .select(
+      "id,public_id,status,source_amount_usd,deposit_address,quoted_dest_out,quoted_dest_per_usd",
+    )
+    .in("status", ["awaiting_payment", "payment_detected"])
+    .eq("source_chain", "txc")
+    .returns<
+      Array<{
+        id: string;
+        public_id: string;
+        status: string;
+        source_amount_usd: number;
+        deposit_address: string;
+        quoted_dest_out: number;
+        quoted_dest_per_usd: number;
+      }>
+    >();
+  if (!orders?.length) return { detected: 0 };
+
+  const REQUIRED_CONFIRMATIONS = 1;
+  let detected = 0;
+  let tip = 0;
+  try {
+    tip = await getTxcTipHeight();
+  } catch (e) {
+    console.error("[watch-txc] tip failed", e);
+    return { detected: 0 };
+  }
+  let txcSpot = 0;
+  try {
+    txcSpot = await getSpotPrice("TXC_USDT");
+  } catch (e) {
+    console.error("[watch-txc] spot failed", e);
+    return { detected: 0 };
+  }
+
+  for (const order of orders) {
+    try {
+      const transfers = await scanTxcIncoming(order.deposit_address, tip);
+      if (!transfers.length) continue;
+
+      for (const t of transfers) {
+        const txcAmount = t.amountSats / 1e8;
+        const usd = txcAmount * txcSpot;
+
+        await supabaseAdmin.from("deposits").upsert(
+          {
+            order_id: order.id,
+            chain: "txc",
+            tx_hash: t.txid,
+            log_index: 0,
+            token: "TXC",
+            from_address: t.fromAddress ?? "",
+            to_address: order.deposit_address,
+            amount_usd: usd,
+            block_number: t.blockHeight ?? 0,
+            confirmations: t.confirmations,
+          },
+          { onConflict: "chain,tx_hash,log_index" },
+        );
+
+        const { data: allDeposits } = await supabaseAdmin
+          .from("deposits")
+          .select("amount_usd")
+          .eq("order_id", order.id);
+        const totalPaidUsd = (allDeposits ?? []).reduce(
+          (sum, d) => sum + Number(d.amount_usd ?? 0),
+          0,
+        );
+
+        const repricedOut = +(
+          totalPaidUsd * Number(order.quoted_dest_per_usd)
+        ).toFixed(8);
+        const originalOut = Number(order.quoted_dest_out);
+        const repriced = Math.abs(repricedOut - originalOut) > 0.00000001;
+
+        if (order.status === "awaiting_payment") {
+          await supabaseAdmin
+            .from("orders")
+            .update({
+              status: "payment_detected",
+              paid_tx_hash: t.txid,
+              paid_amount_usd: totalPaidUsd,
+              quoted_dest_out: repricedOut,
+            })
+            .eq("id", order.id);
+          order.status = "payment_detected";
+          order.quoted_dest_out = repricedOut;
+          await logOrderEvent(order.id, "state", "payment_detected", {
+            tx_hash: t.txid,
+            usd: totalPaidUsd,
+            confirmations: t.confirmations,
+            original_payout: originalOut,
+            repriced_payout: repricedOut,
+          });
+          await notifyById("payment_detected", order.id);
+        } else {
+          await supabaseAdmin
+            .from("orders")
+            .update({
+              paid_amount_usd: totalPaidUsd,
+              quoted_dest_out: repricedOut,
+            })
+            .eq("id", order.id);
+          order.quoted_dest_out = repricedOut;
+          if (repriced) {
+            await logOrderEvent(order.id, "note", "repriced", {
+              additional_tx: t.txid,
+              total_usd: totalPaidUsd,
+              original_payout: originalOut,
+              repriced_payout: repricedOut,
+            });
+          }
+        }
+
+        if (
+          order.status === "payment_detected" &&
+          t.confirmations >= REQUIRED_CONFIRMATIONS
+        ) {
+          await supabaseAdmin
+            .from("orders")
+            .update({ status: "confirmed" })
+            .eq("id", order.id);
+          await logOrderEvent(order.id, "state", "confirmed", {
+            confirmations: t.confirmations,
+          });
+          await notifyById("payment_confirmed", order.id);
+          detected += 1;
+        }
+      }
+    } catch (e) {
+      console.error(`[watch-txc] order ${order.public_id} failed`, e);
+    }
+  }
+  return { detected };
+}
+
+
+/**
  * For confirmed orders, pay the customer IMMEDIATELY using local signing.
  * Both TXC and wTXC now sign + broadcast directly from our hot wallet.
  * Bitmart is NEVER on the critical path — treasury replenishment runs
