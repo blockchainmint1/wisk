@@ -16,7 +16,7 @@ export const Route = createFileRoute("/embed-builder")({
   component: EmbedBuilder,
 });
 
-const ORIGIN = "https://wtxc.texitcoin.org";
+const ORIGIN = "https://swap.texitcoin.org";
 
 type Side = "wTXC" | "TXC";
 

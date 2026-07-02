@@ -3,4 +3,4 @@ Allow: /
 Disallow: /admin
 Disallow: /swap/
 
-Sitemap: https://swap.honest.money/sitemap.xml
+Sitemap: https://swap.texitcoin.org/sitemap.xml

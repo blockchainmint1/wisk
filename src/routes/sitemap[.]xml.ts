@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
 
-const BASE_URL = "https://swap.honest.money";
+const BASE_URL = "https://swap.texitcoin.org";
 
 interface SitemapEntry {
   path: string;

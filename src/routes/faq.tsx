@@ -68,9 +68,9 @@ export const Route = createFileRoute("/faq")({
         content:
           "Common questions about swapping stablecoins for native TXC or wTXC.",
       },
-      { property: "og:url", content: "https://swap.honest.money/faq" },
+      { property: "og:url", content: "https://swap.texitcoin.org/faq" },
     ],
-    links: [{ rel: "canonical", href: "https://swap.honest.money/faq" }],
+    links: [{ rel: "canonical", href: "https://swap.texitcoin.org/faq" }],
     scripts: [
       {
         type: "application/ld+json",
