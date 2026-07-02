@@ -190,7 +190,7 @@ export const adminOrderDetail = createServerFn({ method: "POST" })
       }
     }
 
-    // Hot wallet balance (TXC + ISK$)
+    // Hot wallet balance (TXC + wTXC)
     let hotBalance: {
       address: string;
       confirmedTxc: number;

@@ -362,7 +362,7 @@ async function settleConfirmed() {
 
 /**
  * Treasury replenishment — runs AFTER the customer is paid.
- * For each completed TXC or ISK$ order that has not yet had a Bitmart buy
+ * For each completed TXC or wTXC order that has not yet had a Bitmart buy
  * submitted, submit a market buy to refill our hot wallet. This is
  * best-effort: failures here do NOT affect the customer order, they just
  * log and retry next tick.
@@ -427,7 +427,7 @@ async function replenishTreasury() {
  * Poll Bitmart fills for ANY order with a bitmart_order_id and no recorded
  * fill yet. Updates bookkeeping (bitmart_filled_dest, bitmart_avg_price) but
  * does NOT change customer-facing status for TXC orders (already completed).
- * For ISK$ orders still in buying_on_bitmart, advances to `bought` so the
+ * For wTXC orders still in buying_on_bitmart, advances to `bought` so the
  * withdrawal step picks them up.
  */
 async function pollBitmartFillsDecoupled() {
