@@ -1,80 +1,64 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { SiteFooter, SiteHeader } from "@/components/site-shell";
-import { DESTINATIONS, type DestAsset } from "@/lib/destinations";
 
 export const Route = createFileRoute("/embed-builder")({
   head: () => ({
     meta: [
-      { title: "Embed the swap on your site — SWAP" },
+      { title: "Embed the wTXC ↔ TXC bridge — snippet builder" },
       {
         name: "description",
         content:
-          "Drop the swap widget into any website with a single iframe snippet. Pre-set destination asset, source chain, amount, and theme.",
+          "Drop the wTXC ↔ TXC bridge widget into any website with a single iframe snippet. Pick default direction, amount, and theme.",
       },
     ],
   }),
   component: EmbedBuilder,
 });
 
-const ORIGIN = "https://swap.honest.money";
+const ORIGIN = "https://wtxc.texitcoin.org";
+
+type Side = "wTXC" | "TXC";
 
 function EmbedBuilder() {
-  const [assets, setAssets] = useState<Array<DestAsset>>(["TXC"]);
-  const [amount, setAmount] = useState<string>("1000");
-  const [chain, setChain] = useState<string>("");
-  const [token, setToken] = useState<string>("");
+  const [have, setHave] = useState<Side>("wTXC");
+  const [amount, setAmount] = useState<string>("100");
+  const [lock, setLock] = useState<boolean>(false);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [width, setWidth] = useState<string>("100%");
-  const [height, setHeight] = useState<string>("760");
+  const [height, setHeight] = useState<string>("680");
   const [autoResize, setAutoResize] = useState<boolean>(true);
   const [copied, setCopied] = useState(false);
 
-  const toggleAsset = (a: DestAsset) => {
-    setAssets((prev) => {
-      const has = prev.includes(a);
-      if (has && prev.length === 1) return prev; // require at least one
-      return has ? prev.filter((x) => x !== a) : [...prev, a];
-    });
-  };
-
   const buildUrl = (origin: string) => {
     const u = new URL(`${origin}/embed`);
-    if (assets.length > 0) u.searchParams.set("assets", assets.join(","));
+    u.searchParams.set("have", have);
     if (amount) u.searchParams.set("amount", amount);
-    if (chain) u.searchParams.set("chain", chain);
-    if (token) u.searchParams.set("token", token);
     if (theme) u.searchParams.set("theme", theme);
+    if (lock) u.searchParams.set("lock", "1");
     return u.toString();
   };
 
-  // Snippet always points at the canonical production origin.
-  const url = useMemo(
-    () => buildUrl(ORIGIN),
-    [assets, amount, chain, token, theme],
-  );
-
-  // Live preview uses the current origin so unpublished changes are visible.
+  const url = useMemo(() => buildUrl(ORIGIN), [have, amount, lock, theme]);
   const previewUrl = useMemo(
     () =>
       buildUrl(
         typeof window !== "undefined" ? window.location.origin : ORIGIN,
       ),
-    [assets, amount, chain, token, theme],
+    [have, amount, lock, theme],
   );
 
-  const titleAssets = assets.map((a) => DESTINATIONS[a].label).join(" / ");
+  const want: Side = have === "wTXC" ? "TXC" : "wTXC";
 
   const snippet = useMemo(() => {
-    const widthAttr = /^\d+$/.test(width) ? `${width}` : width;
-    const heightAttr = /^\d+$/.test(height) ? `${height}` : height;
-    const iframe = `<iframe id="swap-honest-money" src="${url}" style="width:${widthAttr === "100%" ? "100%" : `${widthAttr}px`};height:${/^\d+$/.test(heightAttr) ? `${heightAttr}px` : heightAttr};border:0;background:transparent" allow="clipboard-write" loading="lazy" title="Swap to ${titleAssets} — honest.money"></iframe>`;
+    const widthAttr = /^\d+$/.test(width) ? `${width}px` : width;
+    const heightAttr = /^\d+$/.test(height) ? `${height}px` : height;
+    const iframe = `<iframe id="wtxc-bridge" src="${url}" style="width:${widthAttr};height:${heightAttr};border:0;background:transparent" allow="clipboard-write" loading="lazy" title="${have} to ${want} bridge"></iframe>`;
     const resizer = autoResize
-      ? `\n<script>(function(){window.addEventListener("message",function(e){if(!e.data||e.data.type!=="swap-embed:height")return;var f=document.getElementById("swap-honest-money");if(f&&typeof e.data.height==="number")f.style.height=e.data.height+"px"});})();</script>`
+      ? `\n<script>(function(){window.addEventListener("message",function(e){if(!e.data||e.data.type!=="swap-embed:height")return;var f=document.getElementById("wtxc-bridge");if(f&&typeof e.data.height==="number")f.style.height=e.data.height+"px"});})();</script>`
       : "";
     return iframe + resizer;
-  }, [url, width, height, autoResize, titleAssets]);
-
+  }, [url, width, height, autoResize, have, want]);
 
   const copy = async () => {
     try {
@@ -95,10 +79,12 @@ function EmbedBuilder() {
             Distribution Kit
           </div>
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter leading-none">
-            Embed the swap <span className="text-accent">anywhere</span>
+            Embed the bridge <span className="text-accent">anywhere</span>
           </h1>
           <p className="mt-4 text-muted-foreground max-w-2xl font-mono text-sm">
-            Drop this iframe on any site — blog, wallet docs, project page — and your visitors can swap stablecoins for native TXC or wTXC without leaving. No keys, no SDK, no signup.
+            Drop this iframe on any site — wallet, docs, project page — and
+            your visitors can swap wTXC ↔ TXC without leaving. No keys, no
+            SDK, no signup.
           </p>
         </div>
 
@@ -108,35 +94,39 @@ function EmbedBuilder() {
               1 · Configure defaults
             </h2>
 
-            <Field label="Destination assets (pick one or more)">
+            <Field label="Default direction">
               <div className="grid grid-cols-2 gap-2">
-                {(["TXC", "wTXC"] as const).map((a) => {
-                  const active = assets.includes(a);
+                {(["wTXC", "TXC"] as const).map((a) => {
+                  const active = have === a;
                   return (
                     <button
                       key={a}
                       type="button"
-                      onClick={() => toggleAsset(a)}
+                      onClick={() => setHave(a)}
                       className={`p-3 rounded-lg font-mono text-sm border transition-colors ${
                         active
                           ? "border-accent text-accent bg-accent/10"
                           : "border-border bg-secondary text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      {active ? "✓ " : ""}{DESTINATIONS[a].label}
+                      {active ? "✓ " : ""}Have {a} → Want{" "}
+                      {a === "wTXC" ? "TXC" : "wTXC"}
                     </button>
                   );
                 })}
               </div>
-              <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest px-1">
-                {assets.length > 1
-                  ? "Widget shows an in-place picker for visitors."
-                  : "Single-asset widget — no picker shown."}
-              </div>
+              <label className="flex items-center gap-2 text-xs font-mono text-muted-foreground pt-1">
+                <input
+                  type="checkbox"
+                  checked={lock}
+                  onChange={(e) => setLock(e.target.checked)}
+                  className="accent-accent"
+                />
+                Lock direction (hide flip button)
+              </label>
             </Field>
 
-
-            <Field label="Default USD amount">
+            <Field label={`Default amount (${have})`}>
               <input
                 type="text"
                 inputMode="decimal"
@@ -145,32 +135,6 @@ function EmbedBuilder() {
                 className="w-full bg-secondary border border-border p-3 rounded-lg font-mono text-sm focus:outline-none focus:border-accent"
               />
             </Field>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Default chain (optional)">
-                <select
-                  value={chain}
-                  onChange={(e) => setChain(e.target.value)}
-                  className="w-full bg-secondary border border-border p-3 rounded-lg font-mono text-sm focus:outline-none focus:border-accent"
-                >
-                  <option value="">(let user pick)</option>
-                  <option value="ethereum">Ethereum</option>
-                  <option value="base">Base</option>
-                  <option value="arbitrum">Arbitrum</option>
-                  <option value="polygon">Polygon</option>
-                  <option value="bsc">BNB Chain</option>
-                </select>
-              </Field>
-              <Field label="Default token (optional)">
-                <input
-                  type="text"
-                  value={token}
-                  onChange={(e) => setToken(e.target.value.toUpperCase())}
-                  placeholder="e.g. USDC"
-                  className="w-full bg-secondary border border-border p-3 rounded-lg font-mono text-sm focus:outline-none focus:border-accent"
-                />
-              </Field>
-            </div>
 
             <Field label="Theme">
               <div className="grid grid-cols-2 gap-2">
@@ -243,17 +207,25 @@ function EmbedBuilder() {
             <div className="border border-border rounded-lg overflow-hidden bg-secondary/30">
               <iframe
                 src={previewUrl}
-                title="Swap embed preview"
-                style={{ width: "100%", height: `${Number(height) || 760}px`, border: 0 }}
+                title="Bridge embed preview"
+                style={{
+                  width: "100%",
+                  height: `${Number(height) || 680}px`,
+                  border: 0,
+                }}
                 allow="clipboard-write"
               />
             </div>
 
             <div className="text-xs font-mono text-muted-foreground space-y-2 pt-2">
               <p className="text-foreground">Sharing tips</p>
-              <p>· The widget is responsive — width:100% inside any container.</p>
-              <p>· When a user creates an order we post a <code className="text-accent">swap-embed:order-created</code> message to your page so you can react.</p>
-              <p>· No keys or SDK required. Anyone can embed.</p>
+              <p>· Responsive by default — width:100% inside any container.</p>
+              <p>
+                · On order creation we post{" "}
+                <code className="text-accent">swap-embed:order-created</code>{" "}
+                to the parent window with the order ID.
+              </p>
+              <p>· No keys or SDK. Anyone can embed.</p>
             </div>
           </section>
         </div>
@@ -263,7 +235,13 @@ function EmbedBuilder() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-2">
       <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest px-1">
