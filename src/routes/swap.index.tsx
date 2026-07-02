@@ -18,13 +18,14 @@ export const Route = createFileRoute("/swap/")({
       {
         name: "description",
         content:
-          "Quote and initiate your stablecoin → TXC or wTXC swap. Live pricing, 5% protocol fee, unique deposit address per order.",
+          "Quote and initiate your swap. Wrap TXC to wTXC (free), unwrap wTXC to TXC (1%), or on-ramp from stables/ETH at live Bitmart pricing +5%.",
       },
       { property: "og:title", content: "Swap — SWAP" },
       {
         property: "og:description",
-        content: "Stablecoins in. Native TXC or wTXC out. Live Bitmart pricing.",
+        content: "TXC ↔ wTXC bridge with a stablecoin on-ramp. Locked quotes, direct payouts.",
       },
+
     ],
   }),
   component: SwapPage,
