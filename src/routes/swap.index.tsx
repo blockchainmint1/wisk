@@ -130,7 +130,7 @@ function SwapPage() {
           <p className="mt-4 text-sm text-muted-foreground font-mono">
             {isUnwrap
               ? `Unwrap wTXC → native TXC · ${unwrapFeePct.toFixed(unwrapFeePct % 1 === 0 ? 0 : 2)}% bridge fee`
-              : "Wrap native TXC → wTXC on Ethereum · free"}
+              : `Wrap native TXC → wTXC on Ethereum · ${wrapFeePct === 0 ? "free" : `${wrapFeePct.toFixed(wrapFeePct % 1 === 0 ? 0 : 2)}% fee`}`}
           </p>
         </div>
 
