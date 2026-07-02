@@ -672,6 +672,7 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           await runPhase("expireStale", expireStale);
           result.stuck = (await runPhase("detectStuck", detectStuck)) ?? result.stuck;
           result.watch = (await runPhase("watchDeposits", watchDeposits)) ?? result.watch;
+          result.watchTxc = (await runPhase("watchTxcDeposits", watchTxcDeposits)) ?? result.watchTxc;
           result.settle = (await runPhase("settleConfirmed", settleConfirmed)) ?? result.settle;
           result.replenish = (await runPhase("replenishTreasury", replenishTreasury)) ?? result.replenish;
           result.fills = (await runPhase("pollBitmartFillsDecoupled", pollBitmartFillsDecoupled)) ?? result.fills;
