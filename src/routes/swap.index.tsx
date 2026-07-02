@@ -207,6 +207,10 @@ function SwapPage() {
                 <span className="ml-2 opacity-70">
                   · {unwrapFeePct.toFixed(unwrapFeePct % 1 === 0 ? 0 : 2)}% fee
                 </span>
+              ) : wrapFeeBps > 0 ? (
+                <span className="ml-2 opacity-70">
+                  · {wrapFeePct.toFixed(wrapFeePct % 1 === 0 ? 0 : 2)}% fee
+                </span>
               ) : (
                 <span className="ml-2 opacity-70">· 1:1, no fee</span>
               )}
