@@ -10,11 +10,15 @@ import { deriveDepositAddress } from "./hd.server";
 import { getSettings } from "./settings.server";
 import { notifyOrderEvent } from "./telegram.server";
 
-const CHAIN_KEYS = Object.keys(CHAINS) as [ChainKey, ...ChainKey[]];
+const EVM_CHAIN_KEYS = Object.keys(CHAINS) as [ChainKey, ...ChainKey[]];
+// "txc" is the native TEXITcoin chain used as a *source* for the wrap
+// direction (user sends TXC → we pay wTXC). It's not in CHAINS because
+// CHAINS is the EVM registry.
+const ALL_SOURCE_CHAINS = [...EVM_CHAIN_KEYS, "txc"] as [string, ...string[]];
 
 const CreateInput = z
   .object({
-    sourceChain: z.enum(CHAIN_KEYS),
+    sourceChain: z.enum(ALL_SOURCE_CHAINS),
     sourceToken: z.string().min(1).max(20),
     usdAmount: z.number().positive().max(1_000_000),
     destAsset: z
@@ -31,9 +35,30 @@ const CreateInput = z
         message: `Invalid ${dest.label} address`,
       });
     }
+    // Wrap direction: source = native TXC → dest MUST be wTXC.
+    if (data.sourceChain === "txc") {
+      if (data.sourceToken !== "TXC") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["sourceToken"],
+          message: "TXC source chain requires TXC token",
+        });
+      }
+      if (data.destAsset !== "wTXC") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["destAsset"],
+          message: "TXC → must go to wTXC (wrap)",
+        });
+      }
+    }
     // Guard against nonsensical pairs. wTXC → wTXC and TXC → wTXC-from-wTXC
     // would be a no-op or self-loop.
-    if (isWtxcSource(data.sourceChain, data.sourceToken) && data.destAsset === "wTXC") {
+    if (
+      data.sourceChain !== "txc" &&
+      isWtxcSource(data.sourceChain as ChainKey, data.sourceToken) &&
+      data.destAsset === "wTXC"
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["destAsset"],
@@ -45,8 +70,11 @@ const CreateInput = z
 export const createOrder = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => CreateInput.parse(input))
   .handler(async ({ data }) => {
-    // Validate chain/token pairing (merged registry)
-    await getMergedToken(data.sourceChain as ChainKey, data.sourceToken);
+    const isWrap = data.sourceChain === "txc";
+    // Validate chain/token pairing (merged registry) — EVM sources only.
+    if (!isWrap) {
+      await getMergedToken(data.sourceChain as ChainKey, data.sourceToken);
+    }
     const dest = getDestination(data.destAsset);
 
     const settings = await getSettings();
@@ -64,19 +92,22 @@ export const createOrder = createServerFn({ method: "POST" })
     }
 
     // Quote calculation:
-    //  - Bridge unwrap (source = wTXC, dest = TXC): 1 wTXC = (1 - fee) TXC.
-    //    We still fetch the TXC spot to convert USD → wTXC-to-send on the UI,
-    //    but the *payout ratio* is fee-adjusted, not premium-adjusted.
-    //  - Everything else (stables/ETH → TXC or wTXC): standard Bitmart spot
-    //    + 5% protocol premium.
+    //  - Wrap (source = native TXC → dest = wTXC): 1 TXC = (1 - wrap fee) wTXC.
+    //  - Bridge unwrap (source = wTXC → dest = TXC): 1 wTXC = (1 - unwrap fee) TXC.
+    //  - Everything else (stables/ETH → TXC or wTXC): Bitmart spot + 5%.
     const spot = await getSpotPrice(dest.bitmartSymbol);
-    const isUnwrap = isWtxcSource(data.sourceChain as ChainKey, data.sourceToken);
+    const isUnwrap =
+      !isWrap && isWtxcSource(data.sourceChain as ChainKey, data.sourceToken);
 
     let assetPerUsd: number;
     let assetOut: number;
-    if (isUnwrap) {
+    if (isWrap) {
+      const feeMul = 1 - settings.wrap_fee_bps / 10_000;
+      // usdAmount was computed on the UI from haveTxc * spot. 1:1 minus fee.
+      assetPerUsd = (1 / spot) * feeMul;
+      assetOut = data.usdAmount * assetPerUsd;
+    } else if (isUnwrap) {
       const feeMul = 1 - settings.unwrap_fee_bps / 10_000;
-      // 1 USD of wTXC in → (1/spot) TXC worth, then apply unwrap fee.
       assetPerUsd = (1 / spot) * feeMul;
       assetOut = data.usdAmount * assetPerUsd;
     } else {
@@ -95,7 +126,7 @@ export const createOrder = createServerFn({ method: "POST" })
     if (idxErr || typeof idxData !== "number") {
       throw new Error("Failed to allocate deposit address: " + (idxErr?.message ?? "no index"));
     }
-    const depositAddress = deriveDepositAddress(idxData);
+    const depositAddress = deriveDepositAddress(idxData, isWrap ? "txc" : "evm");
 
     const expiresAt = new Date(Date.now() + settings.expiry_minutes * 60_000).toISOString();
 
@@ -105,13 +136,17 @@ export const createOrder = createServerFn({ method: "POST" })
         source_chain: data.sourceChain,
         source_token: data.sourceToken,
         source_amount_usd: data.usdAmount,
-        deposit_address: depositAddress.toLowerCase(),
+        deposit_address: isWrap ? depositAddress : depositAddress.toLowerCase(),
         deposit_index: idxData,
         dest_asset: dest.key,
         dest_address: data.destAddress,
         quoted_dest_per_usd: assetPerUsd,
         quoted_dest_out: assetOut,
-        premium_bps: isUnwrap ? -settings.unwrap_fee_bps : settings.premium_bps,
+        premium_bps: isWrap
+          ? -settings.wrap_fee_bps
+          : isUnwrap
+            ? -settings.unwrap_fee_bps
+            : settings.premium_bps,
         bitmart_spot_price: spot,
         expires_at: expiresAt,
       })
