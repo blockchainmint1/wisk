@@ -18,8 +18,8 @@ const ERC20_ABI = [
 let cachedProvider: JsonRpcProvider | null = null;
 function getProvider(): JsonRpcProvider {
   if (cachedProvider) return cachedProvider;
-  const key = process.env.ALCHEMY_API_KEY?.trim();
-  if (!key) throw new Error("ALCHEMY_API_KEY is not configured");
+  const key = (process.env.ALCHEMY_API_KEY || process.env.ALCHEMY_API)?.trim();
+  if (!key) throw new Error("ALCHEMY_API_KEY / ALCHEMY_API is not configured");
   cachedProvider = new JsonRpcProvider(
     `https://eth-mainnet.g.alchemy.com/v2/${key}`,
     WTXC_CHAIN_ID,
