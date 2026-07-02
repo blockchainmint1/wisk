@@ -43,7 +43,7 @@ function TermsPage() {
 
           <Section title="2. Service Description">
             <p>
-              swapTXC operates a non-custodial swap service allowing users to exchange ERC-20 stablecoins (USDC, USDT, pyUSD, DAI, and others) on supported EVM chains for native TXC or wTXC assets on the TEXITcoin chain. The Protocol sources liquidity from Bitmart and applies a fixed 5% protocol premium above the live spot price.
+              SWAP operates a custodial bridge between native TEXITcoin (TXC) and its ERC-20 representation on Ethereum, wTXC (contract 0x9FC65df3997073B8551Ffd617154B5102fACbb88), plus a stablecoin and ETH on-ramp into either asset. TXC held by the operator wallet backs wTXC in circulation 1:1. The on-ramp sources liquidity from Bitmart and applies a fixed 5% protocol premium above the live spot price.
             </p>
           </Section>
 
@@ -52,25 +52,28 @@ function TermsPage() {
             <ul className="list-disc list-inside space-y-2">
               <li>Are at least 18 years of age or the legal age of majority in your jurisdiction.</li>
               <li>Have the legal capacity to enter into these terms.</li>
-              <li>Are not located in, under the control of, or a national or resident of any jurisdiction where use of the Protocol is prohibited by law.</li>
+              <li>Are not located in, under the control of, or a national or resident of any jurisdiction where use of the service is prohibited by law.</li>
               <li>Are not on any sanctions list maintained by the United States, European Union, United Nations, or other applicable authority.</li>
             </ul>
           </Section>
 
-          <Section title="4. Non-Custodial Nature">
+          <Section title="4. Custodial Nature">
             <p>
-              The Protocol is non-custodial. You retain sole control of your wallet private keys at all times. We do not hold, store, or have access to your private keys or recovery phrases. You are solely responsible for the security of your wallets and the accuracy of destination addresses you provide.
+              SWAP is custodial by design. TXC backing wTXC in circulation is held in an operator wallet. On-ramp deposits are held for the brief window between confirmation and payout. You retain sole control of your own wallets and are solely responsible for the accuracy of destination addresses you provide.
             </p>
           </Section>
 
           <Section title="5. Fees & Pricing">
             <ul className="list-disc list-inside space-y-2">
-              <li>A fixed 5.00% protocol premium is applied to all swaps above the live Bitmart spot price.</li>
-              <li>Network gas fees for deposit transactions are borne by the user and are separate from the Protocol fee.</li>
+              <li>Wrapping (TXC → wTXC) is free.</li>
+              <li>Unwrapping (wTXC → TXC) costs 1% of the amount unwrapped.</li>
+              <li>On-ramp swaps (stablecoins or ETH → TXC or wTXC) carry a 5.00% protocol premium above the live Bitmart spot price.</li>
+              <li>Network gas fees for deposit transactions are borne by the user and are separate from the protocol fee.</li>
               <li>Quotes are valid for a limited time window and are locked at the moment of confirmation.</li>
               <li>All fees are non-refundable once a swap has been initiated and confirmed on-chain.</li>
             </ul>
           </Section>
+
 
           <Section title="6. User Responsibilities">
             <p className="mb-4">You agree to:</p>
