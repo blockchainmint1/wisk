@@ -16,7 +16,7 @@ const FAQS: Array<{ q: string; a: string }> = [
   },
   {
     q: "Which native assets can I receive?",
-    a: "TEXITcoin (TXC) on the TXC network, Iskander Coin (ISK$) on the ISK network, and Zero Chill Units (ZCU) when listed. Each is paid out to the native address you provide at order creation.",
+    a: "TEXITcoin (TXC) — native on the TXC chain — and wTXC — the 1:1 wrapped ERC-20 on Ethereum. Each is paid out to the native address you provide at order creation.",
   },
   {
     q: "How long does a swap take?",

@@ -45,7 +45,7 @@ function PrivacyPage() {
             <p className="mb-4">We collect minimal information necessary to process swaps:</p>
             <ul className="list-disc list-inside space-y-2">
               <li><strong>On-chain data:</strong> Wallet addresses, transaction hashes, and deposit/withdrawal details required to execute swaps.</li>
-              <li><strong>Destination addresses:</strong> Native TXC, ISK, or ZCU wallet addresses provided for settlement.</li>
+              <li><strong>Destination addresses:</strong> Native TXC or wTXC wallet addresses provided for settlement.</li>
               <li><strong>Contact information:</strong> Optional email or Telegram handle if you choose to receive order status notifications.</li>
               <li><strong>Technical data:</strong> IP addresses and browser metadata for fraud prevention and service security.</li>
             </ul>
