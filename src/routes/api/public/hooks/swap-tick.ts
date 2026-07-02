@@ -30,6 +30,7 @@ import { getSettings } from "@/lib/settings.server";
 import { sendTxc } from "@/lib/txc-sign.server";
 import { sendWtxc } from "@/lib/wtxc.server";
 import { getSpotPrice } from "@/lib/bitmart.server";
+import { scanTxcIncoming, getTxcTipHeight } from "@/lib/txc-scan.server";
 
 async function notifyById(
   event: Parameters<typeof notifyOrderEvent>[0],
