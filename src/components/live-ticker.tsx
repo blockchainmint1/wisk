@@ -23,21 +23,13 @@ export function LiveTicker() {
     staleTime: 15_000,
   });
 
-  const isk = useQuery({
-    queryKey: ["spot-ticker", "ISK$"],
-    queryFn: () => fn({ data: { usdAmount: 1, destAsset: "ISK$" } }),
-    refetchInterval: 30_000,
-    staleTime: 15_000,
-  });
-
   const txcPrice = txc.data?.ok ? txc.data.spotPriceUsd : null;
-  const iskPrice = isk.data?.ok ? isk.data.spotPriceUsd : null;
 
   return (
     <>
       <PricePill label="TXC" price={txcPrice} />
-      <PricePill label="ISK$" price={iskPrice} />
-      <span className="text-muted-foreground">+5% PREMIUM</span>
+      <PricePill label="wTXC" price={txcPrice} />
+      <span className="text-muted-foreground">+5% PREMIUM · UNWRAP 1%</span>
     </>
   );
 }
