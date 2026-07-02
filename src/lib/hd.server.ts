@@ -11,7 +11,7 @@
 import { HDKey } from "@scure/bip32";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak256 } from "viem";
-import { deriveEvmAddress } from "./bridge-wallet.server";
+import { deriveEvmAddress, deriveTxcAddress } from "./bridge-wallet.server";
 
 let cachedXpubRoot: HDKey | null = null;
 const BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]+$/;
@@ -30,15 +30,27 @@ function tryGetXpubRoot(): HDKey | null {
   }
 }
 
+export type DepositKind = "evm" | "txc";
+
 /**
  * Derive a receive address at the given index. Index 0 = operator/treasury,
- * N ≥ 1 = per-order customer deposit addresses.
+ * N ≥ 1 = per-order customer deposit addresses. `kind` selects EVM (default,
+ * for stables/ETH/wTXC deposits) vs TXC (native chain, for wrap deposits).
  */
-export function deriveDepositAddress(index: number): `0x${string}` {
+export function deriveDepositAddress(
+  index: number,
+  kind: DepositKind = "evm",
+): string {
   if (!Number.isInteger(index) || index < 0) {
     throw new Error(`Invalid HD index: ${index}`);
   }
-  // Prefer the mnemonic-backed derivation whenever it's available.
+  if (kind === "txc") {
+    if (!process.env.BRIDGE_MNEMONIC?.trim()) {
+      throw new Error("TXC deposit derivation requires BRIDGE_MNEMONIC");
+    }
+    return deriveTxcAddress(index);
+  }
+  // EVM path
   if (process.env.BRIDGE_MNEMONIC?.trim()) {
     return deriveEvmAddress(index);
   }

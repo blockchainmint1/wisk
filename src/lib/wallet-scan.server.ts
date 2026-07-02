@@ -26,7 +26,7 @@ const FALLBACK_RPCS: Record<ChainKey, string> = {
 function rpcUrl(chain: ChainKey): string {
   const envOverride = process.env[`EVM_RPC_${chain.toUpperCase()}`];
   if (envOverride) return envOverride;
-  const key = process.env.ALCHEMY_API_KEY;
+  const key = process.env.ALCHEMY_API_KEY || process.env.ALCHEMY_API;
   if (key) return `https://${ALCHEMY_HOSTS[chain]}/v2/${key}`;
   return FALLBACK_RPCS[chain];
 }

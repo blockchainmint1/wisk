@@ -70,14 +70,16 @@ function SwapPage() {
 
   const txcPriceUsd = quote?.ok ? quote.spotPriceUsd : null;
   const unwrapFeeBps = quote?.ok ? (quote.unwrapFeeBps ?? 100) : 100;
+  const wrapFeeBps = quote?.ok ? (quote.wrapFeeBps ?? 0) : 0;
   const unwrapFeePct = unwrapFeeBps / 100;
+  const wrapFeePct = wrapFeeBps / 100;
 
-  // wTXC ↔ TXC is 1:1. Unwrap takes a fee. Wrap is free.
+  // wTXC ↔ TXC is 1:1 minus whichever direction fee applies.
   const wantAmount = useMemo(() => {
     if (haveAmount <= 0) return 0;
     if (isUnwrap) return haveAmount * (1 - unwrapFeeBps / 10_000);
-    return haveAmount; // wrap 1:1
-  }, [haveAmount, isUnwrap, unwrapFeeBps]);
+    return haveAmount * (1 - wrapFeeBps / 10_000);
+  }, [haveAmount, isUnwrap, unwrapFeeBps, wrapFeeBps]);
 
   const usdAmount = useMemo(() => {
     if (!txcPriceUsd || haveAmount <= 0) return 0;
@@ -89,13 +91,10 @@ function SwapPage() {
   const mutation = useMutation({
     mutationFn: async () => {
       setError(null);
-      if (isWrap) {
-        throw new Error("Wrap (TXC → wTXC) is coming soon.");
-      }
       return createFn({
         data: {
-          sourceChain: "ethereum",
-          sourceToken: "wTXC",
+          sourceChain: isWrap ? "txc" : "ethereum",
+          sourceToken: isWrap ? "TXC" : "wTXC",
           usdAmount,
           destAsset,
           destAddress: dest.trim(),
@@ -114,7 +113,7 @@ function SwapPage() {
   });
 
   const formValid =
-    isUnwrap && haveAmount > 0 && addressValid && quote?.ok === true && usdAmount >= 10;
+    haveAmount > 0 && addressValid && quote?.ok === true && usdAmount >= 10;
 
   function flip() {
     setHave((h) => (h === "wTXC" ? "TXC" : "wTXC"));
@@ -131,7 +130,7 @@ function SwapPage() {
           <p className="mt-4 text-sm text-muted-foreground font-mono">
             {isUnwrap
               ? `Unwrap wTXC → native TXC · ${unwrapFeePct.toFixed(unwrapFeePct % 1 === 0 ? 0 : 2)}% bridge fee`
-              : "Wrap native TXC → wTXC on Ethereum · free"}
+              : `Wrap native TXC → wTXC on Ethereum · ${wrapFeePct === 0 ? "free" : `${wrapFeePct.toFixed(wrapFeePct % 1 === 0 ? 0 : 2)}% fee`}`}
           </p>
         </div>
 
@@ -208,6 +207,10 @@ function SwapPage() {
                 <span className="ml-2 opacity-70">
                   · {unwrapFeePct.toFixed(unwrapFeePct % 1 === 0 ? 0 : 2)}% fee
                 </span>
+              ) : wrapFeeBps > 0 ? (
+                <span className="ml-2 opacity-70">
+                  · {wrapFeePct.toFixed(wrapFeePct % 1 === 0 ? 0 : 2)}% fee
+                </span>
               ) : (
                 <span className="ml-2 opacity-70">· 1:1, no fee</span>
               )}
@@ -265,17 +268,15 @@ function SwapPage() {
           >
             {mutation.isPending
               ? "Creating Order…"
-              : isWrap
-                ? "Wrap coming soon"
-                : haveAmount <= 0
-                  ? "Enter an amount"
-                  : usdAmount > 0 && usdAmount < 10
-                    ? "Minimum $10 equivalent"
-                    : !addressValid
-                      ? `Enter ${destConfig.label} address`
-                      : !quote?.ok
-                        ? "Waiting for quote…"
-                        : "Get started"}
+              : haveAmount <= 0
+                ? "Enter an amount"
+                : usdAmount > 0 && usdAmount < 10
+                  ? "Minimum $10 equivalent"
+                  : !addressValid
+                    ? `Enter ${destConfig.label} address`
+                    : !quote?.ok
+                      ? "Waiting for quote…"
+                      : "Get started"}
           </button>
 
           <p className="mt-4 text-center text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
