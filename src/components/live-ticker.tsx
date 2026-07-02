@@ -29,7 +29,8 @@ export function LiveTicker() {
     <>
       <PricePill label="TXC" price={txcPrice} />
       <PricePill label="wTXC" price={txcPrice} />
-      <span className="text-muted-foreground">+5% PREMIUM · UNWRAP 1%</span>
+      <span className="text-muted-foreground">WRAP 0% · UNWRAP 1% · ON-RAMP +5%</span>
     </>
   );
 }
+

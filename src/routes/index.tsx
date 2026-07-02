@@ -5,28 +5,21 @@ import { SiteFooter, SiteHeader } from "@/components/site-shell";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "swapTXC — Swap stables for native TXC or wTXC" },
+      { title: "SWAP — The TXC ↔ wTXC bridge & on-ramp" },
       {
         name: "description",
         content:
-          "Exit to sovereignty. Swap USDC, USDT, pyUSD or any stable on Ethereum, Base, Arbitrum, Polygon, or BSC for native TXC or wTXC. Live Bitmart pricing, 5% protocol fee.",
+          "Wrap TXC to wTXC (free), unwrap wTXC back to TXC (1%), or on-ramp from any major stablecoin or ETH on 5 EVM chains. Custodial bridge, live Bitmart pricing, settled direct to your wallet.",
       },
-      { property: "og:title", content: "swapTXC — Swap stables for native TXC or wTXC" },
+      { property: "og:title", content: "SWAP — The TXC ↔ wTXC bridge & on-ramp" },
       {
         property: "og:description",
-        content: "Stablecoins in. Sovereign TXC or wTXC out. Live Bitmart liquidity, 5% protocol fee.",
+        content:
+          "Wrap free. Unwrap 1%. On-ramp from stables or ETH. The bridge for TEXITcoin.",
       },
+      { property: "og:type", content: "website" },
       { property: "og:url", content: "https://swap.honest.money/" },
-      {
-        property: "og:image",
-        content:
-          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/6d467578-a8e3-4751-9ed9-116ee4f42bf3/id-preview-494c0a9a--9fa74c59-6726-48bb-a5bf-a6cc868c7787.lovable.app-1780819348498.png",
-      },
-      {
-        name: "twitter:image",
-        content:
-          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/6d467578-a8e3-4751-9ed9-116ee4f42bf3/id-preview-494c0a9a--9fa74c59-6726-48bb-a5bf-a6cc868c7787.lovable.app-1780819348498.png",
-      },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [{ rel: "canonical", href: "https://swap.honest.money/" }],
     scripts: [
@@ -35,10 +28,10 @@ export const Route = createFileRoute("/")({
         children: JSON.stringify({
           "@context": "https://schema.org",
           "@type": "WebSite",
-          name: "swapTXC",
+          name: "SWAP",
           url: "https://swap.honest.money/",
           description:
-            "Swap stablecoins on major EVM chains for native TXC or wTXC. Live Bitmart pricing, 5% protocol fee.",
+            "TXC ↔ wTXC bridge with a stablecoin on-ramp across 5 EVM chains.",
         }),
       },
     ],
@@ -53,15 +46,16 @@ function HomePage() {
       <main className="max-w-7xl mx-auto px-4 py-16 md:py-28">
         <div className="grid lg:grid-cols-2 gap-20 items-center">
           <div className="space-y-8 animate-slide-up">
+            <div className="inline-flex items-center gap-2 border border-border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.3em]">
+              <span className="size-1.5 rounded-full bg-accent animate-pulse-dot" />
+              TXC ↔ wTXC bridge
+            </div>
             <h1 className="text-6xl md:text-7xl font-extrabold tracking-tighter leading-none mb-6 text-balance">
-              EXIT TO <br />
-              <span className="text-accent underline decoration-4 underline-offset-8">
-                SOVEREIGNTY
-              </span>
+              THE <span className="text-accent underline decoration-4 underline-offset-8">BRIDGE</span> <br />
+              FOR TEXITCOIN.
             </h1>
-            <p className="text-lg text-muted-foreground max-w-[42ch] font-medium leading-relaxed text-balance">
-              The bridge to native TEXITcoin, Iskander Coin & Zero Chill Units. Send USDC, USDT, pyUSD or any stable from any major EVM chain
-              and receive TXC or wTXC at live Bitmart spot pricing — settled directly to your wallet.
+            <p className="text-lg text-muted-foreground max-w-[46ch] font-medium leading-relaxed text-balance">
+              Move native TXC onto Ethereum as wTXC, or bring it home again. Or on-ramp from any major stablecoin — or ETH itself — on five EVM chains. Custodial, fast, and settled straight to your wallet.
             </p>
             <div className="flex gap-4">
               <Link
@@ -78,9 +72,9 @@ function HomePage() {
               </a>
             </div>
             <div className="grid grid-cols-3 gap-4 border-t border-border pt-8">
-              <Stat label="Protocol Fee" value="5.00%" sub="FIXED" />
-              <Stat label="Chains" value="5" sub="EVM MAINNETS" />
-              <Stat label="Settlement" value="~5 min" sub="TYPICAL" />
+              <Stat label="Wrap fee" value="0%" sub="TXC → wTXC" />
+              <Stat label="Unwrap fee" value="1%" sub="wTXC → TXC" />
+              <Stat label="On-ramp" value="+5%" sub="STABLES / ETH" />
             </div>
           </div>
 
@@ -89,12 +83,24 @@ function HomePage() {
             <div className="bg-secondary border border-border p-1 rounded-2xl">
               <div className="bg-background border border-border rounded-xl p-8 space-y-6">
                 <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-                  Settlement Flow
+                  Three ways in, three ways out
                 </div>
-                <FlowRow num="01" title="Deposit Stable" detail="Send USDC, USDT, pyUSD or any stable to your unique address" />
-                <FlowRow num="02" title="Confirm On-Chain" detail="We wait for chain-specific confirmations" />
-                <FlowRow num="03" title="Native Payout" detail="We pay you directly from our hot wallet at the locked quote" />
-                <FlowRow num="04" title="Treasury Refill" detail="We replenish our position on Bitmart in the background" active />
+                <FlowRow
+                  num="→"
+                  title="Wrap"
+                  detail="Send native TXC · receive wTXC (ERC-20) on Ethereum. Free."
+                />
+                <FlowRow
+                  num="←"
+                  title="Unwrap"
+                  detail="Send wTXC on Ethereum · receive native TXC. 1% fee."
+                />
+                <FlowRow
+                  num="$"
+                  title="On-ramp"
+                  detail="Send USDC/USDT/pyUSD/DAI/ETH · receive TXC or wTXC at live Bitmart pricing +5%."
+                  active
+                />
               </div>
             </div>
           </div>
@@ -102,24 +108,48 @@ function HomePage() {
 
         <section id="how" className="mt-32 border-t border-border pt-16">
           <h2 className="font-mono text-sm uppercase tracking-[0.3em] font-bold mb-12">
-            Operating Principles
+            How the bridge works
           </h2>
           <div className="grid md:grid-cols-3 gap-10">
             <Principle
               n="01"
-              title="One direction. Done well."
-              body="Stablecoins in, native TXC or wTXC out. No bridges, no wrapped tokens, no liquidity pools to manage."
+              title="One custodian, no smart-contract magic."
+              body="TXC you send is held 1:1 in the operator wallet. wTXC (0x9FC6…bb88) is issued against it. Low-tech, auditable, boring on purpose."
             />
             <Principle
               n="02"
-              title="Live market pricing."
-              body="Every quote is locked from the Bitmart TXC/USDT spot price the moment you confirm. No oracle drift."
+              title="Wrap free. Unwrap 1%."
+              body="Wrapping is free forever. Unwrapping charges 1% — that's the bridge's only ongoing cost, and it funds continued operation."
             />
             <Principle
               n="03"
-              title="Self-sovereign delivery."
-              body="TXC settles to the native address you provide. Custody never leaves your control beyond the swap window."
+              title="Stables in, TXC or wTXC out."
+              body="Prefer to buy in with USDC, USDT, pyUSD, DAI or ETH? The on-ramp fills your order at live Bitmart TXC/USDT pricing plus a 5% protocol fee."
             />
+          </div>
+        </section>
+
+        <section className="mt-24 border-t border-border pt-16">
+          <h2 className="font-mono text-sm uppercase tracking-[0.3em] font-bold mb-8">
+            Supported networks
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 font-mono text-xs">
+            {[
+              { name: "Ethereum", note: "USDC · USDT · pyUSD · DAI · ETH · wTXC" },
+              { name: "Base", note: "USDC · USDbC · USDT · ETH" },
+              { name: "Arbitrum", note: "USDC · USDC.e · USDT · DAI · ETH" },
+              { name: "Polygon", note: "USDC · USDC.e · USDT · DAI" },
+              { name: "BNB Chain", note: "USDT · USDC" },
+            ].map((c) => (
+              <div key={c.name} className="border border-border p-4">
+                <div className="text-foreground font-bold uppercase tracking-widest text-[11px]">
+                  {c.name}
+                </div>
+                <div className="text-muted-foreground mt-2 text-[10px] leading-relaxed">
+                  {c.note}
+                </div>
+              </div>
+            ))}
           </div>
         </section>
       </main>
@@ -155,7 +185,7 @@ function FlowRow({
   return (
     <div className="flex items-start gap-4">
       <div
-        className={`font-mono text-[10px] uppercase tracking-widest pt-1 ${
+        className={`font-mono text-lg leading-none pt-0.5 ${
           active ? "text-accent" : "text-muted-foreground"
         }`}
       >
@@ -163,7 +193,9 @@ function FlowRow({
       </div>
       <div className="flex-1 border-l border-border pl-4">
         <div className="text-sm font-bold">{title}</div>
-        <div className="text-xs text-muted-foreground font-mono mt-1">{detail}</div>
+        <div className="text-xs text-muted-foreground font-mono mt-1 leading-relaxed">
+          {detail}
+        </div>
       </div>
     </div>
   );

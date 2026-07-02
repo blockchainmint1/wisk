@@ -43,9 +43,9 @@ export function SiteFooter() {
     <footer className="border-t border-border py-12 mt-24">
       <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between gap-8 opacity-70">
         <div className="text-[10px] font-mono uppercase tracking-widest space-y-4">
-          <p className="font-bold text-foreground">Sovereign Protocol</p>
+          <p className="font-bold text-foreground">TXC ↔ wTXC Bridge</p>
           <p className="max-w-xs leading-relaxed">
-            Stablecoins in, native assets out. Liquidity sourced live from Bitmart.
+            Wrap free. Unwrap 1%. Stablecoin on-ramp at live Bitmart pricing.
           </p>
           <a href="https://honest.money" className="text-muted-foreground hover:text-accent transition-colors">
             Part of the honest.money ecosystem
@@ -57,13 +57,16 @@ export function SiteFooter() {
             <Link to="/faq" className="block hover:text-accent">FAQ</Link>
             <Link to="/embed-builder" className="block hover:text-accent">Embed Widget</Link>
             <a href="https://texitcoin.org" className="block hover:text-accent">texitcoin.org</a>
+            <a href="https://texitcoin.org/build" className="block hover:text-accent">Developers</a>
             <a href="https://help.minetxc.com" className="block hover:text-accent">Help Center</a>
           </div>
           <div className="space-y-2">
             <p className="font-bold text-foreground">Status</p>
-            <p className="text-success">Network Healthy</p>
-            <p>Premium: 5.00%</p>
+            <p className="text-success">Bridge Online</p>
+            <p>Wrap 0% · Unwrap 1%</p>
+            <p>On-ramp +5%</p>
           </div>
+
           <div className="space-y-2">
             <p className="font-bold text-foreground">Project</p>
             <Link to="/change-log" className="block hover:text-accent">Change Log</Link>
