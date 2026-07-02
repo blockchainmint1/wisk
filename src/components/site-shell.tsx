@@ -58,7 +58,7 @@ export function SiteFooter() {
             <Link to="/embed-builder" className="block hover:text-accent">Embed Widget</Link>
             <a href="https://texitcoin.org" className="block hover:text-accent">texitcoin.org</a>
             <a href="https://texitcoin.org/build" className="block hover:text-accent">Developers</a>
-            <a href="https://help.minetxc.com" className="block hover:text-accent">Help Center</a>
+            <a href="https://help.honest.money" className="block hover:text-accent">Help Center</a>
           </div>
           <div className="space-y-2">
             <p className="font-bold text-foreground">Status</p>
