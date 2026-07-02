@@ -1,6 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { LiveTicker } from "@/components/live-ticker";
 import { SiteFooter, SiteHeader } from "@/components/site-shell";
+import { SwapForm } from "@/components/swap-form";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -58,12 +59,6 @@ function HomePage() {
               Move native TXC onto Ethereum as wTXC, or bring it home again. Or on-ramp from any major stablecoin — or ETH itself — on five EVM chains. Custodial, fast, and settled straight to your wallet.
             </p>
             <div className="flex gap-4">
-              <Link
-                to="/swap"
-                className="px-8 py-4 bg-accent text-accent-foreground font-mono font-bold uppercase tracking-widest text-sm hover:brightness-110 transition-all shadow-[0_0_30px_hsl(0_84%_50%/0.3)]"
-              >
-                Start Swap
-              </Link>
               <a
                 href="#how"
                 className="px-8 py-4 border border-border font-mono text-sm uppercase tracking-widest hover:bg-foreground hover:text-background transition-colors"
@@ -78,31 +73,8 @@ function HomePage() {
             </div>
           </div>
 
-          <div className="relative animate-slide-up [animation-delay:150ms]">
-            <div className="absolute -inset-1 bg-accent/20 blur-3xl rounded-3xl -z-10" />
-            <div className="bg-secondary border border-border p-1 rounded-2xl">
-              <div className="bg-background border border-border rounded-xl p-8 space-y-6">
-                <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-                  Three ways in, three ways out
-                </div>
-                <FlowRow
-                  num="→"
-                  title="Wrap"
-                  detail="Send native TXC · receive wTXC (ERC-20) on Ethereum. Free."
-                />
-                <FlowRow
-                  num="←"
-                  title="Unwrap"
-                  detail="Send wTXC on Ethereum · receive native TXC. 1% fee."
-                />
-                <FlowRow
-                  num="$"
-                  title="On-ramp"
-                  detail="Send USDC/USDT/pyUSD/DAI/ETH · receive TXC or wTXC at live Bitmart pricing +5%."
-                  active
-                />
-              </div>
-            </div>
+          <div className="animate-slide-up [animation-delay:150ms]">
+            <SwapForm compact />
           </div>
         </div>
 
@@ -171,35 +143,6 @@ function Stat({ label, value, sub }: { label: string; value: string; sub: string
   );
 }
 
-function FlowRow({
-  num,
-  title,
-  detail,
-  active,
-}: {
-  num: string;
-  title: string;
-  detail: string;
-  active?: boolean;
-}) {
-  return (
-    <div className="flex items-start gap-4">
-      <div
-        className={`font-mono text-lg leading-none pt-0.5 ${
-          active ? "text-accent" : "text-muted-foreground"
-        }`}
-      >
-        {num}
-      </div>
-      <div className="flex-1 border-l border-border pl-4">
-        <div className="text-sm font-bold">{title}</div>
-        <div className="text-xs text-muted-foreground font-mono mt-1 leading-relaxed">
-          {detail}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function Principle({ n, title, body }: { n: string; title: string; body: string }) {
   return (
