@@ -154,31 +154,67 @@ export interface TxcSendResult {
   inputsUsed: number;
 }
 
-// In-process serializer. Two concurrent sendTxc() calls would otherwise
-// fetch the same UTXO list and try to spend the same input — the second
-// broadcast then fails with "txn-mempool-conflict" / "missing inputs".
-// Chaining sends through a single promise also ensures the second call's
-// /address/.../utxo fetch already includes the first call's unconfirmed
-// change output, so we never get "No confirmed UTXOs" after a recent send.
-let sendChain: Promise<unknown> = Promise.resolve();
-function serialize<T>(fn: () => Promise<T>): Promise<T> {
-  const next = sendChain.then(fn, fn);
-  // Don't let one failure poison the chain.
-  sendChain = next.catch(() => undefined);
-  return next;
+// Cross-invocation lock. Cloudflare Workers give every cron tick a fresh
+// isolate, so an in-process serializer can't stop two overlapping ticks from
+// grabbing the same UTXO and racing to broadcast (loser gets
+// "txn-mempool-conflict"). We take a DB-backed lock keyed to the hot wallet
+// before selecting inputs, and only release it after a short delay so the
+// mempool has time to propagate our tx before the next tick fetches UTXOs.
+const LOCK_KEY = "txc_hot";
+const LOCK_TTL_SECONDS = 90; // hard ceiling; auto-expires if we crash
+const POST_BROADCAST_HOLD_MS = 4_000;
+const LOCK_POLL_MS = 500;
+const LOCK_MAX_WAIT_MS = 60_000;
+
+async function withWalletLock<T>(fn: () => Promise<T>): Promise<T> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const holder = `txc-sign-${crypto.randomUUID()}`;
+  const deadline = Date.now() + LOCK_MAX_WAIT_MS;
+
+  while (true) {
+    const { data, error } = await supabaseAdmin.rpc("try_acquire_wallet_lock", {
+      _wallet_key: LOCK_KEY,
+      _ttl_seconds: LOCK_TTL_SECONDS,
+      _holder: holder,
+    });
+    if (error) throw new Error(`Wallet lock acquire failed: ${error.message}`);
+    if (data === true) break;
+    if (Date.now() > deadline) {
+      throw new Error(
+        "Timed out waiting for TXC hot-wallet lock (another payout is in flight)",
+      );
+    }
+    await new Promise((r) => setTimeout(r, LOCK_POLL_MS));
+  }
+
+  try {
+    const result = await fn();
+    // Hold the lock briefly after broadcast so the next payout's UTXO
+    // fetch sees our unconfirmed change output.
+    await new Promise((r) => setTimeout(r, POST_BROADCAST_HOLD_MS));
+    return result;
+  } finally {
+    try {
+      await supabaseAdmin.rpc("release_wallet_lock", {
+        _wallet_key: LOCK_KEY,
+        _holder: holder,
+      });
+    } catch (e) {
+      console.error("release_wallet_lock failed (will auto-expire)", e);
+    }
+  }
 }
 
 /**
- * Build, sign and broadcast a TXC payment using the WIF in TXC_WIF.
- * Fee is deducted from the change output (recipient receives exactly `amountTxc`).
- * Coin selection: accumulate UTXOs (largest first) — includes unconfirmed
- * change from our own previous sends so back-to-back payouts can chain.
+ * Build, sign and broadcast a TXC payment. Serialized via a DB-backed lock
+ * so concurrent Worker invocations never spend the same UTXO. Fee is
+ * deducted from the change output (recipient receives exactly `amountTxc`).
  */
 export async function sendTxc(opts: {
   toAddress: string;
   amountTxc: number; // whole TXC, will be converted to sats
 }): Promise<TxcSendResult> {
-  return serialize(() => sendTxcInner(opts));
+  return withWalletLock(() => sendTxcInner(opts));
 }
 
 async function sendTxcInner(opts: {
