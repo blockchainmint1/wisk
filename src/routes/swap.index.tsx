@@ -89,13 +89,10 @@ function SwapPage() {
   const mutation = useMutation({
     mutationFn: async () => {
       setError(null);
-      if (isWrap) {
-        throw new Error("Wrap (TXC → wTXC) is coming soon.");
-      }
       return createFn({
         data: {
-          sourceChain: "ethereum",
-          sourceToken: "wTXC",
+          sourceChain: isWrap ? "txc" : "ethereum",
+          sourceToken: isWrap ? "TXC" : "wTXC",
           usdAmount,
           destAsset,
           destAddress: dest.trim(),
@@ -114,7 +111,7 @@ function SwapPage() {
   });
 
   const formValid =
-    isUnwrap && haveAmount > 0 && addressValid && quote?.ok === true && usdAmount >= 10;
+    haveAmount > 0 && addressValid && quote?.ok === true && usdAmount >= 10;
 
   function flip() {
     setHave((h) => (h === "wTXC" ? "TXC" : "wTXC"));
