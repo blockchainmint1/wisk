@@ -2,112 +2,107 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
-import { Wallet } from "lucide-react";
+import { ArrowDownUp, Wallet } from "lucide-react";
 import { z } from "zod";
 import { EmbedResize } from "@/components/embed-resize";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { DEST_ASSETS, DESTINATIONS, type DestAsset } from "@/lib/destinations";
-import { createOrder, listChainOptions } from "@/lib/orders.functions";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { DESTINATIONS, type DestAsset } from "@/lib/destinations";
+import { createOrder } from "@/lib/orders.functions";
 import { getQuote } from "@/lib/quote.functions";
 
 const EmbedSearch = z.object({
-  asset: z.enum(DEST_ASSETS as [DestAsset, ...DestAsset[]]).optional(),
-  assets: z.string().optional(), // comma-separated, e.g. "TXC,wTXC"
+  // Which side the user "has" by default. Flip button lets them swap.
+  have: z.enum(["wTXC", "TXC"]).optional(),
   amount: z.coerce.number().positive().optional(),
-  chain: z.string().optional(),
-  token: z.string().optional(),
   theme: z.enum(["dark", "light"]).optional(),
+  // Lock direction — hide the flip button if true.
+  lock: z.coerce.boolean().optional(),
 });
 
 export const Route = createFileRoute("/embed")({
   validateSearch: (s) => EmbedSearch.parse(s),
   head: () => ({
     meta: [
-      { title: "Swap embed" },
+      { title: "wTXC ↔ TXC bridge — embed" },
       { name: "robots", content: "noindex" },
-      { name: "description", content: "Embeddable swap widget for stablecoins → TXC / wTXC." },
+      {
+        name: "description",
+        content: "Embeddable wTXC ↔ TXC bridge widget.",
+      },
     ],
   }),
   component: EmbedPage,
 });
 
+type Side = "wTXC" | "TXC";
+
 function EmbedPage() {
   const search = Route.useSearch();
-  const listChains = useServerFn(listChainOptions);
   const quoteFn = useServerFn(getQuote);
   const createFn = useServerFn(createOrder);
 
-  const { data: chains } = useQuery({
-    queryKey: ["chains"],
-    queryFn: () => listChains(),
-    staleTime: Infinity,
-  });
-
-  const [chain, setChain] = useState<string>(search.chain ?? "ethereum");
-  const [token, setToken] = useState<string>(search.token ?? "USDC");
-  const [amount, setAmount] = useState<string>(String(search.amount ?? 1000));
-
-  const allowedAssets: DestAsset[] = useMemo(() => {
-    const raw: string[] = search.assets
-      ? search.assets.split(",").map((s: string) => s.trim()).filter(Boolean)
-      : search.asset
-        ? [search.asset]
-        : ["TXC"];
-    const filtered = raw.filter((a: string): a is DestAsset =>
-      (DEST_ASSETS as string[]).includes(a),
-    );
-    return filtered.length > 0 ? filtered : ["TXC"];
-  }, [search.assets, search.asset]);
-
-  const [destAsset, setDestAsset] = useState<DestAsset>(allowedAssets[0]);
-  if (!allowedAssets.includes(destAsset)) {
-    setDestAsset(allowedAssets[0]);
-  }
-
-
-
-
+  const [have, setHave] = useState<Side>(search.have ?? "wTXC");
+  const [amount, setAmount] = useState<string>(String(search.amount ?? 100));
   const [dest, setDest] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
-  // Apply theme from query param (override the boot script). Embeds usually pin theme.
+  const want: Side = have === "wTXC" ? "TXC" : "wTXC";
+  const isUnwrap = have === "wTXC" && want === "TXC";
+  const isWrap = !isUnwrap;
+  const destAsset: DestAsset = want;
+  const destConfig = DESTINATIONS[destAsset];
+
+  // Apply theme override.
   if (typeof document !== "undefined" && search.theme) {
     const root = document.documentElement;
     if (search.theme === "dark") root.classList.add("dark");
     else root.classList.remove("dark");
   }
 
-  const destConfig = DESTINATIONS[destAsset];
-  const usdAmount = useMemo(() => {
+  const haveAmount = useMemo(() => {
     const n = Number.parseFloat(amount.replace(/,/g, ""));
     return Number.isFinite(n) && n > 0 ? n : 0;
   }, [amount]);
 
   const { data: quote } = useQuery({
-    queryKey: ["quote", usdAmount, destAsset],
-    queryFn: () => quoteFn({ data: { usdAmount: Math.max(usdAmount, 1), destAsset } }),
+    queryKey: ["quote", destAsset],
+    queryFn: () => quoteFn({ data: { usdAmount: 100, destAsset } }),
     refetchInterval: 15_000,
   });
 
-  const assetOut =
-    quote?.ok && usdAmount > 0 ? (usdAmount / quote.effectivePriceUsd).toFixed(8) : "—";
-  const addressValid = destConfig.addressRegex.test(dest.trim());
+  const txcPriceUsd = quote?.ok ? quote.spotPriceUsd : null;
+  const unwrapFeeBps = quote?.ok ? (quote.unwrapFeeBps ?? 100) : 100;
+  const wrapFeeBps = quote?.ok ? (quote.wrapFeeBps ?? 0) : 0;
+  const unwrapFeePct = unwrapFeeBps / 100;
+  const wrapFeePct = wrapFeeBps / 100;
 
-  const chainOpt = chains?.find((c) => c.key === chain);
-  const tokenOptions = chainOpt?.tokens ?? [{ symbol: "USDC", isNative: false }];
-  if (chainOpt && !tokenOptions.some((t) => t.symbol === token)) {
-    setToken(tokenOptions[0].symbol);
-  }
-  const selectedTokenIsNative = tokenOptions.find((t) => t.symbol === token)?.isNative === true;
-  const formValid = usdAmount >= 10 && addressValid && quote?.ok === true;
+  const wantAmount = useMemo(() => {
+    if (haveAmount <= 0) return 0;
+    if (isUnwrap) return haveAmount * (1 - unwrapFeeBps / 10_000);
+    return haveAmount * (1 - wrapFeeBps / 10_000);
+  }, [haveAmount, isUnwrap, unwrapFeeBps, wrapFeeBps]);
+
+  const usdAmount = useMemo(() => {
+    if (!txcPriceUsd || haveAmount <= 0) return 0;
+    return haveAmount * txcPriceUsd;
+  }, [haveAmount, txcPriceUsd]);
+
+  const addressValid = destConfig.addressRegex.test(dest.trim());
+  const formValid =
+    haveAmount > 0 && addressValid && quote?.ok === true && usdAmount >= 10;
 
   const mutation = useMutation({
     mutationFn: async () => {
       setError(null);
       return createFn({
         data: {
-          sourceChain: chain as "ethereum" | "base" | "arbitrum" | "polygon" | "bsc",
-          sourceToken: token,
+          sourceChain: isWrap ? "txc" : "ethereum",
+          sourceToken: isWrap ? "TXC" : "wTXC",
           usdAmount,
           destAsset,
           destAddress: dest.trim(),
@@ -120,18 +115,26 @@ function EmbedPage() {
         setError("Order created but no ID returned.");
         return;
       }
-      // Notify parent so the host can navigate top-level if it wants to.
       if (typeof window !== "undefined" && window.parent !== window) {
         window.parent.postMessage(
-          { type: "swap-embed:order-created", orderId: id, url: `https://swap.honest.money/swap/${id}` },
+          {
+            type: "swap-embed:order-created",
+            orderId: id,
+            url: `https://wtxc.texitcoin.org/swap/${id}`,
+          },
           "*",
         );
       }
-      // Stay inside the iframe by default.
       window.location.href = `/swap/${id}?embed=1`;
     },
     onError: (e: Error) => setError(e?.message || "Order creation failed."),
   });
+
+  function flip() {
+    if (search.lock) return;
+    setHave((h) => (h === "wTXC" ? "TXC" : "wTXC"));
+    setDest("");
+  }
 
   return (
     <div className="min-h-[600px] bg-background text-foreground p-4">
@@ -139,91 +142,95 @@ function EmbedPage() {
       <div className="max-w-xl mx-auto">
         <div className="flex items-center justify-between mb-3">
           <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-            Swap to <span className="text-accent">{destConfig.label}</span>
+            {isUnwrap ? "Unwrap wTXC → TXC" : "Wrap TXC → wTXC"}
           </div>
           <a
-            href={`https://swap.honest.money/swap`}
+            href="https://wtxc.texitcoin.org/swap"
             target="_blank"
             rel="noopener noreferrer"
             className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground hover:text-accent"
           >
-            swap.honest.money ↗
+            wtxc.texitcoin.org ↗
           </a>
         </div>
 
-        <div className="bg-background border border-border rounded-xl p-5 space-y-4">
-          {allowedAssets.length > 1 ? (
-            <Field label="Destination Asset">
-              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${allowedAssets.length}, minmax(0, 1fr))` }}>
-                {allowedAssets.map((a) => (
-                  <button
-                    key={a}
-                    type="button"
-                    onClick={() => { setDestAsset(a); setDest(""); }}
-                    className={`p-3 rounded-lg font-mono text-sm border transition-colors ${
-                      a === destAsset
-                        ? "border-accent text-accent bg-accent/10"
-                        : "border-border bg-secondary text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {DESTINATIONS[a].label}
-                  </button>
-                ))}
-              </div>
-            </Field>
-          ) : null}
-
-
-
-
-          <Field label="Source Chain">
-            <select
-              value={chain}
-              onChange={(e) => setChain(e.target.value)}
-              className="w-full bg-secondary border border-border rounded-lg p-3 font-mono text-sm focus:outline-none focus:border-accent"
-            >
-              {chains?.map((c) => (
-                <option key={c.key} value={c.key}>{c.name}</option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label={`You Send (${token === "ETH" ? "USD value in ETH" : token})`}>
-            <div className="flex items-center gap-3 bg-secondary border border-border p-3 rounded-lg focus-within:border-accent">
+        <div className="bg-background border border-border rounded-xl p-4 space-y-1">
+          {/* HAVE */}
+          <div className="bg-secondary/60 border border-border rounded-2xl p-4">
+            <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-2">
+              Have
+            </div>
+            <div className="flex items-center gap-3">
               <input
                 type="text"
                 inputMode="decimal"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="bg-transparent border-none outline-none font-mono text-xl w-full text-foreground"
+                placeholder="0"
+                className="bg-transparent border-none outline-none font-mono text-3xl w-full text-foreground placeholder:text-muted-foreground/40"
               />
-              <select
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                className="bg-background border border-border px-3 py-1.5 rounded-md font-mono text-xs focus:outline-none"
-              >
-                {tokenOptions.map((t) => (
-                  <option key={t.symbol} value={t.symbol}>
-                    {t.symbol}{t.isNative ? " (native)" : ""}
-                  </option>
-                ))}
-              </select>
+              <SidePill side={have} />
             </div>
-            {selectedTokenIsNative ? (
-              <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest px-1">
-                Amount is USD; we'll show the exact {token} amount on the next screen.
-              </div>
-            ) : null}
-          </Field>
+          </div>
 
-          <Field label={`Recipient ${destConfig.label} Address`}>
+          {/* FLIP */}
+          <div className="relative h-0">
+            <button
+              type="button"
+              onClick={flip}
+              disabled={!!search.lock}
+              aria-label="Flip direction"
+              className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-background border-4 border-background shadow-lg flex items-center justify-center hover:bg-accent hover:text-accent-foreground transition-colors z-10 ring-1 ring-border disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-background disabled:hover:text-foreground"
+            >
+              <ArrowDownUp className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* WANT */}
+          <div className="bg-secondary/60 border border-border rounded-2xl p-4 mt-1">
+            <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-2">
+              Want
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="font-mono text-3xl w-full text-foreground truncate">
+                {wantAmount > 0
+                  ? wantAmount.toLocaleString(undefined, {
+                      maximumFractionDigits: 6,
+                    })
+                  : "0"}
+              </div>
+              <SidePill side={want} />
+            </div>
+            <div className="mt-2 text-[10px] font-mono text-muted-foreground">
+              {txcPriceUsd
+                ? `1 TXC ≈ $${txcPriceUsd.toFixed(6)}`
+                : "Fetching TXC price…"}
+              {isUnwrap ? (
+                <span className="ml-2 opacity-70">
+                  · {unwrapFeePct.toFixed(unwrapFeePct % 1 === 0 ? 0 : 2)}% fee
+                </span>
+              ) : wrapFeeBps > 0 ? (
+                <span className="ml-2 opacity-70">
+                  · {wrapFeePct.toFixed(wrapFeePct % 1 === 0 ? 0 : 2)}% fee
+                </span>
+              ) : (
+                <span className="ml-2 opacity-70">· 1:1, no fee</span>
+              )}
+            </div>
+          </div>
+
+          {/* RECIPIENT */}
+          <div className="bg-secondary/40 border border-border rounded-2xl p-4 mt-1">
+            <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-2">
+              Send {destConfig.label} to
+            </div>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={dest}
                 onChange={(e) => setDest(e.target.value)}
                 placeholder={destConfig.addressHint}
-                className="flex-1 bg-secondary border border-border p-3 rounded-lg font-mono text-xs focus:outline-none focus:border-accent"
+                className="flex-1 bg-background border border-border p-3 rounded-lg font-mono text-xs focus:outline-none focus:border-accent"
               />
               <TooltipProvider delayDuration={150}>
                 <Tooltip>
@@ -233,7 +240,7 @@ function EmbedPage() {
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label="Get a wallet"
-                      className="shrink-0 flex items-center justify-center px-3 bg-secondary border border-border rounded-lg hover:border-accent hover:text-accent transition-colors"
+                      className="shrink-0 flex items-center justify-center px-3 bg-background border border-border rounded-lg hover:border-accent hover:text-accent transition-colors"
                     >
                       <Wallet className="h-4 w-4" />
                     </a>
@@ -243,20 +250,14 @@ function EmbedPage() {
               </TooltipProvider>
             </div>
             {dest.trim().length > 0 && !addressValid ? (
-              <div className="text-[10px] font-mono text-accent uppercase tracking-widest px-1">
+              <div className="mt-2 text-[10px] font-mono text-accent uppercase tracking-widest">
                 Invalid {destConfig.label} address
               </div>
             ) : null}
-          </Field>
-
-          <div className="bg-secondary/50 rounded-lg p-3 space-y-1.5 text-xs font-mono">
-            <Row label="You receive" value={`${assetOut} ${destConfig.label}`} strong />
-            <Row label="Spot price" value={quote?.ok ? `$${quote.spotPriceUsd.toFixed(6)}` : "—"} />
-            <Row label="Effective (+5%)" value={quote?.ok ? `$${quote.effectivePriceUsd.toFixed(6)}` : "—"} />
           </div>
 
           {error ? (
-            <div className="text-xs font-mono text-accent border border-accent/40 p-3 rounded">
+            <div className="mt-3 text-xs font-mono text-accent border border-accent/40 p-3 rounded-xl">
               {error}
             </div>
           ) : null}
@@ -264,13 +265,23 @@ function EmbedPage() {
           <button
             onClick={() => mutation.mutate()}
             disabled={!formValid || mutation.isPending}
-            className="w-full bg-accent hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed text-accent-foreground font-mono font-bold py-4 rounded-lg transition-all uppercase tracking-widest text-sm"
+            className="mt-3 w-full bg-accent hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed text-accent-foreground font-mono font-bold py-4 rounded-2xl transition-all uppercase tracking-widest text-sm"
           >
-            {mutation.isPending ? "Creating Order…" : "Get Payment Address"}
+            {mutation.isPending
+              ? "Creating Order…"
+              : haveAmount <= 0
+                ? "Enter an amount"
+                : usdAmount > 0 && usdAmount < 10
+                  ? "Minimum $10 equivalent"
+                  : !addressValid
+                    ? `Enter ${destConfig.label} address`
+                    : !quote?.ok
+                      ? "Waiting for quote…"
+                      : "Get started"}
           </button>
 
-          <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest text-center">
-            Powered by swap.honest.money · 5% protocol fee · min $10
+          <p className="mt-3 text-center text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
+            Powered by wtxc.texitcoin.org · quote locks 15 min
           </p>
         </div>
       </div>
@@ -278,22 +289,10 @@ function EmbedPage() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function SidePill({ side }: { side: Side }) {
   return (
-    <div className="space-y-2">
-      <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest px-1">
-        {label}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className="flex justify-between">
-      <span className="text-muted-foreground">{label}</span>
-      <span className={strong ? "text-foreground font-bold" : ""}>{value}</span>
+    <div className="shrink-0 flex items-center gap-2 bg-background border border-border rounded-full px-3 py-1.5 font-mono text-sm">
+      <span className="font-bold">{side}</span>
     </div>
   );
 }
