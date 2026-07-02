@@ -81,7 +81,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "Swap stablecoins on major EVM chains for native TXC, ISK$ or ZCU at live Bitmart pricing with a 5% protocol fee.",
+          "Swap stablecoins on major EVM chains for native TXC or wTXC at live Bitmart pricing with a 5% protocol fee.",
       },
       { property: "og:site_name", content: "swapTXC" },
       { property: "og:type", content: "website" },

@@ -1847,7 +1847,7 @@ function MarketTab() {
         </div>
         <p className="text-xs font-mono text-muted-foreground mt-2 max-w-xl leading-relaxed">
           Live spot balances on the Bitmart exchange account used for
-          replenishment buys and TXC/ISK liquidity.
+          replenishment buys and TXC/wTXC liquidity.
         </p>
       </div>
 

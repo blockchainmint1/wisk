@@ -4,7 +4,7 @@ import { SiteFooter, SiteHeader } from "@/components/site-shell";
 const FAQS: Array<{ q: string; a: string }> = [
   {
     q: "What does swapTXC actually do?",
-    a: "You send a stablecoin (USDC, USDT, DAI, PYUSD, FRAX, TUSD, USDP, USDe) or native ETH on a supported EVM chain. We deliver the equivalent value in native TXC, ISK$ or ZCU directly to your wallet on its native chain. No bridges, no wrapped tokens.",
+    a: "You send a stablecoin (USDC, USDT, DAI, PYUSD, FRAX, TUSD, USDP, USDe) or native ETH on a supported EVM chain. We deliver the equivalent value in native TXC or wTXC directly to your wallet on its native chain. No bridges, no wrapped tokens.",
   },
   {
     q: "What is the fee?",
@@ -55,13 +55,13 @@ export const Route = createFileRoute("/faq")({
       {
         name: "description",
         content:
-          "Common questions about swapping stablecoins for native TXC, ISK$ or ZCU on swapTXC — fees, timing, supported networks, and recovery.",
+          "Common questions about swapping stablecoins for native TXC or wTXC on swapTXC — fees, timing, supported networks, and recovery.",
       },
       { property: "og:title", content: "FAQ — swapTXC" },
       {
         property: "og:description",
         content:
-          "Common questions about swapping stablecoins for native TXC, ISK$ or ZCU.",
+          "Common questions about swapping stablecoins for native TXC or wTXC.",
       },
       { property: "og:url", content: "https://swap.honest.money/faq" },
     ],

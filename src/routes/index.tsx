@@ -5,16 +5,16 @@ import { SiteFooter, SiteHeader } from "@/components/site-shell";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "swapTXC — Swap stables for native TXC, ISK$ or ZCU" },
+      { title: "swapTXC — Swap stables for native TXC or wTXC" },
       {
         name: "description",
         content:
-          "Exit to sovereignty. Swap USDC, USDT, pyUSD or any stable on Ethereum, Base, Arbitrum, Polygon, or BSC for native TXC, ISK$ or ZCU. Live Bitmart pricing, 5% protocol fee.",
+          "Exit to sovereignty. Swap USDC, USDT, pyUSD or any stable on Ethereum, Base, Arbitrum, Polygon, or BSC for native TXC or wTXC. Live Bitmart pricing, 5% protocol fee.",
       },
-      { property: "og:title", content: "swapTXC — Swap stables for native TXC, ISK$ or ZCU" },
+      { property: "og:title", content: "swapTXC — Swap stables for native TXC or wTXC" },
       {
         property: "og:description",
-        content: "Stablecoins in. Sovereign TXC, ISK$ or ZCU out. Live Bitmart liquidity, 5% protocol fee.",
+        content: "Stablecoins in. Sovereign TXC or wTXC out. Live Bitmart liquidity, 5% protocol fee.",
       },
       { property: "og:url", content: "https://swap.honest.money/" },
       {
@@ -38,7 +38,7 @@ export const Route = createFileRoute("/")({
           name: "swapTXC",
           url: "https://swap.honest.money/",
           description:
-            "Swap stablecoins on major EVM chains for native TXC, ISK$ or ZCU. Live Bitmart pricing, 5% protocol fee.",
+            "Swap stablecoins on major EVM chains for native TXC or wTXC. Live Bitmart pricing, 5% protocol fee.",
         }),
       },
     ],
@@ -61,7 +61,7 @@ function HomePage() {
             </h1>
             <p className="text-lg text-muted-foreground max-w-[42ch] font-medium leading-relaxed text-balance">
               The bridge to native TEXITcoin, Iskander Coin & Zero Chill Units. Send USDC, USDT, pyUSD or any stable from any major EVM chain
-              and receive TXC, ISK or ZCU at live Bitmart spot pricing — settled directly to your wallet.
+              and receive TXC or wTXC at live Bitmart spot pricing — settled directly to your wallet.
             </p>
             <div className="flex gap-4">
               <Link
@@ -108,7 +108,7 @@ function HomePage() {
             <Principle
               n="01"
               title="One direction. Done well."
-              body="Stablecoins in, native TXC, ISK or ZCU out. No bridges, no wrapped tokens, no liquidity pools to manage."
+              body="Stablecoins in, native TXC or wTXC out. No bridges, no wrapped tokens, no liquidity pools to manage."
             />
             <Principle
               n="02"

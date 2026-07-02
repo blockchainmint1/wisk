@@ -287,7 +287,7 @@ async function watchDeposits() {
 
 /**
  * For confirmed orders, pay the customer IMMEDIATELY using local signing.
- * Both TXC and ISK$ now sign + broadcast directly from our hot wallet.
+ * Both TXC and wTXC now sign + broadcast directly from our hot wallet.
  * Bitmart is NEVER on the critical path — treasury replenishment runs
  * in the background after the customer is paid.
  */
