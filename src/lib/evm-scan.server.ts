@@ -12,8 +12,8 @@ const ALCHEMY_HOSTS: Record<ChainKey, string> = {
 };
 
 function alchemyUrl(chain: ChainKey): string {
-  const key = process.env.ALCHEMY_API_KEY;
-  if (!key) throw new Error("ALCHEMY_API_KEY is not set");
+  const key = process.env.ALCHEMY_API_KEY || process.env.ALCHEMY_API;
+  if (!key) throw new Error("ALCHEMY_API_KEY / ALCHEMY_API is not set");
   return `https://${ALCHEMY_HOSTS[chain]}/v2/${key}`;
 }
 
