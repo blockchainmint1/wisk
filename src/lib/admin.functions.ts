@@ -335,7 +335,7 @@ export const adminForceFail = createServerFn({ method: "POST" })
 
 
 // ===== Bitmart balances =====
-const WATCHED_CURRENCIES = ["TXC", "ISK$", "USDT"] as const;
+const WATCHED_CURRENCIES = ["TXC", "USDT"] as const;
 export const adminBitmartBalances = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
