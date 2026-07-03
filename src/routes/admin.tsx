@@ -998,27 +998,6 @@ function EthWalletTab() {
   const admin = data?.addresses.find((a) => a.index === 0) ?? null;
 
   return (
-  const fundWtxc = useMutation({
-    mutationFn: (v: { toIndex: number; amountWtxc: number }) => fundWtxcFn({ data: v }),
-    onSuccess: () => {
-      setFundTarget(null);
-      setFundAmount("");
-      qc.invalidateQueries({ queryKey: ["admin", "eth-derived"] });
-    },
-  });
-  const fundGas = useMutation({
-    mutationFn: (v: { toIndex: number; amountEth: number }) => fundGasFn({ data: v }),
-    onSuccess: () => {
-      setFundTarget(null);
-      setFundAmount("");
-      qc.invalidateQueries({ queryKey: ["admin", "eth-derived"] });
-    },
-  });
-
-  const data = scan.data;
-  const admin = data?.addresses.find((a) => a.index === 0) ?? null;
-
-  return (
     <div className="space-y-6">
       <div className="flex justify-between items-end flex-wrap gap-3">
         <div>
