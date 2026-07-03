@@ -146,7 +146,7 @@ function Stat({ label, value, sub }: { label: string; value: string; sub: string
 }
 
 
-function Principle({ n, title, body }: { n: string; title: string; body: React.ReactNode }) {
+function Principle({ n, title, body }: { n: string; title: string; body: ReactNode }) {
   return (
     <div className="space-y-3">
       <div className="font-mono text-[10px] text-accent uppercase tracking-[0.3em]">{n}</div>
