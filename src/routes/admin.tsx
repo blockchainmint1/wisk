@@ -1255,6 +1255,7 @@ function SettingsTab() {
     low_wtxc_threshold: number;
     payouts_frozen: boolean;
     payouts_frozen_reason: string;
+    telegram_chat_id: string;
   }>(null);
 
   useEffect(() => {
