@@ -394,8 +394,31 @@ export const adminHotWalletBalances = createServerFn({ method: "POST" })
         ? { ok: true as const, ...wtxcRes.value }
         : { ok: false as const, error: (wtxcRes.reason as Error)?.message ?? "rpc failed" };
 
+    // Fire-and-forget: record a TXC balance snapshot so we can chart history.
+    // Rate-limited to one row per ~10 minutes to keep the table small.
+    if (txc.ok) {
+      void (async () => {
+        try {
+          const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+          const { data: recent } = await supabaseAdmin
+            .from("txc_balance_snapshots")
+            .select("id")
+            .gt("taken_at", tenMinAgo)
+            .limit(1);
+          if (!recent || recent.length === 0) {
+            await supabaseAdmin
+              .from("txc_balance_snapshots")
+              .insert({ balance_txc: txc.confirmed });
+          }
+        } catch {
+          // best-effort; never fail the balance read on snapshot write
+        }
+      })();
+    }
+
     return { evm, txc, wtxc };
   });
+
 
 
 // ===== Reconciliation =====
