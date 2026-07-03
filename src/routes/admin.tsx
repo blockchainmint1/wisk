@@ -1391,6 +1391,19 @@ function SettingsTab() {
         <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
           Telegram
         </div>
+        <Field label="Notify chat / group ID">
+          <input
+            type="text"
+            value={form.telegram_chat_id}
+            onChange={(e) => set("telegram_chat_id", e.target.value)}
+            placeholder="-1001234567890 or @channelname"
+            className="w-full bg-background border border-border rounded p-2 font-mono text-sm focus:outline-none focus:border-accent"
+          />
+          <Hint>
+            Group ID (starts with <code>-100</code>), user ID, or <code>@channel</code>. Save
+            settings before testing. Add the bot to the group first.
+          </Hint>
+        </Field>
         <button
           onClick={() => tg.mutate()}
           disabled={tg.isPending}
