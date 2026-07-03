@@ -279,12 +279,7 @@ function OrdersTab() {
         <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-2">
           Hot wallet balances
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <BalanceCard
-            label="EVM Stables"
-            value={hot.data?.evm.ok ? `$${hot.data.evm.adminUsd.toFixed(2)}` : null}
-            error={hot.data?.evm.ok === false ? hot.data.evm.error : null}
-          />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <BalanceCard
             label="TXC"
             value={
@@ -362,7 +357,6 @@ function OrdersTab() {
               <th className="text-left p-3">Order</th>
               <th className="text-left p-3">Status</th>
               <th className="text-left p-3">Source</th>
-              <th className="text-right p-3">USD</th>
               <th className="text-right p-3">TXC</th>
               <th className="text-right p-3">wTXC</th>
               <th className="text-left p-3">Dest</th>
@@ -396,7 +390,7 @@ function OrdersTab() {
               ))}
             {!filteredOrders.length && !orders.isLoading ? (
               <tr>
-                <td colSpan={10} className="p-8 text-center text-muted-foreground">
+                <td colSpan={9} className="p-8 text-center text-muted-foreground">
                   No orders match this filter.
                 </td>
               </tr>
@@ -463,7 +457,6 @@ type OrderRowData = {
   status: string;
   source_chain: string;
   source_token: string;
-  source_amount_usd: number;
   dest_address: string;
   dest_asset: string | null;
   quoted_dest_out: number;
@@ -499,7 +492,6 @@ function OrderRow({
           ) : null}
         </td>
         <td className="p-3">{o.source_chain} · {o.source_token}</td>
-        <td className="p-3 text-right">${Number(o.source_amount_usd).toFixed(2)}</td>
         <td className="p-3 text-right">
           {(o.dest_asset ?? "TXC") === "TXC"
             ? (o.bitmart_filled_dest != null
@@ -548,7 +540,7 @@ function OrderRow({
       </tr>
       {open ? (
         <tr className="border-t border-border bg-background/40">
-          <td colSpan={10} className="p-0">
+          <td colSpan={9} className="p-0">
             <OrderDetail publicId={o.public_id} />
           </td>
         </tr>
@@ -584,7 +576,6 @@ function OrderDetail({ publicId }: { publicId: string }) {
     <div className="p-5 space-y-5">
       {/* Quote */}
       <DetailGrid title="Quote">
-        <KV k="Spot" v={`$${Number(order.bitmart_spot_price ?? 0).toFixed(6)}`} />
         <KV k="Premium" v={`${(order.premium_bps / 100).toFixed(2)}%`} />
         <KV k="Quoted out" v={`${Number(order.quoted_dest_out).toFixed(4)} ${asset}`} />
         <KV k="Expires" v={new Date(order.expires_at).toLocaleString()} />
@@ -593,7 +584,6 @@ function OrderDetail({ publicId }: { publicId: string }) {
       {/* Deposit */}
       <DetailGrid title="Deposit">
         <KV k="Address" v={order.deposit_address} mono />
-        <KV k="Paid" v={order.paid_amount_usd != null ? `$${Number(order.paid_amount_usd).toFixed(2)}` : "—"} />
         <KV k="Tx" v={order.paid_tx_hash ?? "—"} mono />
         <KV k="Deposits" v={String(deposits.length)} />
       </DetailGrid>
@@ -609,24 +599,6 @@ function OrderDetail({ publicId }: { publicId: string }) {
               : bitmartLive && "state" in bitmartLive
                 ? `(live) ${bitmartLive.state} · ${bitmartLive.filled_size}`
                 : "—"
-          }
-        />
-        <KV
-          k="Avg price"
-          v={
-            order.bitmart_avg_price != null
-              ? `$${Number(order.bitmart_avg_price).toFixed(6)}`
-              : bitmartLive && "price_avg" in bitmartLive
-                ? `$${Number(bitmartLive.price_avg).toFixed(6)}`
-                : "—"
-          }
-        />
-        <KV
-          k="Notional spent"
-          v={
-            order.paid_amount_usd
-              ? `$${(Number(order.paid_amount_usd) / 1.05).toFixed(2)}`
-              : "—"
           }
         />
       </DetailGrid>
@@ -791,11 +763,6 @@ function TreasuryTab() {
   const data = scan.data;
   const admin = data?.addresses.find((a) => a.index === 0) ?? null;
   const customer = data?.addresses.filter((a) => a.index !== 0) ?? [];
-  const totalUsd = data
-    ? data.chains.reduce((s, c) => s + c.totalStableUsd, 0)
-    : 0;
-  const adminUsd = admin?.totalUsd ?? 0;
-  const customerUsd = customer.reduce((s, a) => s + a.totalUsd, 0);
 
   return (
     <div className="space-y-6">
@@ -840,7 +807,7 @@ function TreasuryTab() {
               <p className="text-[11px] font-mono text-muted-foreground mt-2 max-w-xl leading-relaxed">
                 Sum of TXC sent to customers minus TXC re-bought on Bitmart.
                 Small market buys can partially cancel when the remainder drops
-                under Bitmart's ~5 USDT minimum — those gaps land here.
+                under Bitmart's minimum — those gaps land here.
               </p>
             </div>
             <button
@@ -851,7 +818,7 @@ function TreasuryTab() {
             </button>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div className="bg-background/60 border border-border rounded-lg p-3">
               <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
                 TXC sold
@@ -866,34 +833,19 @@ function TreasuryTab() {
                 TXC bought
               </div>
               <div className="font-mono text-xl mt-1">{debt.data.txcBought.toFixed(4)}</div>
-              <div className="text-[10px] font-mono text-muted-foreground">
-                ${debt.data.usdtSpent.toFixed(2)} spent
-              </div>
             </div>
             <div className="bg-accent/10 border border-accent/40 rounded-lg p-3">
               <div className="text-[10px] font-mono uppercase tracking-widest text-accent">
                 Outstanding
               </div>
               <div className="font-mono text-xl mt-1">{debt.data.txcDebt.toFixed(4)} TXC</div>
-              <div className="text-[10px] font-mono text-muted-foreground">
-                ≈ ${debt.data.estUsdtToSquareUp.toFixed(2)} @ ${debt.data.spotPrice.toFixed(6)}
-              </div>
-            </div>
-            <div className="bg-background/60 border border-border rounded-lg p-3">
-              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                Customer USD in
-              </div>
-              <div className="font-mono text-xl mt-1">${debt.data.usdtTakenIn.toFixed(2)}</div>
-              <div className="text-[10px] font-mono text-muted-foreground">
-                {debt.data.pendingBuys} buys pending
-              </div>
             </div>
           </div>
 
           <div className="flex items-end gap-2 flex-wrap pt-2 border-t border-border">
             <div className="flex-1 min-w-[180px]">
               <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                Square-up market buy (USDT)
+                Square-up market buy
               </label>
               <input
                 type="number"
@@ -902,7 +854,6 @@ function TreasuryTab() {
                 step={1}
                 value={bulkAmount}
                 onChange={(e) => setBulkAmount(e.target.value)}
-                placeholder={debt.data.estUsdtToSquareUp.toFixed(2)}
                 className="w-full mt-1 px-3 py-2 bg-background border border-border rounded font-mono text-sm"
               />
             </div>
@@ -959,31 +910,6 @@ function TreasuryTab() {
         <div className="text-[10px] font-mono text-muted-foreground">Scanning all chains…</div>
       ) : (
         <>
-          {/* Totals */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="bg-secondary/40 border border-border rounded-xl p-5">
-              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                Total holdings
-              </div>
-              <div className="font-mono text-3xl mt-2">${totalUsd.toFixed(2)}</div>
-            </div>
-            <div className="bg-secondary/40 border border-border rounded-xl p-5">
-              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                Admin (#0)
-              </div>
-              <div className="font-mono text-3xl mt-2">${adminUsd.toFixed(2)}</div>
-            </div>
-            <div className="bg-secondary/40 border border-border rounded-xl p-5">
-              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                In customer slots
-              </div>
-              <div className="font-mono text-3xl mt-2">${customerUsd.toFixed(2)}</div>
-              <div className="text-[10px] font-mono text-muted-foreground mt-1">
-                {customer.length} funded · {data.totalAddresses - 1} ever issued
-              </div>
-            </div>
-          </div>
-
           {/* Admin treasury card */}
           {admin ? (
             <div className="border border-accent/40 bg-accent/5 rounded-xl p-5 space-y-3">
@@ -1013,9 +939,6 @@ function TreasuryTab() {
                       <div className="uppercase tracking-widest text-muted-foreground">
                         {c.chainName}
                       </div>
-                      <div className="text-foreground mt-1">
-                        ${row?.totalUsd.toFixed(2) ?? "0.00"}
-                      </div>
                       <div className="text-muted-foreground">
                         {(row?.native ?? 0).toFixed(6)} {c.nativeSymbol}
                       </div>
@@ -1037,9 +960,6 @@ function TreasuryTab() {
                   <div className="text-[10px] font-mono text-accent mt-1">{c.error}</div>
                 ) : (
                   <>
-                    <div className="font-mono text-sm mt-1">
-                      ${c.totalStableUsd.toFixed(2)}
-                    </div>
                     <div className="font-mono text-[10px] text-muted-foreground">
                       {c.totalNative.toFixed(6)} {c.nativeSymbol}
                     </div>
@@ -1064,7 +984,6 @@ function TreasuryTab() {
                     <th className="text-left p-3">#</th>
                     <th className="text-left p-3">Address</th>
                     <th className="text-left p-3">Chain</th>
-                    <th className="text-right p-3">Stables (USD)</th>
                     <th className="text-right p-3">Native</th>
                     <th className="text-left p-3">Linked order</th>
                   </tr>
@@ -1076,9 +995,6 @@ function TreasuryTab() {
                       <td className="p-3 truncate max-w-[20ch]">{a.address}</td>
                       <td className="p-3">{a.chainName}</td>
                       <td className="p-3 text-right">
-                        {a.totalUsd > 0 ? `$${a.totalUsd.toFixed(2)}` : "—"}
-                      </td>
-                      <td className="p-3 text-right">
                         {a.native > 0 ? `${a.native.toFixed(6)} ${a.nativeSymbol}` : "—"}
                       </td>
                       <td className="p-3 text-muted-foreground">{a.linkedOrderId ?? "—"}</td>
@@ -1086,7 +1002,7 @@ function TreasuryTab() {
                   ))}
                   {!customer.length ? (
                     <tr>
-                      <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                      <td colSpan={5} className="p-8 text-center text-muted-foreground">
                         No customer slots currently hold a balance.
                       </td>
                     </tr>
@@ -1167,10 +1083,6 @@ function WalletTab() {
                   <div className="text-[10px] font-mono text-accent mt-1">{c.error}</div>
                 ) : (
                   <>
-                    <div className="font-mono text-sm mt-1">
-                      ${c.totalStableUsd.toFixed(2)}{" "}
-                      <span className="text-muted-foreground text-[10px]">stables</span>
-                    </div>
                     <div className="font-mono text-[10px] text-muted-foreground mt-1">
                       {c.totalNative.toFixed(6)} {c.nativeSymbol} · blk {c.blockNumber}
                     </div>
@@ -1197,7 +1109,7 @@ function WalletTab() {
                   <th className="text-left p-3">Address</th>
                   <th className="text-left p-3">Chain</th>
                   <th className="text-right p-3">Native</th>
-                  <th className="text-right p-3">Stables (USD)</th>
+                  <th className="text-left p-3">Tokens</th>
                   <th className="text-left p-3">Linked order</th>
                 </tr>
               </thead>
@@ -1210,8 +1122,7 @@ function WalletTab() {
                     <td className="p-3 text-right">
                       {a.native > 0 ? `${a.native.toFixed(6)} ${a.nativeSymbol}` : "—"}
                     </td>
-                    <td className="p-3 text-right">
-                      {a.totalUsd > 0 ? `$${a.totalUsd.toFixed(2)}` : "—"}
+                    <td className="p-3 text-left">
                       {a.tokens.some((t) => t.balance > 0) ? (
                         <div className="text-[10px] text-muted-foreground">
                           {a.tokens
@@ -1219,7 +1130,9 @@ function WalletTab() {
                             .map((t) => `${t.balance.toFixed(2)} ${t.symbol}`)
                             .join(" · ")}
                         </div>
-                      ) : null}
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className="p-3 text-muted-foreground">
                       {a.linkedOrderId ?? "—"}
@@ -1327,16 +1240,6 @@ function SettingsTab() {
         </Field>
         <Field label="Order expiry (minutes)">
           <NumberInput value={form.expiry_minutes} onChange={(v) => set("expiry_minutes", Math.round(v))} />
-        </Field>
-        <Field label="Min order size (USD)">
-          <NumberInput value={form.min_usd} onChange={(v) => set("min_usd", v)} />
-        </Field>
-        <Field label="Max order size (USD)">
-          <NumberInput value={form.max_usd} onChange={(v) => set("max_usd", v)} />
-        </Field>
-        <Field label="Telegram: min USD for new-order alerts">
-          <NumberInput value={form.notify_min_usd_created} onChange={(v) => set("notify_min_usd_created", v)} />
-          <Hint>0 = notify every order</Hint>
         </Field>
         <Field label="Kill switch (block new orders)">
           <label className="flex items-center gap-2 mt-2">
@@ -1737,7 +1640,7 @@ function TokensTab() {
           <div className="text-[10px] font-mono text-accent">{(create.error as Error).message}</div>
         ) : null}
         <p className="text-[10px] font-mono text-muted-foreground leading-relaxed">
-          Stables are priced at $1. For non-stables (e.g. native ETH or other
+          Stables are priced at par value. For non-stables (e.g. native ETH or other
           volatile tokens), set a Bitmart symbol like <span className="text-foreground">ETH_USDT</span> so
           deposits get repriced at detection. Tokens added here appear instantly in the swap form.
         </p>
@@ -1917,21 +1820,16 @@ function ReconcilePanel({
   onRefetch: () => void;
   loading: boolean;
 }) {
-  const diff = r.stablesDiff;
-  const diffOk = Math.abs(diff) < Math.max(1, r.expectedStablesUsd * 0.02);
   return (
     <div className="border border-border bg-secondary/30 rounded-xl p-5 space-y-4">
       <div className="flex justify-between items-start gap-3 flex-wrap">
         <div>
           <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-            Reconciliation · do we hold the money?
+            Asset debt
           </div>
           <p className="text-[11px] font-mono text-muted-foreground mt-2 max-w-xl leading-relaxed">
-            <span className="text-foreground">Expected stables</span> = USD paid
-            in by customers − USDT we spent on Bitmart buy-backs.{" "}
-            <span className="text-foreground">Actual</span> = EVM admin stables
-            + Bitmart USDT. A persistent gap means a manual withdrawal,
-            unaccounted fee, or pricing drift.
+            TXC and wTXC we have paid out to customers minus what we have re-bought.
+            Positive numbers mean we still owe assets to the hot wallet.
           </p>
         </div>
         <button
@@ -1942,62 +1840,14 @@ function ReconcilePanel({
         </button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-background/60 border border-border rounded-lg p-3">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-            USD in (completed)
-          </div>
-          <div className="font-mono text-xl mt-1">${r.usdIn.toFixed(2)}</div>
-          <div className="text-[10px] font-mono text-muted-foreground">{r.orderCount} orders</div>
-        </div>
-        <div className="bg-background/60 border border-border rounded-lg p-3">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-            USDT spent rebuying
-          </div>
-          <div className="font-mono text-xl mt-1">${r.usdSpentBuying.toFixed(2)}</div>
-          <div className="text-[10px] font-mono text-muted-foreground">
-            TXC (Bitmart) + wTXC (operator)
-          </div>
-        </div>
-        <div className="bg-background/60 border border-border rounded-lg p-3">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-            Expected stables
-          </div>
-          <div className="font-mono text-xl mt-1">${r.expectedStablesUsd.toFixed(2)}</div>
-        </div>
-        <div className="bg-background/60 border border-border rounded-lg p-3">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-            Actual stables
-          </div>
-          <div className="font-mono text-xl mt-1">${r.actualStablesUsd.toFixed(2)}</div>
-          <div className="text-[10px] font-mono text-muted-foreground">
-            EVM ${r.evmStablesUsd.toFixed(0)} · BM USDT ${r.bitmartUsdt.toFixed(0)}
-          </div>
-        </div>
-      </div>
-
-      <div className={`border rounded-lg p-3 ${diffOk ? "border-border bg-background/60" : "border-accent/40 bg-accent/10"}`}>
-        <div className={`text-[10px] font-mono uppercase tracking-widest ${diffOk ? "text-muted-foreground" : "text-accent"}`}>
-          Stables diff (actual − expected)
-        </div>
-        <div className="font-mono text-2xl mt-1">
-          {diff >= 0 ? "+" : ""}${diff.toFixed(2)}
-        </div>
-        <div className="text-[10px] font-mono text-muted-foreground mt-1">
-          {diffOk
-            ? "Within tolerance (≤2% / $1). Looks balanced."
-            : "Outside tolerance — investigate withdrawals, unfilled buys, or pricing drift."}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-border">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-border">
         <div className="bg-background/60 border border-border rounded-lg p-3">
           <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
             TXC debt owed
           </div>
           <div className="font-mono text-lg mt-1">{r.txcDebt.toFixed(4)} TXC</div>
           <div className="text-[10px] font-mono text-muted-foreground">
-            ≈ ${r.txcDebtUsd.toFixed(2)} @ ${r.txcPrice.toFixed(6)} · {r.pendingTxcBuys} pending
+            {r.pendingTxcBuys} pending buys
           </div>
         </div>
         <div className="bg-background/60 border border-border rounded-lg p-3">
@@ -2006,16 +1856,7 @@ function ReconcilePanel({
           </div>
           <div className="font-mono text-lg mt-1">{r.wtxcDebt.toFixed(4)} wTXC</div>
           <div className="text-[10px] font-mono text-muted-foreground">
-            ≈ ${r.wtxcDebtUsd.toFixed(2)} @ ${r.txcPrice.toFixed(6)} · {r.pendingWtxcBuys} pending
-          </div>
-        </div>
-        <div className="bg-background/60 border border-border rounded-lg p-3">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-            Net position (mark-to-market)
-          </div>
-          <div className="font-mono text-lg mt-1">${r.netPositionUsd.toFixed(2)}</div>
-          <div className="text-[10px] font-mono text-muted-foreground">
-            stables + BM inventory − asset debt
+            {r.pendingWtxcBuys} pending buys
           </div>
         </div>
       </div>
