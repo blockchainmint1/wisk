@@ -738,6 +738,7 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           result.settle = (await runPhase("settleConfirmed", settleConfirmed)) ?? result.settle;
           result.replenish = (await runPhase("replenishTreasury", replenishTreasury)) ?? result.replenish;
           result.fills = (await runPhase("pollBitmartFillsDecoupled", pollBitmartFillsDecoupled)) ?? result.fills;
+          result.balances = (await runPhase("checkHotBalances", checkHotBalances)) ?? result.balances;
         } catch (e) {
           const msg = e instanceof Error ? `${e.message}\n${e.stack ?? ""}` : String(e);
           console.error("[swap-tick] fatal", e);
