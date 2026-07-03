@@ -316,7 +316,7 @@ function OrdersTab() {
           ) : null}
         </div>
         <div className="flex gap-1">
-          {(["all", "open", "completed", "failed"] as const).map((s) => (
+          {(["all", "open", "completed", "canceled", "failed"] as const).map((s) => (
             <button
               key={s}
               onClick={() => { setStatusFilter(s); setPage(0); }}
