@@ -54,10 +54,8 @@ export const Route = createFileRoute("/")({
 });
 
 function HomePage() {
-  const { wrap_fee_bps, unwrap_fee_bps } = Route.useLoaderData();
+  const { wrap_fee_bps } = Route.useLoaderData();
   const wrapPct = fmtPct(wrap_fee_bps);
-  const unwrapPct = fmtPct(unwrap_fee_bps);
-  const unwrapLabel = unwrap_fee_bps === 0 ? "free" : unwrapPct;
   const wrapLabel = wrap_fee_bps === 0 ? "free" : wrapPct;
 
   return (
