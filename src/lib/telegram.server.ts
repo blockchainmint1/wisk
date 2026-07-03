@@ -282,7 +282,7 @@ export async function sendAdminAlert(
 
   const lovableKey = process.env.LOVABLE_API_KEY;
   const telegramKey = process.env.TELEGRAM_API_KEY;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const chatId = await getTelegramChatId();
   if (!lovableKey || !telegramKey || !chatId) {
     console.warn("[telegram] admin alert skipped; missing config:", title);
     return;
