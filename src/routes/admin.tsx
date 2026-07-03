@@ -492,7 +492,6 @@ function OrderRow({
           ) : null}
         </td>
         <td className="p-3">{o.source_chain} · {o.source_token}</td>
-        <td className="p-3 text-right">${Number(o.source_amount_usd).toFixed(2)}</td>
         <td className="p-3 text-right">
           {(o.dest_asset ?? "TXC") === "TXC"
             ? (o.bitmart_filled_dest != null
@@ -541,7 +540,7 @@ function OrderRow({
       </tr>
       {open ? (
         <tr className="border-t border-border bg-background/40">
-          <td colSpan={10} className="p-0">
+          <td colSpan={9} className="p-0">
             <OrderDetail publicId={o.public_id} />
           </td>
         </tr>
