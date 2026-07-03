@@ -159,8 +159,8 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
   const [tab, setTab] = useState<Tab>("orders");
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: "orders", label: "Orders" },
-    { id: "treasury", label: "Treasury" },
-    { id: "wallet", label: "Wallet" },
+    { id: "treasury", label: "TXC Wallet" },
+    { id: "wallet", label: "ETH Wallet" },
     { id: "settings", label: "Settings" },
     { id: "admins", label: "Admins" },
     { id: "blocklist", label: "Blocklist" },
@@ -198,12 +198,13 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
       </div>
 
       {tab === "orders" && <OrdersTab />}
-      {tab === "treasury" && <TreasuryTab />}
-      {tab === "wallet" && <WalletTab />}
+      {tab === "treasury" && <TxcWalletTab />}
+      {tab === "wallet" && <EthWalletTab />}
       {tab === "settings" && <SettingsTab />}
       {tab === "admins" && <AdminsTab />}
       {tab === "blocklist" && <BlocklistTab />}
       {tab === "audit" && <AuditTab />}
+
     </div>
   );
 }
