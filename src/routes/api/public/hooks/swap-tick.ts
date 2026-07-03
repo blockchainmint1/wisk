@@ -785,6 +785,25 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           result.replenish = (await runPhase("replenishTreasury", replenishTreasury)) ?? result.replenish;
           result.fills = (await runPhase("pollBitmartFillsDecoupled", pollBitmartFillsDecoupled)) ?? result.fills;
           result.balances = (await runPhase("checkHotBalances", checkHotBalances)) ?? result.balances;
+
+          // Fast mempool loop: pg_cron's minimum cadence is 1 minute, but TXC
+          // wrap payouts fire on 0-conf mempool sighting. Do 3 extra light
+          // passes (TXC mempool watch + settle) spaced 15s apart so worst-case
+          // detection → payout latency is ~15s instead of ~60s. Bail early if
+          // the initial pass already burned most of the minute.
+          const FAST_INTERVAL_MS = 15_000;
+          const MAX_TOTAL_MS = 55_000;
+          for (let i = 0; i < 3; i++) {
+            if (Date.now() - started > MAX_TOTAL_MS - FAST_INTERVAL_MS) break;
+            await new Promise((r) => setTimeout(r, FAST_INTERVAL_MS));
+            const w = await runPhase("watchTxcDeposits", watchTxcDeposits);
+            if (w) result.watchTxc.detected += w.detected;
+            const s = await runPhase("settleConfirmed", settleConfirmed);
+            if (s) {
+              result.settle.sent += s.sent;
+              result.settle.queuedForBitmart += s.queuedForBitmart;
+            }
+          }
         } catch (e) {
           const msg = e instanceof Error ? `${e.message}\n${e.stack ?? ""}` : String(e);
           console.error("[swap-tick] fatal", e);
