@@ -565,18 +565,38 @@ function OrderDetail({ publicId }: { publicId: string }) {
   }
   if (!q.data) return null;
 
-  const { order, deposits, events, audit, bitmartLive, hotBalance } = q.data;
+  const { order, deposits, events, audit, hotBalance } = q.data;
   const asset = order.dest_asset ?? "TXC";
   const explorer = (txid: string) =>
     asset === "wTXC"
       ? `https://etherscan.io/tx/${txid}`
       : `https://mempool.texitcoin.org/tx/${txid}`;
 
+  const srcToken = (order.source_token ?? "").toUpperCase();
+  const dstAsset = (order.dest_asset ?? "TXC").toUpperCase();
+  const service =
+    srcToken === "TXC" && dstAsset === "WTXC"
+      ? "Wrap"
+      : srcToken === "WTXC" && dstAsset === "TXC"
+        ? "Unwrap"
+        : "Swap";
+  const firstDeposit = deposits[0];
+  const receivedAmount =
+    firstDeposit?.amount_source != null
+      ? Number(firstDeposit.amount_source)
+      : firstDeposit?.amount_usd != null
+        ? Number(firstDeposit.amount_usd)
+        : null;
+  const quotedInLabel = order.source_token ?? "—";
+
   return (
     <div className="p-5 space-y-5">
       {/* Quote */}
       <DetailGrid title="Quote">
+        <KV k="Service" v={service} />
         <KV k="Premium" v={`${(order.premium_bps / 100).toFixed(2)}%`} />
+        <KV k="Timestamp" v={new Date(order.created_at).toLocaleString()} />
+        <KV k="Quoted in" v={`${Number(order.source_amount_usd).toFixed(4)} ${quotedInLabel}`} />
         <KV k="Quoted out" v={`${Number(order.quoted_dest_out).toFixed(4)} ${asset}`} />
         <KV k="Expires" v={new Date(order.expires_at).toLocaleString()} />
       </DetailGrid>
@@ -584,28 +604,20 @@ function OrderDetail({ publicId }: { publicId: string }) {
       {/* Deposit */}
       <DetailGrid title="Deposit">
         <KV k="Address" v={order.deposit_address} mono />
-        <KV k="Tx" v={order.paid_tx_hash ?? "—"} mono />
-        <KV k="Deposits" v={String(deposits.length)} />
-      </DetailGrid>
-
-      {/* Bitmart trade */}
-      <DetailGrid title="Bitmart trade">
-        <KV k="Order ID" v={order.bitmart_order_id ?? "—"} mono />
+        <KV k="Tx hash" v={order.paid_tx_hash ?? "—"} mono />
         <KV
-          k="Filled"
+          k="Received"
           v={
-            order.bitmart_filled_dest != null
-              ? `${Number(order.bitmart_filled_dest).toFixed(4)} ${asset}`
-              : bitmartLive && "state" in bitmartLive
-                ? `(live) ${bitmartLive.state} · ${bitmartLive.filled_size}`
-                : "—"
+            receivedAmount != null
+              ? `${receivedAmount.toFixed(8)} ${quotedInLabel}`
+              : "—"
           }
         />
       </DetailGrid>
 
       {/* Payout */}
       <DetailGrid title="Payout">
-        <KV k="From" v={order.dest_from_address ?? "—"} mono />
+        <KV k="From" v={order.dest_from_address ?? hotBalance?.address ?? "—"} mono />
         <KV k="To" v={order.dest_address} mono />
         <KV
           k="Tx hash"
@@ -625,6 +637,16 @@ function OrderDetail({ publicId }: { publicId: string }) {
           }
         />
         <KV
+          k="Amount sent"
+          v={
+            order.bitmart_filled_dest != null
+              ? `${Number(order.bitmart_filled_dest).toFixed(8)} ${asset}`
+              : order.dest_tx_hash
+                ? `${Number(order.quoted_dest_out).toFixed(8)} ${asset}`
+                : "—"
+          }
+        />
+        <KV
           k="Fee"
           v={
             order.dest_fee_sats != null
@@ -633,17 +655,14 @@ function OrderDetail({ publicId }: { publicId: string }) {
           }
         />
         {hotBalance ? (
-          <>
-            <KV k="Hot wallet" v={hotBalance.address} mono />
-            <KV
-              k="Hot balance"
-              v={`${hotBalance.confirmedTxc.toFixed(4)} ${asset}${
-                hotBalance.unconfirmedTxc
-                  ? ` (+${hotBalance.unconfirmedTxc.toFixed(4)} pending)`
-                  : ""
-              }`}
-            />
-          </>
+          <KV
+            k="Hot balance"
+            v={`${hotBalance.confirmedTxc.toFixed(4)} ${asset}${
+              hotBalance.unconfirmedTxc
+                ? ` (+${hotBalance.unconfirmedTxc.toFixed(4)} pending)`
+                : ""
+            }`}
+          />
         ) : null}
       </DetailGrid>
 
