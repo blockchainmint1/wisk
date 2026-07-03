@@ -1243,6 +1243,8 @@ function SettingsTab() {
     notify_min_usd_created: number;
     low_txc_threshold: number;
     low_wtxc_threshold: number;
+    payouts_frozen: boolean;
+    payouts_frozen_reason: string;
   }>(null);
 
   useEffect(() => {
