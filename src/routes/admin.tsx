@@ -1830,21 +1830,16 @@ function ReconcilePanel({
   onRefetch: () => void;
   loading: boolean;
 }) {
-  const diff = r.stablesDiff;
-  const diffOk = Math.abs(diff) < Math.max(1, r.expectedStablesUsd * 0.02);
   return (
     <div className="border border-border bg-secondary/30 rounded-xl p-5 space-y-4">
       <div className="flex justify-between items-start gap-3 flex-wrap">
         <div>
           <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-            Reconciliation · do we hold the money?
+            Asset debt
           </div>
           <p className="text-[11px] font-mono text-muted-foreground mt-2 max-w-xl leading-relaxed">
-            <span className="text-foreground">Expected stables</span> = USD paid
-            in by customers − USDT we spent on Bitmart buy-backs.{" "}
-            <span className="text-foreground">Actual</span> = EVM admin stables
-            + Bitmart USDT. A persistent gap means a manual withdrawal,
-            unaccounted fee, or pricing drift.
+            TXC and wTXC we have paid out to customers minus what we have re-bought.
+            Positive numbers mean we still owe assets to the hot wallet.
           </p>
         </div>
         <button
@@ -1855,62 +1850,14 @@ function ReconcilePanel({
         </button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-background/60 border border-border rounded-lg p-3">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-            USD in (completed)
-          </div>
-          <div className="font-mono text-xl mt-1">${r.usdIn.toFixed(2)}</div>
-          <div className="text-[10px] font-mono text-muted-foreground">{r.orderCount} orders</div>
-        </div>
-        <div className="bg-background/60 border border-border rounded-lg p-3">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-            USDT spent rebuying
-          </div>
-          <div className="font-mono text-xl mt-1">${r.usdSpentBuying.toFixed(2)}</div>
-          <div className="text-[10px] font-mono text-muted-foreground">
-            TXC (Bitmart) + wTXC (operator)
-          </div>
-        </div>
-        <div className="bg-background/60 border border-border rounded-lg p-3">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-            Expected stables
-          </div>
-          <div className="font-mono text-xl mt-1">${r.expectedStablesUsd.toFixed(2)}</div>
-        </div>
-        <div className="bg-background/60 border border-border rounded-lg p-3">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-            Actual stables
-          </div>
-          <div className="font-mono text-xl mt-1">${r.actualStablesUsd.toFixed(2)}</div>
-          <div className="text-[10px] font-mono text-muted-foreground">
-            EVM ${r.evmStablesUsd.toFixed(0)} · BM USDT ${r.bitmartUsdt.toFixed(0)}
-          </div>
-        </div>
-      </div>
-
-      <div className={`border rounded-lg p-3 ${diffOk ? "border-border bg-background/60" : "border-accent/40 bg-accent/10"}`}>
-        <div className={`text-[10px] font-mono uppercase tracking-widest ${diffOk ? "text-muted-foreground" : "text-accent"}`}>
-          Stables diff (actual − expected)
-        </div>
-        <div className="font-mono text-2xl mt-1">
-          {diff >= 0 ? "+" : ""}${diff.toFixed(2)}
-        </div>
-        <div className="text-[10px] font-mono text-muted-foreground mt-1">
-          {diffOk
-            ? "Within tolerance (≤2% / $1). Looks balanced."
-            : "Outside tolerance — investigate withdrawals, unfilled buys, or pricing drift."}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-border">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-border">
         <div className="bg-background/60 border border-border rounded-lg p-3">
           <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
             TXC debt owed
           </div>
           <div className="font-mono text-lg mt-1">{r.txcDebt.toFixed(4)} TXC</div>
           <div className="text-[10px] font-mono text-muted-foreground">
-            ≈ ${r.txcDebtUsd.toFixed(2)} @ ${r.txcPrice.toFixed(6)} · {r.pendingTxcBuys} pending
+            {r.pendingTxcBuys} pending buys
           </div>
         </div>
         <div className="bg-background/60 border border-border rounded-lg p-3">
@@ -1919,16 +1866,7 @@ function ReconcilePanel({
           </div>
           <div className="font-mono text-lg mt-1">{r.wtxcDebt.toFixed(4)} wTXC</div>
           <div className="text-[10px] font-mono text-muted-foreground">
-            ≈ ${r.wtxcDebtUsd.toFixed(2)} @ ${r.txcPrice.toFixed(6)} · {r.pendingWtxcBuys} pending
-          </div>
-        </div>
-        <div className="bg-background/60 border border-border rounded-lg p-3">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-            Net position (mark-to-market)
-          </div>
-          <div className="font-mono text-lg mt-1">${r.netPositionUsd.toFixed(2)}</div>
-          <div className="text-[10px] font-mono text-muted-foreground">
-            stables + BM inventory − asset debt
+            {r.pendingWtxcBuys} pending buys
           </div>
         </div>
       </div>
