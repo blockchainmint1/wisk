@@ -279,12 +279,7 @@ function OrdersTab() {
         <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-2">
           Hot wallet balances
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <BalanceCard
-            label="EVM Stables"
-            value={hot.data?.evm.ok ? `$${hot.data.evm.adminUsd.toFixed(2)}` : null}
-            error={hot.data?.evm.ok === false ? hot.data.evm.error : null}
-          />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <BalanceCard
             label="TXC"
             value={
