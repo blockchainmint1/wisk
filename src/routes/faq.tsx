@@ -68,6 +68,21 @@ const FAQS: Array<{ q: string; a: ReactNode }> = [
   },
 ];
 
+const SCHEMA_TEXTS = [
+  `A custodial bridge between native TEXITcoin (TXC) and its ERC-20 twin on Ethereum, wTXC (${CONTRACT}). One operator wallet holds real TXC 1:1 against every wTXC in circulation.`,
+  "Wrap (TXC → wTXC) is 5%. Unwrap (wTXC → TXC) is free. Fees are set by the operator and shown live on the swap form before you confirm.",
+  "By choice. A one-operator hot wallet with a public reconciliation dashboard is simpler, cheaper to run, and easier to audit than a contract we'd have to trust ourselves to secure. TXC held by the bridge matches wTXC in circulation — publicly checkable at any time.",
+  "Native TXC on the TEXITcoin network, or wTXC on Ethereum. We do not offer stablecoin or ETH on-ramp swaps.",
+  "Native TXC (paid to any TXC address — legacy T… or SegWit txc1q…) or wTXC (paid to any Ethereum 0x… address).",
+  "Around 5 minutes end-to-end. We wait for chain-specific confirmations on your deposit, then sign and broadcast the payout from the hot wallet. Slower chains (Ethereum mainnet) take longer than the TEXITcoin network.",
+  "Funds sent on an unsupported chain or with an unsupported token aren't picked up automatically. Contact the Help Center with your order ID and deposit tx hash — manual recovery may be possible.",
+  "We can only send to the address you provided at order creation. Double-check before confirming — payouts can't be reversed.",
+  "Each quote is valid for the expiry window shown on the order page (15 minutes by default). Late deposits are held for manual reconciliation — contact support with your order ID.",
+  "Yes — that's the model. The bridge is custodial by design. TXC backing wTXC lives in the operator wallet full-time while the wTXC is in circulation.",
+  "After creating an order you're redirected to a live status page that auto-refreshes through every stage. Your browser also keeps a local history of recent swaps on /swap.",
+  "Minimums and maximums are shown live on the swap form and enforced at order creation. They can change based on hot-wallet liquidity and operator limits.",
+];
+
 export const Route = createFileRoute("/faq")({
   head: () => ({
     meta: [
