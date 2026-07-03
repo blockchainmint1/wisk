@@ -412,6 +412,26 @@ async function watchTxcDeposits() {
         const originalOut = Number(order.quoted_dest_out);
         const repriced = Math.abs(repricedOut - originalOut) > 0.00000001;
 
+        // Underpayment gate: if the payout is >0.5% short of the ORIGINAL
+        // quote, hold in payment_detected with underpayment_ack='pending'
+        // until the customer either tops up (auto-clears) or accepts via
+        // the order page (or the quote expires → auto-accept).
+        const UNDERPAY_THRESHOLD = 0.005; // 0.5%
+        const originalQuote =
+          Number(order.original_quoted_dest_out) || originalOut;
+        const shortRatio =
+          originalQuote > 0
+            ? Math.max(0, (originalQuote - repricedOut) / originalQuote)
+            : 0;
+        const isShort = shortRatio > UNDERPAY_THRESHOLD;
+        let nextAck: string | null = order.underpayment_ack;
+        if (isShort && nextAck !== "accepted") {
+          nextAck = "pending";
+        } else if (!isShort && nextAck === "pending") {
+          // Top-up closed the gap.
+          nextAck = null;
+        }
+
         if (order.status === "awaiting_payment") {
           await supabaseAdmin
             .from("orders")
@@ -420,16 +440,24 @@ async function watchTxcDeposits() {
               paid_tx_hash: t.txid,
               paid_amount_usd: totalPaidUsd,
               quoted_dest_out: repricedOut,
+              original_quoted_dest_out:
+                order.original_quoted_dest_out ?? originalOut,
+              underpayment_ack: nextAck,
             })
             .eq("id", order.id);
           order.status = "payment_detected";
           order.quoted_dest_out = repricedOut;
+          order.original_quoted_dest_out =
+            order.original_quoted_dest_out ?? originalOut;
+          order.underpayment_ack = nextAck;
           await logOrderEvent(order.id, "state", "payment_detected", {
             tx_hash: t.txid,
             usd: totalPaidUsd,
             confirmations: t.confirmations,
             original_payout: originalOut,
             repriced_payout: repricedOut,
+            underpayment: isShort,
+            short_ratio: shortRatio,
           });
           await notifyById("payment_detected", order.id);
         } else {
@@ -438,17 +466,26 @@ async function watchTxcDeposits() {
             .update({
               paid_amount_usd: totalPaidUsd,
               quoted_dest_out: repricedOut,
+              underpayment_ack: nextAck,
             })
             .eq("id", order.id);
           order.quoted_dest_out = repricedOut;
+          order.underpayment_ack = nextAck;
           if (repriced) {
             await logOrderEvent(order.id, "note", "repriced", {
               additional_tx: t.txid,
               total_usd: totalPaidUsd,
               original_payout: originalOut,
               repriced_payout: repricedOut,
+              underpayment: isShort,
+              short_ratio: shortRatio,
             });
           }
+        }
+
+        // Hold at payment_detected while awaiting the customer's decision.
+        if (order.underpayment_ack === "pending") {
+          continue;
         }
 
         if (
