@@ -8,17 +8,13 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { supabase } from "@/integrations/supabase/client";
 import {
   adminAuditLog,
-  adminBitmartBalances,
   adminBulkReplenish,
-  adminCreateCustomToken,
-  adminDeleteCustomToken,
   adminForceComplete,
   adminForceFail,
   adminGetSettings,
   adminHotWalletBalances,
   adminInviteAdmin,
   adminListAdmins,
-  adminListCustomTokens,
   adminListOrders,
   adminReconcile,
   adminSearchOrders,
@@ -28,7 +24,6 @@ import {
   adminRevokeAdmin,
   adminTelegramTest,
   adminTreasuryDebt,
-  adminUpdateCustomToken,
   adminUpdateSettings,
   adminWalletScan,
 } from "@/lib/admin.functions";
@@ -43,7 +38,7 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-type Tab = "orders" | "treasury" | "wallet" | "market" | "tokens" | "settings" | "admins" | "audit";
+type Tab = "orders" | "treasury" | "wallet" | "settings" | "admins" | "audit";
 
 function AdminPage() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -156,8 +151,6 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
     { id: "orders", label: "Orders" },
     { id: "treasury", label: "Treasury" },
     { id: "wallet", label: "Wallet" },
-    { id: "market", label: "Market" },
-    { id: "tokens", label: "Tokens" },
     { id: "settings", label: "Settings" },
     { id: "admins", label: "Admins" },
     { id: "audit", label: "Audit" },
@@ -196,8 +189,6 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
       {tab === "orders" && <OrdersTab />}
       {tab === "treasury" && <TreasuryTab />}
       {tab === "wallet" && <WalletTab />}
-      {tab === "market" && <MarketTab />}
-      {tab === "tokens" && <TokensTab />}
       {tab === "settings" && <SettingsTab />}
       {tab === "admins" && <AdminsTab />}
       {tab === "audit" && <AuditTab />}
@@ -1596,228 +1587,6 @@ function AuditTab() {
   );
 }
 
-// ===== Tokens Tab (admin-managed source asset registry) =====
-const TOKEN_CHAINS = ["ethereum", "base", "arbitrum", "polygon", "bsc"] as const;
-type TokenChain = (typeof TOKEN_CHAINS)[number];
-
-function TokensTab() {
-  const listFn = useServerFn(adminListCustomTokens);
-  const createFn = useServerFn(adminCreateCustomToken);
-  const updateFn = useServerFn(adminUpdateCustomToken);
-  const deleteFn = useServerFn(adminDeleteCustomToken);
-  const qc = useQueryClient();
-
-  const tokens = useQuery({
-    queryKey: ["admin", "custom-tokens"],
-    queryFn: () => listFn({}),
-  });
-
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ["admin", "custom-tokens"] });
-    qc.invalidateQueries({ queryKey: ["chains"] });
-  };
-
-  const create = useMutation({
-    mutationFn: (data: {
-      chain: TokenChain;
-      symbol: string;
-      address: string;
-      decimals: number;
-      isNative: boolean;
-      bitmartSymbol?: string;
-      enabled: boolean;
-    }) => createFn({ data }),
-    onSuccess: invalidate,
-  });
-  const update = useMutation({
-    mutationFn: (vars: { id: string; enabled?: boolean; decimals?: number; bitmartSymbol?: string | null }) =>
-      updateFn({ data: vars }),
-    onSuccess: invalidate,
-  });
-  const del = useMutation({
-    mutationFn: (id: string) => deleteFn({ data: { id } }),
-    onSuccess: invalidate,
-  });
-
-  const [chain, setChain] = useState<TokenChain>("ethereum");
-  const [symbol, setSymbol] = useState("");
-  const [address, setAddress] = useState("");
-  const [decimals, setDecimals] = useState("18");
-  const [isNative, setIsNative] = useState(false);
-  const [bitmartSymbol, setBitmartSymbol] = useState("");
-
-  function reset() {
-    setSymbol("");
-    setAddress("");
-    setDecimals("18");
-    setIsNative(false);
-    setBitmartSymbol("");
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="bg-secondary/40 border border-border rounded-xl p-5 space-y-4">
-        <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-          Add a token
-        </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            const dec = Number.parseInt(decimals, 10);
-            if (!Number.isFinite(dec)) return;
-            create.mutate(
-              {
-                chain,
-                symbol: symbol.trim(),
-                address: isNative ? "" : address.trim(),
-                decimals: dec,
-                isNative,
-                bitmartSymbol: bitmartSymbol.trim() || undefined,
-                enabled: true,
-              },
-              { onSuccess: () => reset() },
-            );
-          }}
-          className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end"
-        >
-          <Field label="Chain">
-            <select
-              value={chain}
-              onChange={(e) => setChain(e.target.value as TokenChain)}
-              className="w-full bg-background border border-border rounded p-2 font-mono text-xs"
-            >
-              {TOKEN_CHAINS.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Symbol">
-            <input
-              required
-              value={symbol}
-              onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-              placeholder="GHO"
-              className="w-full bg-background border border-border rounded p-2 font-mono text-xs"
-            />
-          </Field>
-          <Field label={isNative ? "Address (n/a)" : "Contract address"}>
-            <input
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="0x…"
-              disabled={isNative}
-              className="w-full bg-background border border-border rounded p-2 font-mono text-xs disabled:opacity-40"
-            />
-          </Field>
-          <Field label="Decimals">
-            <input
-              required
-              type="number"
-              value={decimals}
-              onChange={(e) => setDecimals(e.target.value)}
-              min={0}
-              max={36}
-              className="w-full bg-background border border-border rounded p-2 font-mono text-xs"
-            />
-          </Field>
-          <Field label="Bitmart (non-stable)">
-            <input
-              value={bitmartSymbol}
-              onChange={(e) => setBitmartSymbol(e.target.value.toUpperCase())}
-              placeholder="ETH_USDT"
-              className="w-full bg-background border border-border rounded p-2 font-mono text-xs"
-            />
-          </Field>
-          <div className="flex flex-col gap-2">
-            <label className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={isNative}
-                onChange={(e) => setIsNative(e.target.checked)}
-              />
-              Native coin
-            </label>
-            <button
-              type="submit"
-              disabled={create.isPending}
-              className="bg-accent text-accent-foreground py-2 px-3 rounded font-mono text-[10px] uppercase tracking-widest hover:opacity-90 disabled:opacity-50"
-            >
-              {create.isPending ? "Adding…" : "Add token"}
-            </button>
-          </div>
-        </form>
-        {create.error ? (
-          <div className="text-[10px] font-mono text-accent">{(create.error as Error).message}</div>
-        ) : null}
-        <p className="text-[10px] font-mono text-muted-foreground leading-relaxed">
-          Stables are priced at par value. For non-stables (e.g. native ETH or other
-          volatile tokens), set a Bitmart symbol like <span className="text-foreground">ETH_USDT</span> so
-          deposits get repriced at detection. Tokens added here appear instantly in the swap form.
-        </p>
-      </div>
-
-      <div className="overflow-x-auto border border-border rounded-xl">
-        <table className="w-full text-xs font-mono">
-          <thead className="bg-secondary/40 text-muted-foreground uppercase tracking-widest text-[10px]">
-            <tr>
-              <th className="text-left p-3">Chain</th>
-              <th className="text-left p-3">Symbol</th>
-              <th className="text-left p-3">Address</th>
-              <th className="text-right p-3">Decimals</th>
-              <th className="text-left p-3">Bitmart</th>
-              <th className="text-left p-3">Native</th>
-              <th className="text-left p-3">Enabled</th>
-              <th className="text-right p-3">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(tokens.data ?? []).map((t) => (
-              <tr key={t.id} className="border-t border-border">
-                <td className="p-3">{t.chain}</td>
-                <td className="p-3 text-foreground">{t.symbol}</td>
-                <td className="p-3 truncate max-w-[20ch]">{t.address}</td>
-                <td className="p-3 text-right">{t.decimals}</td>
-                <td className="p-3">{t.bitmart_symbol ?? "—"}</td>
-                <td className="p-3">{t.is_native ? "yes" : "—"}</td>
-                <td className="p-3">
-                  <button
-                    onClick={() => update.mutate({ id: t.id, enabled: !t.enabled })}
-                    className={`px-2 py-1 rounded border ${
-                      t.enabled
-                        ? "border-success/50 text-success"
-                        : "border-border text-muted-foreground"
-                    }`}
-                  >
-                    {t.enabled ? "on" : "off"}
-                  </button>
-                </td>
-                <td className="p-3 text-right">
-                  <button
-                    onClick={() => {
-                      if (confirm(`Delete ${t.chain}/${t.symbol}? Existing orders are unaffected.`)) {
-                        del.mutate(t.id);
-                      }
-                    }}
-                    className="border border-accent/50 text-accent px-2 py-1 rounded hover:bg-accent hover:text-accent-foreground"
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {!tokens.data?.length && !tokens.isLoading ? (
-              <tr>
-                <td colSpan={8} className="p-8 text-center text-muted-foreground">
-                  No custom tokens yet. The built-in catalog is always available.
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
 
 // ===== Shared balance card =====
 function BalanceCard({
@@ -1843,57 +1612,6 @@ function BalanceCard({
   );
 }
 
-// ===== Market Tab (Bitmart exchange balances) =====
-function MarketTab() {
-  const balFn = useServerFn(adminBitmartBalances);
-  const balances = useQuery({
-    queryKey: ["admin", "bitmart-balances"],
-    queryFn: () => balFn({}),
-    refetchInterval: 30_000,
-  });
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-          Bitmart
-        </div>
-        <p className="text-xs font-mono text-muted-foreground mt-2 max-w-xl leading-relaxed">
-          Live spot balances on the Bitmart exchange account used for
-          replenishment buys and TXC/wTXC liquidity.
-        </p>
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-            Bitmart balances
-          </div>
-          <button
-            onClick={() => balances.refetch()}
-            className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-1 rounded hover:bg-foreground hover:text-background"
-          >
-            {balances.isFetching ? "…" : "Refresh"}
-          </button>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {balances.data?.ok
-            ? balances.data.items.map((b) => (
-                <div key={b.currency} className="bg-secondary/40 border border-border rounded p-4">
-                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                    {b.currency}
-                  </div>
-                  <div className="font-mono text-lg mt-1">{b.available}</div>
-                </div>
-              ))
-            : balances.data?.ok === false
-              ? <div className="col-span-full text-xs font-mono text-accent">Bitmart: {balances.data.error}</div>
-              : <div className="col-span-full text-[10px] font-mono text-muted-foreground">Loading…</div>}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ===== Reconciliation panel =====
 type ReconcileData = {
