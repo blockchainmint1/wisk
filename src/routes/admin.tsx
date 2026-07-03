@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 import { supabase } from "@/integrations/supabase/client";
 import {
+  adminAddBlockedAddress,
   adminAuditLog,
   adminBulkReplenish,
   adminForceComplete,
@@ -15,8 +16,10 @@ import {
   adminHotWalletBalances,
   adminInviteAdmin,
   adminListAdmins,
+  adminListBlockedAddresses,
   adminListOrders,
   adminReconcile,
+  adminRemoveBlockedAddress,
   adminSearchOrders,
 
   adminOrderDetail,
