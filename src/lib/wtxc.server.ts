@@ -3,7 +3,7 @@
 // and Alchemy for reads/broadcasts (same key that powers the EVM scanner).
 
 import { Contract, JsonRpcProvider, formatUnits, parseUnits } from "ethers";
-import { deriveEvmWallet, getOperatorEvmAddress } from "./bridge-wallet.server";
+import { deriveEvmWallet } from "./bridge-wallet.server";
 
 export const WTXC_CONTRACT = "0x9FC65df3997073B8551Ffd617154B5102fACbb88";
 export const WTXC_DECIMALS = 8;
