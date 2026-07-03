@@ -69,12 +69,19 @@ function OrderPage() {
   const [qrUrl, setQrUrl] = useState<string | null>(null);
   useEffect(() => {
     if (!order?.deposit_address) return;
+    const isDark =
+      typeof document !== "undefined" &&
+      document.documentElement.classList.contains("dark");
     QRCode.toDataURL(order.deposit_address, {
       width: 320,
       margin: 1,
-      color: { dark: "#ffffff", light: "#00000000" },
+      color: {
+        dark: isDark ? "#ffffff" : "#000000",
+        light: "#00000000",
+      },
     }).then(setQrUrl).catch(console.error);
   }, [order?.deposit_address]);
+
 
   useEffect(() => {
     if (!order?.public_id) return;
