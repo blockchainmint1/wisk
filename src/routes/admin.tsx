@@ -38,7 +38,7 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-type Tab = "orders" | "treasury" | "wallet" | "market" | "tokens" | "settings" | "admins" | "audit";
+type Tab = "orders" | "treasury" | "wallet" | "settings" | "admins" | "audit";
 
 function AdminPage() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -151,8 +151,6 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
     { id: "orders", label: "Orders" },
     { id: "treasury", label: "Treasury" },
     { id: "wallet", label: "Wallet" },
-    { id: "market", label: "Market" },
-    { id: "tokens", label: "Tokens" },
     { id: "settings", label: "Settings" },
     { id: "admins", label: "Admins" },
     { id: "audit", label: "Audit" },
@@ -191,8 +189,6 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
       {tab === "orders" && <OrdersTab />}
       {tab === "treasury" && <TreasuryTab />}
       {tab === "wallet" && <WalletTab />}
-      {tab === "market" && <MarketTab />}
-      {tab === "tokens" && <TokensTab />}
       {tab === "settings" && <SettingsTab />}
       {tab === "admins" && <AdminsTab />}
       {tab === "audit" && <AuditTab />}
