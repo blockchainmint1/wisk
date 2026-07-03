@@ -1241,16 +1241,6 @@ function SettingsTab() {
         <Field label="Order expiry (minutes)">
           <NumberInput value={form.expiry_minutes} onChange={(v) => set("expiry_minutes", Math.round(v))} />
         </Field>
-        <Field label="Min order size (USD)">
-          <NumberInput value={form.min_usd} onChange={(v) => set("min_usd", v)} />
-        </Field>
-        <Field label="Max order size (USD)">
-          <NumberInput value={form.max_usd} onChange={(v) => set("max_usd", v)} />
-        </Field>
-        <Field label="Telegram: min USD for new-order alerts">
-          <NumberInput value={form.notify_min_usd_created} onChange={(v) => set("notify_min_usd_created", v)} />
-          <Hint>0 = notify every order</Hint>
-        </Field>
         <Field label="Kill switch (block new orders)">
           <label className="flex items-center gap-2 mt-2">
             <input
