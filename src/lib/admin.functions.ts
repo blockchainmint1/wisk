@@ -536,6 +536,7 @@ const UpdateSettingsInput = z.object({
   low_wtxc_threshold: z.number().min(0).max(10_000_000),
   payouts_frozen: z.boolean(),
   payouts_frozen_reason: z.string().trim().max(280).nullable(),
+  telegram_chat_id: z.string().trim().max(64).nullable(),
 });
 
 export const adminUpdateSettings = createServerFn({ method: "POST" })
