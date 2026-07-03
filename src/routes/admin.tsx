@@ -1272,6 +1272,7 @@ function SettingsTab() {
         data: {
           ...form!,
           paused_reason: form!.paused_reason.trim() || null,
+          payouts_frozen_reason: form!.payouts_frozen_reason.trim() || null,
         },
       }),
     onSuccess: () => {
