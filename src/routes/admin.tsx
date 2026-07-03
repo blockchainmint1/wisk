@@ -1259,6 +1259,9 @@ function SettingsTab() {
         notify_min_usd_created: Number(settings.data.notify_min_usd_created),
         low_txc_threshold: Number(settings.data.low_txc_threshold ?? 10_000),
         low_wtxc_threshold: Number(settings.data.low_wtxc_threshold ?? 10_000),
+        payouts_frozen: Boolean((settings.data as { payouts_frozen?: boolean }).payouts_frozen),
+        payouts_frozen_reason:
+          (settings.data as { payouts_frozen_reason?: string | null }).payouts_frozen_reason ?? "",
       });
     }
   }, [settings.data, form]);
