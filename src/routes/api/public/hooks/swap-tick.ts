@@ -76,6 +76,20 @@ async function failOrder(orderId: string, message: string) {
 }
 
 async function expireStale() {
+  // Auto-accept any pending underpayment whose quote window has closed —
+  // the customer chose not to top up in time, so pay out what they sent.
+  const { data: autoAccepted } = await supabaseAdmin
+    .from("orders")
+    .update({ underpayment_ack: "accepted" })
+    .eq("underpayment_ack", "pending")
+    .lt("expires_at", new Date().toISOString())
+    .select("id");
+  for (const row of autoAccepted ?? []) {
+    await logOrderEvent(row.id, "note", "underpayment_auto_accepted", {
+      reason: "quote_expired",
+    });
+  }
+
   const { data: expired } = await supabaseAdmin
     .from("orders")
     .update({ status: "expired" })
