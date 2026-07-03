@@ -910,31 +910,6 @@ function TreasuryTab() {
         <div className="text-[10px] font-mono text-muted-foreground">Scanning all chains…</div>
       ) : (
         <>
-          {/* Totals */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="bg-secondary/40 border border-border rounded-xl p-5">
-              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                Total holdings
-              </div>
-              <div className="font-mono text-3xl mt-2">${totalUsd.toFixed(2)}</div>
-            </div>
-            <div className="bg-secondary/40 border border-border rounded-xl p-5">
-              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                Admin (#0)
-              </div>
-              <div className="font-mono text-3xl mt-2">${adminUsd.toFixed(2)}</div>
-            </div>
-            <div className="bg-secondary/40 border border-border rounded-xl p-5">
-              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                In customer slots
-              </div>
-              <div className="font-mono text-3xl mt-2">${customerUsd.toFixed(2)}</div>
-              <div className="text-[10px] font-mono text-muted-foreground mt-1">
-                {customer.length} funded · {data.totalAddresses - 1} ever issued
-              </div>
-            </div>
-          </div>
-
           {/* Admin treasury card */}
           {admin ? (
             <div className="border border-accent/40 bg-accent/5 rounded-xl p-5 space-y-3">
