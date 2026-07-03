@@ -960,9 +960,6 @@ function TreasuryTab() {
                   <div className="text-[10px] font-mono text-accent mt-1">{c.error}</div>
                 ) : (
                   <>
-                    <div className="font-mono text-sm mt-1">
-                      ${c.totalStableUsd.toFixed(2)}
-                    </div>
                     <div className="font-mono text-[10px] text-muted-foreground">
                       {c.totalNative.toFixed(6)} {c.nativeSymbol}
                     </div>
