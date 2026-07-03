@@ -1,14 +1,30 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import { SiteFooter, SiteHeader } from "@/components/site-shell";
 
-const FAQS: Array<{ q: string; a: string }> = [
+const CONTRACT = "0x9FC65df3997073B8551Ffd617154B5102fACbb88";
+
+const FAQS: Array<{ q: string; a: ReactNode }> = [
   {
     q: "What is this?",
-    a: "A custodial bridge between native TEXITcoin (TXC) and its ERC-20 twin on Ethereum, wTXC (0x9FC65df3997073B8551Ffd617154B5102fACbb88). It also runs a stablecoin/ETH on-ramp into either side. One operator wallet holds real TXC 1:1 against every wTXC in circulation.",
+    a: (
+      <>
+        A custodial bridge between native TEXITcoin (TXC) and its ERC-20 twin on Ethereum,{" "}
+        <a
+          href="https://texitcoin.org/wtxc"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-foreground underline underline-offset-2 hover:text-accent"
+        >
+          wTXC ({CONTRACT})
+        </a>
+        . One operator wallet holds real TXC 1:1 against every wTXC in circulation.
+      </>
+    ),
   },
   {
     q: "How much does it cost?",
-    a: "Wrap (TXC → wTXC) is free. Unwrap (wTXC → TXC) is 1%. On-ramp swaps (USDC/USDT/pyUSD/DAI/ETH → TXC or wTXC) are quoted at live Bitmart TXC/USDT spot price plus a 5% protocol fee, locked when you confirm.",
+    a: "Wrap (TXC → wTXC) is 5%. Unwrap (wTXC → TXC) is free. Fees are set by the operator and shown live on the swap form before you confirm.",
   },
   {
     q: "Why custodial and not a smart contract?",
@@ -16,7 +32,7 @@ const FAQS: Array<{ q: string; a: string }> = [
   },
   {
     q: "Which networks and tokens can I send from?",
-    a: "Ethereum (USDC, USDT, DAI, PYUSD, FRAX, TUSD, USDP, USDe, native ETH, wTXC), Base (USDC, USDbC, USDT, ETH), Arbitrum (USDC, USDC.e, USDT, DAI, FRAX, ETH), Polygon (USDC, USDC.e, USDT, DAI), and BNB Chain (USDT, USDC). Native ETH is priced live when we detect your deposit.",
+    a: "Native TXC on the TEXITcoin network, or wTXC on Ethereum. We do not offer stablecoin or ETH on-ramp swaps.",
   },
   {
     q: "Which assets can I receive?",
@@ -24,7 +40,7 @@ const FAQS: Array<{ q: string; a: string }> = [
   },
   {
     q: "How long does a swap take?",
-    a: "Around 5 minutes end-to-end. We wait for chain-specific confirmations on your deposit, then sign and broadcast the payout from the hot wallet. Slower source chains (Ethereum mainnet) take longer than L2s.",
+    a: "Around 5 minutes end-to-end. We wait for chain-specific confirmations on your deposit, then sign and broadcast the payout from the hot wallet. Slower chains (Ethereum mainnet) take longer than the TEXITcoin network.",
   },
   {
     q: "What if I send the wrong token or wrong chain?",
@@ -40,7 +56,7 @@ const FAQS: Array<{ q: string; a: string }> = [
   },
   {
     q: "Do you take custody of my funds?",
-    a: "Yes — that's the model. The bridge is custodial by design. TXC backing wTXC lives in the operator wallet full-time; on-ramp deposits are held only for the brief window between confirmation and payout.",
+    a: "Yes — that's the model. The bridge is custodial by design. TXC backing wTXC lives in the operator wallet full-time while the wTXC is in circulation.",
   },
   {
     q: "Where can I track my swap?",
@@ -48,25 +64,39 @@ const FAQS: Array<{ q: string; a: string }> = [
   },
   {
     q: "Is there a minimum or maximum order size?",
-    a: "Yes. The current minimum is $10 and maximum is $50,000 per order. These limits are shown live on the swap form.",
+    a: "Minimums and maximums are shown live on the swap form and enforced at order creation. They can change based on hot-wallet liquidity and operator limits.",
   },
 ];
 
+const SCHEMA_TEXTS = [
+  `A custodial bridge between native TEXITcoin (TXC) and its ERC-20 twin on Ethereum, wTXC (${CONTRACT}). One operator wallet holds real TXC 1:1 against every wTXC in circulation.`,
+  "Wrap (TXC → wTXC) is 5%. Unwrap (wTXC → TXC) is free. Fees are set by the operator and shown live on the swap form before you confirm.",
+  "By choice. A one-operator hot wallet with a public reconciliation dashboard is simpler, cheaper to run, and easier to audit than a contract we'd have to trust ourselves to secure. TXC held by the bridge matches wTXC in circulation — publicly checkable at any time.",
+  "Native TXC on the TEXITcoin network, or wTXC on Ethereum. We do not offer stablecoin or ETH on-ramp swaps.",
+  "Native TXC (paid to any TXC address — legacy T… or SegWit txc1q…) or wTXC (paid to any Ethereum 0x… address).",
+  "Around 5 minutes end-to-end. We wait for chain-specific confirmations on your deposit, then sign and broadcast the payout from the hot wallet. Slower chains (Ethereum mainnet) take longer than the TEXITcoin network.",
+  "Funds sent on an unsupported chain or with an unsupported token aren't picked up automatically. Contact the Help Center with your order ID and deposit tx hash — manual recovery may be possible.",
+  "We can only send to the address you provided at order creation. Double-check before confirming — payouts can't be reversed.",
+  "Each quote is valid for the expiry window shown on the order page (15 minutes by default). Late deposits are held for manual reconciliation — contact support with your order ID.",
+  "Yes — that's the model. The bridge is custodial by design. TXC backing wTXC lives in the operator wallet full-time while the wTXC is in circulation.",
+  "After creating an order you're redirected to a live status page that auto-refreshes through every stage. Your browser also keeps a local history of recent swaps on /swap.",
+  "Minimums and maximums are shown live on the swap form and enforced at order creation. They can change based on hot-wallet liquidity and operator limits.",
+];
 
 export const Route = createFileRoute("/faq")({
   head: () => ({
     meta: [
-      { title: "FAQ — swapTXC" },
+      { title: "FAQ — SWAP" },
       {
         name: "description",
         content:
-          "Common questions about swapping stablecoins for native TXC or wTXC on swapTXC — fees, timing, supported networks, and recovery.",
+          "Common questions about the TXC ↔ wTXC bridge — fees, timing, supported networks, and recovery.",
       },
-      { property: "og:title", content: "FAQ — swapTXC" },
+      { property: "og:title", content: "FAQ — SWAP" },
       {
         property: "og:description",
         content:
-          "Common questions about swapping stablecoins for native TXC or wTXC.",
+          "Common questions about the TXC ↔ wTXC bridge.",
       },
       { property: "og:url", content: "https://swap.texitcoin.org/faq" },
     ],
@@ -77,10 +107,10 @@ export const Route = createFileRoute("/faq")({
         children: JSON.stringify({
           "@context": "https://schema.org",
           "@type": "FAQPage",
-          mainEntity: FAQS.map((f) => ({
+          mainEntity: FAQS.map((f, i) => ({
             "@type": "Question",
             name: f.q,
-            acceptedAnswer: { "@type": "Answer", text: f.a },
+            acceptedAnswer: { "@type": "Answer", text: SCHEMA_TEXTS[i] },
           })),
         }),
       },
@@ -104,7 +134,7 @@ function FaqPage() {
           <p className="text-sm text-muted-foreground mt-4 max-w-prose">
             The short answers. For anything else,{" "}
             <a
-              href="https://help.minetxc.com"
+              href="https://help.honest.money"
               target="_blank"
               rel="noreferrer"
               className="text-accent underline underline-offset-2"
