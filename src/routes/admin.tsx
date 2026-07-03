@@ -1640,7 +1640,7 @@ function TokensTab() {
           <div className="text-[10px] font-mono text-accent">{(create.error as Error).message}</div>
         ) : null}
         <p className="text-[10px] font-mono text-muted-foreground leading-relaxed">
-          Stables are priced at $1. For non-stables (e.g. native ETH or other
+          Stables are priced at par value. For non-stables (e.g. native ETH or other
           volatile tokens), set a Bitmart symbol like <span className="text-foreground">ETH_USDT</span> so
           deposits get repriced at detection. Tokens added here appear instantly in the swap form.
         </p>
