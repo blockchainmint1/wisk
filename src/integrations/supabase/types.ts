@@ -504,6 +504,24 @@ export type Database = {
         }
         Relationships: []
       }
+      txc_balance_snapshots: {
+        Row: {
+          balance_txc: number
+          id: number
+          taken_at: string
+        }
+        Insert: {
+          balance_txc: number
+          id?: number
+          taken_at?: string
+        }
+        Update: {
+          balance_txc?: number
+          id?: number
+          taken_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

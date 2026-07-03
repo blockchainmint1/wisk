@@ -3,7 +3,7 @@
 // and Alchemy for reads/broadcasts (same key that powers the EVM scanner).
 
 import { Contract, JsonRpcProvider, formatUnits, parseUnits } from "ethers";
-import { deriveEvmWallet, getOperatorEvmAddress } from "./bridge-wallet.server";
+import { deriveEvmWallet } from "./bridge-wallet.server";
 
 export const WTXC_CONTRACT = "0x9FC65df3997073B8551Ffd617154B5102fACbb88";
 export const WTXC_DECIMALS = 8;
@@ -51,18 +51,67 @@ function serialize<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 /**
- * Sign + broadcast a wTXC ERC-20 transfer from the operator wallet.
- * Waits for 1 confirmation before returning so the caller can persist
- * the tx hash + status atomically.
+ * Sign + broadcast a wTXC ERC-20 transfer from the operator wallet (index 0).
+ * Waits for 1 confirmation before returning.
  */
 export async function sendWtxc(opts: {
+  toAddress: string;
+  amountWtxc: number;
+}): Promise<WtxcSendResult> {
+  return serialize(() => sendWtxcInner({ ...opts, fromIndex: 0 }));
+}
+
+/**
+ * Sign + broadcast a wTXC ERC-20 transfer from any HD-derived index.
+ * The sender must hold enough ETH for gas.
+ */
+export async function sendWtxcFrom(opts: {
+  fromIndex: number;
   toAddress: string;
   amountWtxc: number;
 }): Promise<WtxcSendResult> {
   return serialize(() => sendWtxcInner(opts));
 }
 
+/** Native ETH balance for an address (raw wei + formatted string). */
+export async function getEthBalance(address: string): Promise<{ wei: bigint; eth: number }> {
+  const provider = getProvider();
+  const wei = await provider.getBalance(address);
+  return { wei, eth: Number(formatUnits(wei, 18)) };
+}
+
+/**
+ * Send native ETH from any HD-derived index. Used to fund gas on a
+ * derived address before sweeping wTXC out of it.
+ */
+export async function sendEthFrom(opts: {
+  fromIndex: number;
+  toAddress: string;
+  amountEth: number;
+}): Promise<{ txid: string; fromAddress: string; toAddress: string; amountEth: number }> {
+  return serialize(async () => {
+    if (!/^0x[a-fA-F0-9]{40}$/.test(opts.toAddress)) {
+      throw new Error(`Invalid ETH destination address: ${opts.toAddress}`);
+    }
+    if (!Number.isFinite(opts.amountEth) || opts.amountEth <= 0) {
+      throw new Error(`Invalid ETH amount: ${opts.amountEth}`);
+    }
+    const provider = getProvider();
+    const wallet = deriveEvmWallet(opts.fromIndex).connect(provider);
+    const value = parseUnits(opts.amountEth.toFixed(18), 18);
+    const tx = await wallet.sendTransaction({ to: opts.toAddress, value });
+    await tx.wait(1);
+    return {
+      txid: tx.hash,
+      fromAddress: wallet.address,
+      toAddress: opts.toAddress,
+      amountEth: opts.amountEth,
+    };
+  });
+}
+
 async function sendWtxcInner(opts: {
+  fromIndex: number;
   toAddress: string;
   amountWtxc: number;
 }): Promise<WtxcSendResult> {
@@ -73,7 +122,7 @@ async function sendWtxcInner(opts: {
     throw new Error(`Invalid wTXC amount: ${opts.amountWtxc}`);
   }
   const provider = getProvider();
-  const wallet = deriveEvmWallet(0).connect(provider);
+  const wallet = deriveEvmWallet(opts.fromIndex).connect(provider);
   const contract = new Contract(WTXC_CONTRACT, ERC20_ABI, wallet);
   const amountRaw = parseUnits(opts.amountWtxc.toFixed(WTXC_DECIMALS), WTXC_DECIMALS);
 
@@ -81,9 +130,10 @@ async function sendWtxcInner(opts: {
   const receipt = await tx.wait(1);
   return {
     txid: tx.hash,
-    fromAddress: getOperatorEvmAddress(),
+    fromAddress: wallet.address,
     toAddress: opts.toAddress,
     amountWtxc: opts.amountWtxc,
     feeSats: Number(receipt?.gasUsed ?? 0n),
   };
 }
+

@@ -10,8 +10,11 @@ import {
   adminAddBlockedAddress,
   adminAuditLog,
   adminBulkReplenish,
+  adminEthDerivedBalances,
   adminForceComplete,
   adminForceFail,
+  adminFundEthGas,
+  adminFundWtxc,
   adminGetSettings,
   adminHotWalletBalances,
   adminInviteAdmin,
@@ -25,11 +28,15 @@ import {
   adminOrderDetail,
   adminRetryOrder,
   adminRevokeAdmin,
+  adminSweepWtxc,
   adminTelegramTest,
   adminTreasuryDebt,
+  adminTxcBalanceHistory,
+  adminTxcTxHistory,
   adminUpdateSettings,
   adminWalletScan,
 } from "@/lib/admin.functions";
+
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -152,8 +159,8 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
   const [tab, setTab] = useState<Tab>("orders");
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: "orders", label: "Orders" },
-    { id: "treasury", label: "Treasury" },
-    { id: "wallet", label: "Wallet" },
+    { id: "treasury", label: "TXC Wallet" },
+    { id: "wallet", label: "ETH Wallet" },
     { id: "settings", label: "Settings" },
     { id: "admins", label: "Admins" },
     { id: "blocklist", label: "Blocklist" },
@@ -191,12 +198,13 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
       </div>
 
       {tab === "orders" && <OrdersTab />}
-      {tab === "treasury" && <TreasuryTab />}
-      {tab === "wallet" && <WalletTab />}
+      {tab === "treasury" && <TxcWalletTab />}
+      {tab === "wallet" && <EthWalletTab />}
       {tab === "settings" && <SettingsTab />}
       {tab === "admins" && <AdminsTab />}
       {tab === "blocklist" && <BlocklistTab />}
       {tab === "audit" && <AuditTab />}
+
     </div>
   );
 }
@@ -741,37 +749,240 @@ function KV({ k, v, mono }: { k: string; v: React.ReactNode; mono?: boolean }) {
   );
 }
 
-// ===== Treasury Tab =====
-function TreasuryTab() {
+// ===== TXC Wallet Tab =====
+function TxcWalletTab() {
+  const hotFn = useServerFn(adminHotWalletBalances);
+  const txHistFn = useServerFn(adminTxcTxHistory);
+  const balHistFn = useServerFn(adminTxcBalanceHistory);
+
+  const hot = useQuery({
+    queryKey: ["admin", "hot-wallet-balances"],
+    queryFn: () => hotFn({}),
+    refetchInterval: 60_000,
+  });
+  const txs = useQuery({
+    queryKey: ["admin", "txc-tx-history"],
+    queryFn: () => txHistFn({ data: { limit: 25 } }),
+    refetchInterval: 60_000,
+  });
+  const hist = useQuery({
+    queryKey: ["admin", "txc-balance-history"],
+    queryFn: () => balHistFn({ data: { hours: 168 } }),
+    refetchInterval: 5 * 60_000,
+  });
+
+  const txc = hot.data?.txc;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-end flex-wrap gap-3">
+        <div>
+          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+            TXC Wallet
+          </div>
+          <p className="text-xs font-mono text-muted-foreground mt-2 max-w-xl leading-relaxed">
+            The TXC hot wallet holds native TXC used to pay unwrap orders.
+            Balance snapshots record whenever this page refreshes.
+          </p>
+        </div>
+        <button
+          onClick={() => { hot.refetch(); txs.refetch(); hist.refetch(); }}
+          className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-2 rounded hover:bg-foreground hover:text-background"
+        >
+          {hot.isFetching || txs.isFetching ? "Refreshing…" : "Refresh"}
+        </button>
+      </div>
+
+      {!txc ? (
+        <div className="text-[10px] font-mono text-muted-foreground">Loading TXC wallet…</div>
+      ) : txc.ok === false ? (
+        <div className="text-xs font-mono text-accent">TXC hot wallet: {txc.error}</div>
+      ) : (
+        <div className="border border-accent/40 bg-accent/5 rounded-xl p-5 space-y-4">
+          <div className="flex justify-between items-start gap-3 flex-wrap">
+            <div className="min-w-0">
+              <div className="text-[10px] font-mono uppercase tracking-widest text-accent">
+                TXC hot wallet address
+              </div>
+              <div className="font-mono text-sm mt-2 break-all">{txc.address}</div>
+              <div className="flex gap-2 mt-3 flex-wrap">
+                <button
+                  onClick={() => navigator.clipboard.writeText(txc.address)}
+                  className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-1.5 rounded hover:bg-foreground hover:text-background"
+                >
+                  Copy
+                </button>
+                <a
+                  href={`https://mempool.texitcoin.org/address/${txc.address}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-1.5 rounded hover:bg-foreground hover:text-background"
+                >
+                  View on mempool.texitcoin.org ↗
+                </a>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                Balance
+              </div>
+              <div className="font-mono text-2xl mt-1">
+                {txc.confirmed.toFixed(4)} <span className="text-sm">TXC</span>
+              </div>
+              {txc.unconfirmed ? (
+                <div className="text-[10px] font-mono text-muted-foreground">
+                  +{txc.unconfirmed.toFixed(4)} pending
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="border border-border rounded-xl p-5">
+        <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-3">
+          Balance history · 7 days
+        </div>
+        {hist.data && hist.data.length >= 2 ? (
+          <BalanceSparkline points={hist.data} />
+        ) : (
+          <div className="text-[10px] font-mono text-muted-foreground py-6">
+            Not enough snapshots yet — chart will populate as balances refresh over time.
+          </div>
+        )}
+      </div>
+
+      <div>
+        <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-2">
+          Recent transactions
+        </div>
+        {txs.error ? (
+          <div className="text-xs font-mono text-accent">
+            {(txs.error as Error).message}
+          </div>
+        ) : txs.data ? (
+          <div className="overflow-x-auto border border-border rounded-xl">
+            <table className="w-full text-xs font-mono">
+              <thead className="bg-secondary/40 text-muted-foreground uppercase tracking-widest text-[10px]">
+                <tr>
+                  <th className="text-left p-3">When</th>
+                  <th className="text-left p-3">Dir</th>
+                  <th className="text-right p-3">Amount</th>
+                  <th className="text-left p-3">Counterparty</th>
+                  <th className="text-left p-3">Txid</th>
+                </tr>
+              </thead>
+              <tbody>
+                {txs.data.txs.map((t) => (
+                  <tr key={t.txid} className="border-t border-border">
+                    <td className="p-3 text-muted-foreground">
+                      {t.blockTime
+                        ? new Date(t.blockTime * 1000).toLocaleString()
+                        : "pending"}
+                    </td>
+                    <td className="p-3">
+                      <span className={t.direction === "in" ? "text-foreground" : "text-accent"}>
+                        {t.direction === "in" ? "IN" : "OUT"}
+                      </span>
+                    </td>
+                    <td className="p-3 text-right">{t.amountTxc.toFixed(4)} TXC</td>
+                    <td className="p-3 truncate max-w-[20ch] text-muted-foreground">
+                      {t.counterparty ?? "—"}
+                    </td>
+                    <td className="p-3">
+                      <a
+                        href={`https://mempool.texitcoin.org/tx/${t.txid}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-muted-foreground hover:text-foreground underline underline-offset-2"
+                      >
+                        {t.txid.slice(0, 10)}…
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+                {!txs.data.txs.length ? (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                      No transactions yet.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-[10px] font-mono text-muted-foreground">Loading transactions…</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BalanceSparkline({ points }: { points: Array<{ balance: number; takenAt: string }> }) {
+  const W = 720;
+  const H = 120;
+  const PAD = 8;
+  const values = points.map((p) => p.balance);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const step = (W - PAD * 2) / Math.max(1, points.length - 1);
+  const path = points
+    .map((p, i) => {
+      const x = PAD + i * step;
+      const y = H - PAD - ((p.balance - min) / range) * (H - PAD * 2);
+      return `${i === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
+    })
+    .join(" ");
+  const last = points[points.length - 1];
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-32">
+        <path d={path} fill="none" stroke="currentColor" strokeWidth={1.5} className="text-accent" />
+      </svg>
+      <div className="flex justify-between text-[10px] font-mono text-muted-foreground mt-1">
+        <span>{new Date(points[0].takenAt).toLocaleDateString()}</span>
+        <span>min {min.toFixed(2)} · max {max.toFixed(2)} · now {last.balance.toFixed(2)} TXC</span>
+        <span>{new Date(last.takenAt).toLocaleDateString()}</span>
+      </div>
+    </div>
+  );
+}
+
+// ===== ETH Wallet Tab =====
+function EthWalletTab() {
   const scanFn = useServerFn(adminWalletScan);
   const debtFn = useServerFn(adminTreasuryDebt);
   const bulkBuyFn = useServerFn(adminBulkReplenish);
   const reconcileFn = useServerFn(adminReconcile);
+  const derivedFn = useServerFn(adminEthDerivedBalances);
+  const sweepFn = useServerFn(adminSweepWtxc);
+  const fundWtxcFn = useServerFn(adminFundWtxc);
+  const fundGasFn = useServerFn(adminFundEthGas);
   const qc = useQueryClient();
   const ALL_CHAINS = ["ethereum", "bsc", "base", "arbitrum", "polygon"] as const;
+
+  const [derivedCount, setDerivedCount] = useState(10);
 
   const scan = useQuery({
     queryKey: ["admin", "treasury-scan"],
     queryFn: () => scanFn({ data: { chains: ALL_CHAINS as unknown as never } }),
     refetchInterval: 60_000,
   });
-
   const debt = useQuery({
     queryKey: ["admin", "treasury-debt"],
     queryFn: () => debtFn(),
     refetchInterval: 30_000,
   });
-
   const reconcile = useQuery({
     queryKey: ["admin", "reconcile"],
     queryFn: () => reconcileFn({}),
     refetchInterval: 60_000,
   });
-
-  const hotFn = useServerFn(adminHotWalletBalances);
-  const hot = useQuery({
-    queryKey: ["admin", "hot-wallet-balances"],
-    queryFn: () => hotFn({}),
+  const derived = useQuery({
+    queryKey: ["admin", "eth-derived", derivedCount],
+    queryFn: () => derivedFn({ data: { count: derivedCount } }),
     refetchInterval: 60_000,
   });
 
@@ -784,75 +995,54 @@ function TreasuryTab() {
     },
   });
 
+  const sweep = useMutation({
+    mutationFn: (fromIndex: number) => sweepFn({ data: { fromIndex } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "eth-derived"] }),
+  });
+
+  const [fundTarget, setFundTarget] = useState<{ index: number; kind: "wtxc" | "gas" } | null>(null);
+  const [fundAmount, setFundAmount] = useState("");
+  const fundWtxc = useMutation({
+    mutationFn: (v: { toIndex: number; amountWtxc: number }) => fundWtxcFn({ data: v }),
+    onSuccess: () => {
+      setFundTarget(null);
+      setFundAmount("");
+      qc.invalidateQueries({ queryKey: ["admin", "eth-derived"] });
+    },
+  });
+  const fundGas = useMutation({
+    mutationFn: (v: { toIndex: number; amountEth: number }) => fundGasFn({ data: v }),
+    onSuccess: () => {
+      setFundTarget(null);
+      setFundAmount("");
+      qc.invalidateQueries({ queryKey: ["admin", "eth-derived"] });
+    },
+  });
+
   const data = scan.data;
   const admin = data?.addresses.find((a) => a.index === 0) ?? null;
-  const customer = data?.addresses.filter((a) => a.index !== 0) ?? [];
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-end flex-wrap gap-3">
         <div>
           <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-            Treasury
+            ETH Wallet
           </div>
           <p className="text-xs font-mono text-muted-foreground mt-2 max-w-xl leading-relaxed">
-            Live balances across the TXC hot wallet and every xpub-derived EVM
-            receive address. Index <span className="text-foreground">#0</span> is the admin
-            treasury; customer deposits rotate through index #1+.
+            HD-derived EVM addresses. Index <span className="text-foreground">#0</span> is the
+            operator (holds wTXC + ETH gas, signs payouts). Indices #1+ are per-order
+            deposit slots — sweep them back to #0 after use.
           </p>
         </div>
         <button
-          onClick={() => { scan.refetch(); hot.refetch(); }}
+          onClick={() => { scan.refetch(); derived.refetch(); }}
           className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-2 rounded hover:bg-foreground hover:text-background"
         >
-          {scan.isFetching || hot.isFetching ? "Scanning…" : "Refresh"}
+          {scan.isFetching || derived.isFetching ? "Scanning…" : "Refresh"}
         </button>
       </div>
 
-      {/* TXC hot wallet treasury address */}
-      {(() => {
-        const txc = hot.data?.txc;
-        if (!txc || txc.ok === false) {
-          return txc?.ok === false ? (
-            <div className="text-xs font-mono text-accent">TXC hot wallet: {txc.error}</div>
-          ) : (
-            <div className="text-[10px] font-mono text-muted-foreground">Loading TXC treasury…</div>
-          );
-        }
-        return (
-          <div className="border border-accent/40 bg-accent/5 rounded-xl p-5 space-y-3">
-            <div className="flex justify-between items-start gap-3 flex-wrap">
-              <div>
-                <div className="text-[10px] font-mono uppercase tracking-widest text-accent">
-                  TXC treasury · hot wallet
-                </div>
-                <div className="font-mono text-sm mt-2 break-all">{txc.address}</div>
-              </div>
-              <button
-                onClick={() => navigator.clipboard.writeText(txc.address)}
-                className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-1.5 rounded hover:bg-foreground hover:text-background"
-              >
-                Copy
-              </button>
-            </div>
-            <div className="pt-2 border-t border-border">
-              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                Balance
-              </div>
-              <div className="font-mono text-lg mt-1">
-                {txc.confirmed.toFixed(4)} TXC
-                {txc.unconfirmed ? (
-                  <span className="text-muted-foreground text-sm">
-                    {" "}(+{txc.unconfirmed.toFixed(4)} pending)
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Reconciliation — asset debt */}
       {reconcile.data ? (
         <ReconcilePanel data={reconcile.data} onRefetch={() => reconcile.refetch()} loading={reconcile.isFetching} />
       ) : reconcile.error ? (
@@ -863,7 +1053,6 @@ function TreasuryTab() {
         <div className="text-[10px] font-mono text-muted-foreground">Reconciling…</div>
       )}
 
-      {/* Treasury debt — TXC sold vs TXC re-bought on Bitmart */}
       {debt.data ? (
         <div className="border border-border bg-secondary/30 rounded-xl p-5 space-y-4">
           <div className="flex justify-between items-start gap-3 flex-wrap">
@@ -873,8 +1062,6 @@ function TreasuryTab() {
               </div>
               <p className="text-[11px] font-mono text-muted-foreground mt-2 max-w-xl leading-relaxed">
                 Sum of TXC sent to customers minus TXC re-bought on Bitmart.
-                Small market buys can partially cancel when the remainder drops
-                under Bitmart's minimum — those gaps land here.
               </p>
             </div>
             <button
@@ -912,7 +1099,7 @@ function TreasuryTab() {
           <div className="flex items-end gap-2 flex-wrap pt-2 border-t border-border">
             <div className="flex-1 min-w-[180px]">
               <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                Square-up market buy
+                Square-up market buy (USDT)
               </label>
               <input
                 type="number"
@@ -941,29 +1128,228 @@ function TreasuryTab() {
             </div>
           ) : null}
           {bulkBuy.data?.ok === false ? (
-            <div className="text-[11px] font-mono text-accent">
-              ✗ {bulkBuy.data.error}
-            </div>
+            <div className="text-[11px] font-mono text-accent">✗ {bulkBuy.data.error}</div>
           ) : null}
+        </div>
+      ) : null}
 
-          {debt.data.topShortfalls.length > 0 ? (
-            <details className="text-[11px] font-mono">
-              <summary className="cursor-pointer text-muted-foreground uppercase tracking-widest text-[10px]">
-                Top shortfalls ({debt.data.topShortfalls.length})
-              </summary>
-              <div className="mt-2 space-y-1">
-                {debt.data.topShortfalls.map((s) => (
-                  <div key={s.public_id} className="grid grid-cols-[1fr_auto_auto] gap-3">
-                    <span>{s.public_id}</span>
-                    <span className="text-muted-foreground">
-                      {s.bought.toFixed(4)} / {s.sold.toFixed(4)}
-                    </span>
-                    <span className="text-accent">-{s.shortfall.toFixed(4)}</span>
-                  </div>
-                ))}
+      {data ? (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {data.chains.map((c) => (
+            <div key={c.chain} className="bg-secondary/40 border border-border rounded p-4">
+              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                {c.chainName}
               </div>
-            </details>
-          ) : null}
+              {c.error ? (
+                <div className="text-[10px] font-mono text-accent mt-1">{c.error}</div>
+              ) : (
+                <>
+                  <div className="font-mono text-[10px] text-muted-foreground">
+                    {c.totalNative.toFixed(6)} {c.nativeSymbol}
+                  </div>
+                  <div className="font-mono text-[10px] text-muted-foreground">
+                    blk {c.blockNumber} · {c.latencyMs}ms
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {admin ? (
+        <div className="border border-accent/40 bg-accent/5 rounded-xl p-5 space-y-3">
+          <div className="flex justify-between items-start gap-3 flex-wrap">
+            <div>
+              <div className="text-[10px] font-mono uppercase tracking-widest text-accent">
+                Operator · index #0
+              </div>
+              <div className="font-mono text-sm mt-2 break-all">{admin.address}</div>
+            </div>
+            <a
+              href={`https://etherscan.io/address/${admin.address}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-1.5 rounded hover:bg-foreground hover:text-background"
+            >
+              Etherscan ↗
+            </a>
+          </div>
+        </div>
+      ) : null}
+
+      <div>
+        <div className="flex justify-between items-end flex-wrap gap-3 mb-2">
+          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+            Derived addresses (wTXC + ETH)
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setDerivedCount((n) => Math.max(1, n - 5))}
+              className="text-[10px] font-mono uppercase tracking-widest border border-border px-2 py-1 rounded hover:bg-foreground hover:text-background"
+            >
+              -5
+            </button>
+            <button
+              onClick={() => setDerivedCount((n) => n + 5)}
+              className="text-[10px] font-mono uppercase tracking-widest border border-border px-2 py-1 rounded hover:bg-foreground hover:text-background"
+            >
+              +5
+            </button>
+          </div>
+        </div>
+        {derived.error ? (
+          <div className="text-xs font-mono text-accent">
+            {(derived.error as Error).message}
+          </div>
+        ) : derived.data ? (
+          <div className="overflow-x-auto border border-border rounded-xl">
+            <table className="w-full text-xs font-mono">
+              <thead className="bg-secondary/40 text-muted-foreground uppercase tracking-widest text-[10px]">
+                <tr>
+                  <th className="text-left p-3">#</th>
+                  <th className="text-left p-3">Address</th>
+                  <th className="text-right p-3">ETH</th>
+                  <th className="text-right p-3">wTXC</th>
+                  <th className="text-right p-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {derived.data.rows.map((r) => (
+                  <tr key={r.address} className="border-t border-border">
+                    <td className="p-3">
+                      {r.index}
+                      {r.index === 0 ? (
+                        <span className="ml-1 text-[9px] uppercase tracking-widest text-accent">op</span>
+                      ) : null}
+                    </td>
+                    <td className="p-3 truncate max-w-[22ch]">
+                      <a
+                        href={`https://etherscan.io/address/${r.address}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="hover:text-foreground text-muted-foreground"
+                      >
+                        {r.address.slice(0, 10)}…{r.address.slice(-6)}
+                      </a>
+                    </td>
+                    <td className="p-3 text-right">
+                      {r.eth > 0 ? r.eth.toFixed(6) : "—"}
+                    </td>
+                    <td className="p-3 text-right">
+                      {r.wtxc > 0 ? r.wtxc.toFixed(4) : "—"}
+                    </td>
+                    <td className="p-3 text-right">
+                      {r.index === 0 ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <div className="flex gap-1 justify-end flex-wrap">
+                          <button
+                            onClick={() => { setFundTarget({ index: r.index, kind: "wtxc" }); setFundAmount(""); }}
+                            className="text-[9px] font-mono uppercase tracking-widest border border-border px-2 py-1 rounded hover:bg-foreground hover:text-background"
+                          >
+                            Fund wTXC
+                          </button>
+                          <button
+                            onClick={() => { setFundTarget({ index: r.index, kind: "gas" }); setFundAmount(""); }}
+                            className="text-[9px] font-mono uppercase tracking-widest border border-border px-2 py-1 rounded hover:bg-foreground hover:text-background"
+                          >
+                            Fund gas
+                          </button>
+                          <button
+                            disabled={r.wtxc <= 0 || sweep.isPending}
+                            onClick={() => {
+                              if (confirm(`Sweep ${r.wtxc.toFixed(4)} wTXC from #${r.index} → operator?`)) {
+                                sweep.mutate(r.index);
+                              }
+                            }}
+                            className="text-[9px] font-mono uppercase tracking-widest border border-accent bg-accent/10 text-accent px-2 py-1 rounded hover:bg-accent hover:text-background disabled:opacity-30"
+                          >
+                            Sweep wTXC
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="text-[10px] font-mono text-muted-foreground">Loading…</div>
+        )}
+
+        {sweep.data ? (
+          <div className="text-[11px] font-mono mt-2">
+            ✓ Swept {sweep.data.amountWtxc.toFixed(4)} wTXC ·{" "}
+            <a
+              href={`https://etherscan.io/tx/${sweep.data.txid}`}
+              target="_blank"
+              rel="noreferrer"
+              className="underline underline-offset-2"
+            >
+              {sweep.data.txid.slice(0, 12)}…
+            </a>
+          </div>
+        ) : null}
+        {sweep.error ? (
+          <div className="text-[11px] font-mono text-accent mt-2">
+            ✗ Sweep failed: {(sweep.error as Error).message}
+          </div>
+        ) : null}
+      </div>
+
+      {fundTarget ? (
+        <div
+          className="fixed inset-0 bg-background/80 backdrop-blur flex items-center justify-center p-4 z-50"
+          onClick={() => setFundTarget(null)}
+        >
+          <div
+            className="bg-background border border-border rounded-xl p-6 max-w-md w-full space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+              Fund {fundTarget.kind === "wtxc" ? "wTXC" : "ETH gas"} → index #{fundTarget.index}
+            </div>
+            <input
+              autoFocus
+              type="number"
+              step="any"
+              min={0}
+              placeholder={fundTarget.kind === "wtxc" ? "wTXC amount" : "ETH amount"}
+              value={fundAmount}
+              onChange={(e) => setFundAmount(e.target.value)}
+              className="w-full px-3 py-2 bg-secondary/40 border border-border rounded font-mono text-sm"
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setFundTarget(null)}
+                className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-2 rounded hover:bg-foreground hover:text-background"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={fundWtxc.isPending || fundGas.isPending}
+                onClick={() => {
+                  const n = parseFloat(fundAmount);
+                  if (!Number.isFinite(n) || n <= 0) return;
+                  if (fundTarget.kind === "wtxc") {
+                    fundWtxc.mutate({ toIndex: fundTarget.index, amountWtxc: n });
+                  } else {
+                    fundGas.mutate({ toIndex: fundTarget.index, amountEth: n });
+                  }
+                }}
+                className="text-[10px] font-mono uppercase tracking-widest border border-accent bg-accent/10 text-accent px-4 py-2 rounded hover:bg-accent hover:text-background disabled:opacity-50"
+              >
+                {fundWtxc.isPending || fundGas.isPending ? "Sending…" : "Send"}
+              </button>
+            </div>
+            {(fundWtxc.error || fundGas.error) ? (
+              <div className="text-[11px] font-mono text-accent">
+                ✗ {((fundWtxc.error ?? fundGas.error) as Error).message}
+              </div>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -972,271 +1358,10 @@ function TreasuryTab() {
           {(scan.error as Error).message}
         </div>
       ) : null}
-
-      {!data ? (
-        <div className="text-[10px] font-mono text-muted-foreground">Scanning all chains…</div>
-      ) : (
-        <>
-          {/* Admin treasury card */}
-          {admin ? (
-            <div className="border border-accent/40 bg-accent/5 rounded-xl p-5 space-y-3">
-              <div className="flex justify-between items-start gap-3 flex-wrap">
-                <div>
-                  <div className="text-[10px] font-mono uppercase tracking-widest text-accent">
-                    Admin treasury · index #0
-                  </div>
-                  <div className="font-mono text-sm mt-2 break-all">{admin.address}</div>
-                </div>
-                <button
-                  onClick={() => navigator.clipboard.writeText(admin.address)}
-                  className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-1.5 rounded hover:bg-foreground hover:text-background"
-                >
-                  Copy
-                </button>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 pt-2 border-t border-border">
-                {data.chains.map((c) => {
-                  // Pull this address's per-chain row to show its breakdown
-                  // (scan stores one row per chain per address)
-                  const row = data.addresses.find(
-                    (r) => r.index === 0 && r.chain === c.chain,
-                  );
-                  return (
-                    <div key={c.chain} className="text-[10px] font-mono">
-                      <div className="uppercase tracking-widest text-muted-foreground">
-                        {c.chainName}
-                      </div>
-                      <div className="text-muted-foreground">
-                        {(row?.native ?? 0).toFixed(6)} {c.nativeSymbol}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
-
-          {/* Per-chain totals */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            {data.chains.map((c) => (
-              <div key={c.chain} className="bg-secondary/40 border border-border rounded p-4">
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                  {c.chainName}
-                </div>
-                {c.error ? (
-                  <div className="text-[10px] font-mono text-accent mt-1">{c.error}</div>
-                ) : (
-                  <>
-                    <div className="font-mono text-[10px] text-muted-foreground">
-                      {c.totalNative.toFixed(6)} {c.nativeSymbol}
-                    </div>
-                    <div className="font-mono text-[10px] text-muted-foreground">
-                      blk {c.blockNumber} · {c.latencyMs}ms
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Customer slots with funds */}
-          <div>
-            <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-2">
-              Funded customer slots
-            </div>
-            <div className="overflow-x-auto border border-border rounded-xl">
-              <table className="w-full text-xs font-mono">
-                <thead className="bg-secondary/40 text-muted-foreground uppercase tracking-widest text-[10px]">
-                  <tr>
-                    <th className="text-left p-3">#</th>
-                    <th className="text-left p-3">Address</th>
-                    <th className="text-left p-3">Chain</th>
-                    <th className="text-right p-3">Native</th>
-                    <th className="text-left p-3">Linked order</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {customer.map((a) => (
-                    <tr key={`${a.chain}-${a.address}`} className="border-t border-border">
-                      <td className="p-3">{a.index}</td>
-                      <td className="p-3 truncate max-w-[20ch]">{a.address}</td>
-                      <td className="p-3">{a.chainName}</td>
-                      <td className="p-3 text-right">
-                        {a.native > 0 ? `${a.native.toFixed(6)} ${a.nativeSymbol}` : "—"}
-                      </td>
-                      <td className="p-3 text-muted-foreground">{a.linkedOrderId ?? "—"}</td>
-                    </tr>
-                  ))}
-                  {!customer.length ? (
-                    <tr>
-                      <td colSpan={5} className="p-8 text-center text-muted-foreground">
-                        No customer slots currently hold a balance.
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="text-[10px] font-mono text-muted-foreground">
-            Generated {new Date(data.generatedAt).toLocaleTimeString()} ·{" "}
-            {data.scannedAddresses} addresses scanned
-            {data.errors.length ? ` · ${data.errors.join(" · ")}` : ""}
-          </div>
-        </>
-      )}
     </div>
   );
 }
 
-// ===== Wallet Tab =====
-function WalletTab() {
-  const scanFn = useServerFn(adminWalletScan);
-  const [chains, setChains] = useState<string[]>(["ethereum", "bsc"]);
-
-  const scan = useQuery({
-    queryKey: ["admin", "wallet-scan", chains.join(",")],
-    queryFn: () => scanFn({ data: { chains: chains as never } }),
-    refetchInterval: 60_000,
-  });
-
-  const ALL = ["ethereum", "bsc", "base", "arbitrum", "polygon"];
-
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-end flex-wrap gap-3">
-        <div>
-          <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-2">
-            Chains to scan
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            {ALL.map((c) => (
-              <button
-                key={c}
-                onClick={() =>
-                  setChains((prev) =>
-                    prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c],
-                  )
-                }
-                className={`px-2 py-1 text-[10px] font-mono uppercase tracking-widest rounded border ${
-                  chains.includes(c)
-                    ? "bg-accent text-accent-foreground border-accent"
-                    : "border-border hover:border-foreground"
-                }`}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-        </div>
-        <button
-          onClick={() => scan.refetch()}
-          className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-2 rounded hover:bg-foreground hover:text-background"
-        >
-          {scan.isFetching ? "Scanning…" : "Refresh"}
-        </button>
-      </div>
-
-      {scan.data ? (
-        <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {scan.data.chains.map((c) => (
-              <div key={c.chain} className="bg-secondary/40 border border-border rounded p-4">
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                  {c.chainName}
-                </div>
-                {c.error ? (
-                  <div className="text-[10px] font-mono text-accent mt-1">{c.error}</div>
-                ) : (
-                  <>
-                    <div className="font-mono text-[10px] text-muted-foreground mt-1">
-                      {c.totalNative.toFixed(6)} {c.nativeSymbol} · blk {c.blockNumber}
-                    </div>
-                    <div className="font-mono text-[10px] text-muted-foreground">
-                      RPC {c.latencyMs}ms
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className="text-[10px] font-mono text-muted-foreground">
-            Scanned {scan.data.scannedAddresses} of {scan.data.totalAddresses} derived
-            addresses · {scan.data.addresses.length} with funds · generated{" "}
-            {new Date(scan.data.generatedAt).toLocaleTimeString()}
-          </div>
-
-          <div className="overflow-x-auto border border-border rounded-xl">
-            <table className="w-full text-xs font-mono">
-              <thead className="bg-secondary/40 text-muted-foreground uppercase tracking-widest text-[10px]">
-                <tr>
-                  <th className="text-left p-3">#</th>
-                  <th className="text-left p-3">Address</th>
-                  <th className="text-left p-3">Chain</th>
-                  <th className="text-right p-3">Native</th>
-                  <th className="text-left p-3">Tokens</th>
-                  <th className="text-left p-3">Linked order</th>
-                </tr>
-              </thead>
-              <tbody>
-                {scan.data.addresses.map((a) => (
-                  <tr key={`${a.chain}-${a.address}`} className="border-t border-border">
-                    <td className="p-3">{a.index}</td>
-                    <td className="p-3 truncate max-w-[20ch]">{a.address}</td>
-                    <td className="p-3">{a.chainName}</td>
-                    <td className="p-3 text-right">
-                      {a.native > 0 ? `${a.native.toFixed(6)} ${a.nativeSymbol}` : "—"}
-                    </td>
-                    <td className="p-3 text-left">
-                      {a.tokens.some((t) => t.balance > 0) ? (
-                        <div className="text-[10px] text-muted-foreground">
-                          {a.tokens
-                            .filter((t) => t.balance > 0)
-                            .map((t) => `${t.balance.toFixed(2)} ${t.symbol}`)
-                            .join(" · ")}
-                        </div>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="p-3 text-muted-foreground">
-                      {a.linkedOrderId ?? "—"}
-                    </td>
-                  </tr>
-                ))}
-                {!scan.data.addresses.length ? (
-                  <tr>
-                    <td colSpan={6} className="p-8 text-center text-muted-foreground">
-                      No addresses with non-zero balances.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
-
-          {scan.data.errors.length ? (
-            <div className="text-[10px] font-mono text-accent">
-              {scan.data.errors.join(" · ")}
-            </div>
-          ) : null}
-
-          <p className="text-[10px] font-mono text-muted-foreground leading-relaxed">
-            To sweep funds, import the HD mnemonic (env: <code>HD_WALLET_MNEMONIC</code>)
-            into a wallet like Rabby or MetaMask. The app only derives addresses
-            here — it never holds private keys.
-          </p>
-        </>
-      ) : scan.error ? (
-        <div className="text-xs font-mono text-accent">{(scan.error as Error).message}</div>
-      ) : (
-        <div className="text-[10px] font-mono text-muted-foreground">Loading…</div>
-      )}
-    </div>
-  );
-}
 
 // ===== Settings Tab =====
 function SettingsTab() {

@@ -5,11 +5,12 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getBalances, getSpotPrice, submitMarketBuy } from "./bitmart.server";
 import { invalidateChainsCache } from "./chains.server";
-import { getOperatorEvmAddress } from "./bridge-wallet.server";
-import { getWtxcBalance } from "./wtxc.server";
+import { deriveEvmAddress, getOperatorEvmAddress } from "./bridge-wallet.server";
+import { getEthBalance, getWtxcBalance, sendEthFrom, sendWtxc, sendWtxcFrom } from "./wtxc.server";
 import { getSettings, invalidateSettingsCache } from "./settings.server";
 import { getTxcHotAddress, getTxcAddressBalanceSats } from "./txc-sign.server";
 import { scanHdWallet } from "./wallet-scan.server";
+
 
 async function assertAdmin(userId: string) {
   const { data, error } = await supabaseAdmin.rpc("has_role", {
@@ -394,8 +395,31 @@ export const adminHotWalletBalances = createServerFn({ method: "POST" })
         ? { ok: true as const, ...wtxcRes.value }
         : { ok: false as const, error: (wtxcRes.reason as Error)?.message ?? "rpc failed" };
 
+    // Fire-and-forget: record a TXC balance snapshot so we can chart history.
+    // Rate-limited to one row per ~10 minutes to keep the table small.
+    if (txc.ok) {
+      void (async () => {
+        try {
+          const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+          const { data: recent } = await supabaseAdmin
+            .from("txc_balance_snapshots")
+            .select("id")
+            .gt("taken_at", tenMinAgo)
+            .limit(1);
+          if (!recent || recent.length === 0) {
+            await supabaseAdmin
+              .from("txc_balance_snapshots")
+              .insert({ balance_txc: txc.confirmed });
+          }
+        } catch {
+          // best-effort; never fail the balance read on snapshot write
+        }
+      })();
+    }
+
     return { evm, txc, wtxc };
   });
+
 
 
 // ===== Reconciliation =====
@@ -1037,3 +1061,192 @@ export const adminRemoveBlockedAddress = createServerFn({ method: "POST" })
     await audit(context.userId, "blocked_address_remove", { id: data.id });
     return { ok: true as const };
   });
+
+// ===== TXC Wallet =====
+
+// Recent transactions for the TXC hot wallet (Esplora API).
+export const adminTxcTxHistory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ limit: z.number().int().min(1).max(50).default(25) }).parse(input ?? {}),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const address = getTxcHotAddress();
+    const ESPLORA =
+      process.env.TXC_MEMPOOL_URL?.trim() ||
+      "https://api.mempool.texitcoin.org/api/v1";
+    const res = await fetch(`${ESPLORA}/address/${address}/txs`);
+    if (!res.ok) {
+      throw new Error(`Esplora ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    }
+    const txs = (await res.json()) as Array<{
+      txid: string;
+      status: { confirmed: boolean; block_height?: number; block_time?: number };
+      vin: Array<{ prevout?: { scriptpubkey_address?: string; value: number } }>;
+      vout: Array<{ scriptpubkey_address?: string; value: number }>;
+    }>;
+
+    const out = txs.slice(0, data.limit).map((tx) => {
+      const isSpend = tx.vin.some((v) => v.prevout?.scriptpubkey_address === address);
+      const credited = tx.vout
+        .filter((v) => v.scriptpubkey_address === address)
+        .reduce((s, v) => s + v.value, 0);
+      const debited = tx.vin
+        .filter((v) => v.prevout?.scriptpubkey_address === address)
+        .reduce((s, v) => s + (v.prevout?.value ?? 0), 0);
+      const netSats = credited - debited;
+      const counterparty = isSpend
+        ? tx.vout.find((v) => v.scriptpubkey_address && v.scriptpubkey_address !== address)?.scriptpubkey_address ?? null
+        : tx.vin.find((v) => v.prevout?.scriptpubkey_address && v.prevout?.scriptpubkey_address !== address)?.prevout?.scriptpubkey_address ?? null;
+      return {
+        txid: tx.txid,
+        direction: netSats >= 0 ? ("in" as const) : ("out" as const),
+        amountTxc: Math.abs(netSats) / 1e8,
+        counterparty,
+        confirmed: tx.status.confirmed,
+        blockHeight: tx.status.block_height ?? null,
+        blockTime: tx.status.block_time ?? null,
+      };
+    });
+    return { address, txs: out };
+  });
+
+// Balance history snapshots for chart.
+export const adminTxcBalanceHistory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ hours: z.number().int().min(1).max(720).default(168) }).parse(input ?? {}),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const since = new Date(Date.now() - data.hours * 3600 * 1000).toISOString();
+    const { data: rows, error } = await supabaseAdmin
+      .from("txc_balance_snapshots")
+      .select("balance_txc,taken_at")
+      .gt("taken_at", since)
+      .order("taken_at", { ascending: true })
+      .limit(2000);
+    if (error) throw new Error(error.message);
+    return (rows ?? []).map((r) => ({
+      balance: Number(r.balance_txc),
+      takenAt: r.taken_at,
+    }));
+  });
+
+// ===== ETH Wallet: derived-address balances (native + wTXC) =====
+
+export const adminEthDerivedBalances = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ count: z.number().int().min(1).max(50).default(10) }).parse(input ?? {}),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const indices = Array.from({ length: data.count }, (_, i) => i);
+    const rows = await Promise.all(
+      indices.map(async (i) => {
+        const address = deriveEvmAddress(i);
+        const [ethRes, wtxcRes] = await Promise.allSettled([
+          getEthBalance(address),
+          getWtxcBalance(address),
+        ]);
+        return {
+          index: i,
+          address,
+          eth: ethRes.status === "fulfilled" ? ethRes.value.eth : 0,
+          wtxc: wtxcRes.status === "fulfilled" ? wtxcRes.value : 0,
+          error:
+            ethRes.status === "rejected"
+              ? (ethRes.reason as Error).message
+              : wtxcRes.status === "rejected"
+                ? (wtxcRes.reason as Error).message
+                : null,
+        };
+      }),
+    );
+    return { operator: getOperatorEvmAddress(), rows };
+  });
+
+// Sweep the entire wTXC balance from a derived index → operator (index 0).
+export const adminSweepWtxc = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ fromIndex: z.number().int().min(1).max(1000) }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const fromAddress = deriveEvmAddress(data.fromIndex);
+    const toAddress = getOperatorEvmAddress();
+    const balance = await getWtxcBalance(fromAddress);
+    if (balance <= 0) throw new Error(`Index #${data.fromIndex} has no wTXC to sweep`);
+    // Truncate to token precision (8 decimals) to avoid parseUnits rounding above balance.
+    const amount = Math.floor(balance * 1e8) / 1e8;
+    const result = await sendWtxcFrom({
+      fromIndex: data.fromIndex,
+      toAddress,
+      amountWtxc: amount,
+    });
+    await audit(context.userId, "wtxc_sweep", {
+      fromIndex: data.fromIndex,
+      fromAddress,
+      toAddress,
+      amountWtxc: amount,
+      txid: result.txid,
+    });
+    return { ok: true as const, ...result };
+  });
+
+// Fund a derived index with wTXC from the operator (index 0).
+export const adminFundWtxc = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        toIndex: z.number().int().min(1).max(1000),
+        amountWtxc: z.number().positive().max(1_000_000_000),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const toAddress = deriveEvmAddress(data.toIndex);
+    const result = await sendWtxc({ toAddress, amountWtxc: data.amountWtxc });
+    await audit(context.userId, "wtxc_fund", {
+      toIndex: data.toIndex,
+      toAddress,
+      amountWtxc: data.amountWtxc,
+      txid: result.txid,
+    });
+    return { ok: true as const, ...result };
+  });
+
+// Send ETH gas from the operator to a derived index (needed before
+// sweeping wTXC out of that derived index).
+export const adminFundEthGas = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        toIndex: z.number().int().min(1).max(1000),
+        amountEth: z.number().positive().max(10),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const toAddress = deriveEvmAddress(data.toIndex);
+    const result = await sendEthFrom({
+      fromIndex: 0,
+      toAddress,
+      amountEth: data.amountEth,
+    });
+    await audit(context.userId, "eth_gas_fund", {
+      toIndex: data.toIndex,
+      toAddress,
+      amountEth: data.amountEth,
+      txid: result.txid,
+    });
+    return { ok: true as const, ...result };
+  });
+
