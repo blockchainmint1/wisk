@@ -457,7 +457,6 @@ type OrderRowData = {
   status: string;
   source_chain: string;
   source_token: string;
-  source_amount_usd: number;
   dest_address: string;
   dest_asset: string | null;
   quoted_dest_out: number;
