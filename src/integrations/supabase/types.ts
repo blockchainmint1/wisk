@@ -109,6 +109,33 @@ export type Database = {
         }
         Relationships: []
       }
+      blocked_addresses: {
+        Row: {
+          address: string
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          reason: string | null
+        }
+        Insert: {
+          address: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          reason?: string | null
+        }
+        Update: {
+          address?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          reason?: string | null
+        }
+        Relationships: []
+      }
       custom_tokens: {
         Row: {
           address: string
@@ -561,6 +588,7 @@ export type Database = {
         | "failed"
         | "refunded"
         | "sending"
+        | "canceled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -701,6 +729,7 @@ export const Constants = {
         "failed",
         "refunded",
         "sending",
+        "canceled",
       ],
     },
   },
