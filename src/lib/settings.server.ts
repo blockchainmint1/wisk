@@ -48,7 +48,7 @@ export async function getSettings(): Promise<AppSettings> {
   const { data, error } = await supabaseAdmin
     .from("app_settings")
     .select(
-      "premium_bps,expiry_minutes,min_usd,max_usd,paused,paused_reason,notify_min_usd_created,wrap_fee_bps,unwrap_fee_bps,low_txc_threshold,low_wtxc_threshold,payouts_frozen,payouts_frozen_reason,updated_at",
+      "premium_bps,expiry_minutes,min_usd,max_usd,paused,paused_reason,notify_min_usd_created,wrap_fee_bps,unwrap_fee_bps,low_txc_threshold,low_wtxc_threshold,payouts_frozen,payouts_frozen_reason,telegram_chat_id,updated_at",
     )
     .eq("id", 1)
     .maybeSingle();
