@@ -565,7 +565,7 @@ function OrderDetail({ publicId }: { publicId: string }) {
   }
   if (!q.data) return null;
 
-  const { order, deposits, events, audit, bitmartLive, hotBalance } = q.data;
+  const { order, deposits, events, audit, hotBalance } = q.data;
   const asset = order.dest_asset ?? "TXC";
   const explorer = (txid: string) =>
     asset === "wTXC"
