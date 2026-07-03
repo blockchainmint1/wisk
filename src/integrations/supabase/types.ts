@@ -404,6 +404,7 @@ export type Database = {
           error_message: string | null
           expires_at: string
           id: string
+          original_quoted_dest_out: number | null
           paid_amount_usd: number | null
           paid_tx_hash: string | null
           premium_bps: number
@@ -415,6 +416,7 @@ export type Database = {
           source_token: string
           status: Database["public"]["Enums"]["order_status"]
           stuck_notified_at: string | null
+          underpayment_ack: string | null
           updated_at: string
           withdrawal_id: string | null
         }
@@ -434,6 +436,7 @@ export type Database = {
           error_message?: string | null
           expires_at?: string
           id?: string
+          original_quoted_dest_out?: number | null
           paid_amount_usd?: number | null
           paid_tx_hash?: string | null
           premium_bps?: number
@@ -445,6 +448,7 @@ export type Database = {
           source_token: string
           status?: Database["public"]["Enums"]["order_status"]
           stuck_notified_at?: string | null
+          underpayment_ack?: string | null
           updated_at?: string
           withdrawal_id?: string | null
         }
@@ -464,6 +468,7 @@ export type Database = {
           error_message?: string | null
           expires_at?: string
           id?: string
+          original_quoted_dest_out?: number | null
           paid_amount_usd?: number | null
           paid_tx_hash?: string | null
           premium_bps?: number
@@ -475,6 +480,7 @@ export type Database = {
           source_token?: string
           status?: Database["public"]["Enums"]["order_status"]
           stuck_notified_at?: string | null
+          underpayment_ack?: string | null
           updated_at?: string
           withdrawal_id?: string | null
         }
