@@ -131,6 +131,34 @@ function OrderPage() {
   );
   const failed = order.status === "failed" || order.status === "expired";
 
+  // Underpayment prompt: backend flags `underpayment_ack='pending'` when
+  // the paid amount is >0.5% short of the original quote. Ask the user
+  // to top up OR continue with the repriced (smaller) payout.
+  const isTxcSource = order.source_chain === "txc";
+  const feeMul = 1 - Math.abs(Number(order.premium_bps ?? 0)) / 10_000;
+  const paidTxc = feeMul > 0 ? Number(order.quoted_dest_out) / feeMul : 0;
+  const requiredTxc =
+    feeMul > 0 && order.original_quoted_dest_out
+      ? Number(order.original_quoted_dest_out) / feeMul
+      : 0;
+  const shortfallTxc = Math.max(0, requiredTxc - paidTxc);
+  const isUnderpayment =
+    isTxcSource && order.underpayment_ack === "pending" && shortfallTxc > 0;
+
+  const [dismissed, setDismissed] = useState(false);
+  const showUnderpayment = isUnderpayment && !dismissed;
+  const qc = useQueryClient();
+  const acceptFn = useServerFn(acceptUnderpayment);
+  const accept = useMutation({
+    mutationFn: () => acceptFn({ data: { publicId: order.public_id } }),
+    onSuccess: () => {
+      toast.success("Continuing with the amount you sent");
+      setDismissed(true);
+      qc.invalidateQueries({ queryKey: ["order", orderId] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
+
   return (
     <div className="min-h-screen">
       {isEmbed ? <EmbedResize /> : <SiteHeader ticker={<LiveTicker />} />}
