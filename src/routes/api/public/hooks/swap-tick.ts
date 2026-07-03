@@ -324,7 +324,7 @@ async function watchTxcDeposits() {
   const { data: orders } = await supabaseAdmin
     .from("orders")
     .select(
-      "id,public_id,status,source_amount_usd,deposit_address,premium_bps,quoted_dest_out,quoted_dest_per_usd",
+      "id,public_id,status,source_amount_usd,deposit_address,premium_bps,quoted_dest_out,quoted_dest_per_usd,original_quoted_dest_out,underpayment_ack",
     )
     .in("status", ["awaiting_payment", "payment_detected"])
     .eq("source_chain", "txc")
@@ -338,6 +338,8 @@ async function watchTxcDeposits() {
         premium_bps: number;
         quoted_dest_out: number;
         quoted_dest_per_usd: number;
+        original_quoted_dest_out: number | null;
+        underpayment_ack: string | null;
       }>
     >();
   if (!orders?.length) return { detected: 0 };
