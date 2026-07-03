@@ -5,11 +5,12 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getBalances, getSpotPrice, submitMarketBuy } from "./bitmart.server";
 import { invalidateChainsCache } from "./chains.server";
-import { getOperatorEvmAddress } from "./bridge-wallet.server";
-import { getWtxcBalance } from "./wtxc.server";
+import { deriveEvmAddress, getOperatorEvmAddress } from "./bridge-wallet.server";
+import { getEthBalance, getWtxcBalance, sendEthFrom, sendWtxc, sendWtxcFrom } from "./wtxc.server";
 import { getSettings, invalidateSettingsCache } from "./settings.server";
 import { getTxcHotAddress, getTxcAddressBalanceSats } from "./txc-sign.server";
 import { scanHdWallet } from "./wallet-scan.server";
+
 
 async function assertAdmin(userId: string) {
   const { data, error } = await supabaseAdmin.rpc("has_role", {
