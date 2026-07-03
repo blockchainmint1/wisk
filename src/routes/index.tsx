@@ -82,9 +82,8 @@ function HomePage() {
                 How it works
               </a>
             </div>
-            <div className="grid grid-cols-2 gap-4 border-t border-border pt-8">
+            <div className="grid grid-cols-1 gap-4 border-t border-border pt-8">
               <Stat label="Wrap fee" value={wrapPct} sub="TXC → wTXC" />
-              <Stat label="Unwrap fee" value={unwrapPct} sub="wTXC → TXC" />
             </div>
           </div>
 
