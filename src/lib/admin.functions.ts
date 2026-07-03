@@ -729,7 +729,7 @@ export const adminTelegramTest = createServerFn({ method: "POST" })
         },
         body: JSON.stringify({
           chat_id: chatId,
-          text: `🧪 <b>TXC Runner</b> test ping at ${new Date().toISOString()}`,
+          text: `🧪 <b>wTXC Swap</b> test ping at ${new Date().toISOString()}`,
           parse_mode: "HTML",
         }),
       });
