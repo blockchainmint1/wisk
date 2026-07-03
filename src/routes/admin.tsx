@@ -576,7 +576,6 @@ function OrderDetail({ publicId }: { publicId: string }) {
     <div className="p-5 space-y-5">
       {/* Quote */}
       <DetailGrid title="Quote">
-        <KV k="Spot" v={`$${Number(order.bitmart_spot_price ?? 0).toFixed(6)}`} />
         <KV k="Premium" v={`${(order.premium_bps / 100).toFixed(2)}%`} />
         <KV k="Quoted out" v={`${Number(order.quoted_dest_out).toFixed(4)} ${asset}`} />
         <KV k="Expires" v={new Date(order.expires_at).toLocaleString()} />
