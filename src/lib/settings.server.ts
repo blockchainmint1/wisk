@@ -73,6 +73,7 @@ export async function getSettings(): Promise<AppSettings> {
     low_wtxc_threshold?: number | string | null;
     payouts_frozen?: boolean | null;
     payouts_frozen_reason?: string | null;
+    telegram_chat_id?: string | null;
     updated_at: string;
   };
   const value: AppSettings = {
@@ -89,6 +90,7 @@ export async function getSettings(): Promise<AppSettings> {
     low_wtxc_threshold: row.low_wtxc_threshold != null ? Number(row.low_wtxc_threshold) : 10_000,
     payouts_frozen: row.payouts_frozen ?? false,
     payouts_frozen_reason: row.payouts_frozen_reason ?? null,
+    telegram_chat_id: row.telegram_chat_id ?? null,
     updated_at: row.updated_at,
   };
   cache = { value, expires: now + TTL_MS };
