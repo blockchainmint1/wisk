@@ -4,8 +4,20 @@
 // detail panel has a full timeline per order.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getSettings } from "./settings.server";
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/telegram";
+
+async function getTelegramChatId(): Promise<string | undefined> {
+  try {
+    const s = await getSettings();
+    const v = s.telegram_chat_id?.trim();
+    if (v) return v;
+  } catch {
+    /* fall through to env */
+  }
+  return process.env.TELEGRAM_CHAT_ID;
+}
 
 export type OrderNotifyEvent =
   | "created"
