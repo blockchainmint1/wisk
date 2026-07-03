@@ -594,8 +594,9 @@ function OrderDetail({ publicId }: { publicId: string }) {
 
       {/* Deposit */}
       <DetailGrid title="Deposit">
-        <KV k="Address" v={order.deposit_address} mono />
-        <KV k="Tx hash" v={order.paid_tx_hash ?? "—"} mono />
+        <KV k="From" v={firstDeposit?.from_address ?? "—"} mono />
+        <KV k="To" v={firstDeposit?.to_address ?? order.deposit_address} mono />
+        <KV k="Tx hash" v={firstDeposit?.tx_hash ?? order.paid_tx_hash ?? "—"} mono />
         <KV
           k="Received"
           v={
