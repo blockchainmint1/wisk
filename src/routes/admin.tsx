@@ -751,6 +751,13 @@ function TreasuryTab() {
     refetchInterval: 60_000,
   });
 
+  const hotFn = useServerFn(adminHotWalletBalances);
+  const hot = useQuery({
+    queryKey: ["admin", "hot-wallet-balances"],
+    queryFn: () => hotFn({}),
+    refetchInterval: 60_000,
+  });
+
   const [bulkAmount, setBulkAmount] = useState("");
   const bulkBuy = useMutation({
     mutationFn: (notionalUsdt: number) => bulkBuyFn({ data: { notionalUsdt } }),
