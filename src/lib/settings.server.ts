@@ -16,6 +16,7 @@ export interface AppSettings {
   low_wtxc_threshold: number;
   payouts_frozen: boolean;
   payouts_frozen_reason: string | null;
+  telegram_chat_id: string | null;
   updated_at: string;
 }
 
