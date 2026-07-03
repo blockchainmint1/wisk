@@ -203,7 +203,7 @@ export async function notifyOrderEvent(
 ): Promise<void> {
   const lovableKey = process.env.LOVABLE_API_KEY;
   const telegramKey = process.env.TELEGRAM_API_KEY;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const chatId = await getTelegramChatId();
 
   const balance = await getHotBalance(order);
 
