@@ -117,8 +117,8 @@ function HomePage() {
             />
             <Principle
               n="02"
-              title={`Wrap ${wrapLabel}. Unwrap ${unwrapLabel}.`}
-              body={`Wrapping charges ${wrapPct} and unwrapping charges ${unwrapPct}. That's the bridge's only ongoing cost, and it funds continued operation.`}
+              title={`Wrap ${wrapLabel}.`}
+              body={`Wrapping charges ${wrapPct}. That's the bridge's only ongoing cost, and it funds continued operation.`}
             />
           </div>
         </section>
