@@ -812,7 +812,7 @@ function TreasuryTab() {
               <p className="text-[11px] font-mono text-muted-foreground mt-2 max-w-xl leading-relaxed">
                 Sum of TXC sent to customers minus TXC re-bought on Bitmart.
                 Small market buys can partially cancel when the remainder drops
-                under Bitmart's ~5 USDT minimum — those gaps land here.
+                under Bitmart's minimum — those gaps land here.
               </p>
             </div>
             <button
@@ -823,7 +823,7 @@ function TreasuryTab() {
             </button>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div className="bg-background/60 border border-border rounded-lg p-3">
               <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
                 TXC sold
@@ -838,34 +838,19 @@ function TreasuryTab() {
                 TXC bought
               </div>
               <div className="font-mono text-xl mt-1">{debt.data.txcBought.toFixed(4)}</div>
-              <div className="text-[10px] font-mono text-muted-foreground">
-                ${debt.data.usdtSpent.toFixed(2)} spent
-              </div>
             </div>
             <div className="bg-accent/10 border border-accent/40 rounded-lg p-3">
               <div className="text-[10px] font-mono uppercase tracking-widest text-accent">
                 Outstanding
               </div>
               <div className="font-mono text-xl mt-1">{debt.data.txcDebt.toFixed(4)} TXC</div>
-              <div className="text-[10px] font-mono text-muted-foreground">
-                ≈ ${debt.data.estUsdtToSquareUp.toFixed(2)} @ ${debt.data.spotPrice.toFixed(6)}
-              </div>
-            </div>
-            <div className="bg-background/60 border border-border rounded-lg p-3">
-              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                Customer USD in
-              </div>
-              <div className="font-mono text-xl mt-1">${debt.data.usdtTakenIn.toFixed(2)}</div>
-              <div className="text-[10px] font-mono text-muted-foreground">
-                {debt.data.pendingBuys} buys pending
-              </div>
             </div>
           </div>
 
           <div className="flex items-end gap-2 flex-wrap pt-2 border-t border-border">
             <div className="flex-1 min-w-[180px]">
               <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                Square-up market buy (USDT)
+                Square-up market buy
               </label>
               <input
                 type="number"
@@ -874,7 +859,6 @@ function TreasuryTab() {
                 step={1}
                 value={bulkAmount}
                 onChange={(e) => setBulkAmount(e.target.value)}
-                placeholder={debt.data.estUsdtToSquareUp.toFixed(2)}
                 className="w-full mt-1 px-3 py-2 bg-background border border-border rounded font-mono text-sm"
               />
             </div>
