@@ -632,6 +632,63 @@ async function pollBitmartFillsDecoupled() {
 }
 
 
+/**
+ * Read hot-wallet balances (TXC + wTXC) each tick; fire a deduped admin
+ * Telegram alert when either drops below its configured floor. Thresholds
+ * are env-configurable so we can tune without a deploy:
+ *   TELEGRAM_LOW_TXC_THRESHOLD   (default 1000 TXC)
+ *   TELEGRAM_LOW_WTXC_THRESHOLD  (default 1000 wTXC)
+ * sendAdminAlert has a 15-min cooldown per (title, dedupeKey), so a
+ * sustained low balance produces at most 4 pings/hr per asset.
+ */
+async function checkHotBalances(): Promise<{ txc: number | null; wtxc: number | null }> {
+  const txcFloor = Number(process.env.TELEGRAM_LOW_TXC_THRESHOLD ?? 1000);
+  const wtxcFloor = Number(process.env.TELEGRAM_LOW_WTXC_THRESHOLD ?? 1000);
+  const out: { txc: number | null; wtxc: number | null } = { txc: null, wtxc: null };
+
+  try {
+    const { getTxcHotAddress, getTxcAddressBalanceSats } = await import(
+      "@/lib/txc-sign.server"
+    );
+    const address = getTxcHotAddress();
+    const { confirmed, unconfirmed } = await getTxcAddressBalanceSats(address);
+    const confirmedTxc = confirmed / 1e8;
+    const pendingTxc = unconfirmed / 1e8;
+    out.txc = confirmedTxc;
+    if (confirmedTxc < txcFloor) {
+      void sendAdminAlert(
+        "⚠️ TXC hot wallet low",
+        `Balance: ${confirmedTxc.toFixed(4)} TXC` +
+          (pendingTxc ? ` (+${pendingTxc.toFixed(4)} pending)` : "") +
+          `\nFloor: ${txcFloor} TXC\nAddress: ${address}\nRecharge to keep payouts flowing.`,
+        "low-txc",
+      );
+    }
+  } catch (e) {
+    console.warn("[check-hot-balances] TXC read failed", e);
+  }
+
+  try {
+    const { getOperatorEvmAddress } = await import("@/lib/bridge-wallet.server");
+    const { getWtxcBalance } = await import("@/lib/wtxc.server");
+    const address = getOperatorEvmAddress();
+    const balance = await getWtxcBalance(address);
+    out.wtxc = balance;
+    if (balance < wtxcFloor) {
+      void sendAdminAlert(
+        "⚠️ wTXC operator wallet low",
+        `Balance: ${balance.toFixed(4)} wTXC\nFloor: ${wtxcFloor} wTXC\nAddress: ${address}\nWrap more TXC to keep payouts flowing.`,
+        "low-wtxc",
+      );
+    }
+  } catch (e) {
+    console.warn("[check-hot-balances] wTXC read failed", e);
+  }
+
+  return out;
+}
+
+
 export const Route = createFileRoute("/api/public/hooks/swap-tick")({
   server: {
     handlers: {
