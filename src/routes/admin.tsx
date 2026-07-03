@@ -1083,10 +1083,6 @@ function WalletTab() {
                   <div className="text-[10px] font-mono text-accent mt-1">{c.error}</div>
                 ) : (
                   <>
-                    <div className="font-mono text-sm mt-1">
-                      ${c.totalStableUsd.toFixed(2)}{" "}
-                      <span className="text-muted-foreground text-[10px]">stables</span>
-                    </div>
                     <div className="font-mono text-[10px] text-muted-foreground mt-1">
                       {c.totalNative.toFixed(6)} {c.nativeSymbol} · blk {c.blockNumber}
                     </div>
