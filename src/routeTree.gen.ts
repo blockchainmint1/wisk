@@ -22,6 +22,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SwapIndexRouteImport } from './routes/swap.index'
 import { Route as SwapOrderIdRouteImport } from './routes/swap.$orderId'
+import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/email/queue/process'
 import { Route as ApiPublicHooksSwapTickRouteImport } from './routes/api/public/hooks/swap-tick'
 
 const TermsRoute = TermsRouteImport.update({
@@ -89,6 +90,12 @@ const SwapOrderIdRoute = SwapOrderIdRouteImport.update({
   path: '/$orderId',
   getParentRoute: () => SwapRoute,
 } as any)
+const LovableEmailQueueProcessRoute =
+  LovableEmailQueueProcessRouteImport.update({
+    id: '/lovable/email/queue/process',
+    path: '/lovable/email/queue/process',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksSwapTickRoute = ApiPublicHooksSwapTickRouteImport.update({
   id: '/api/public/hooks/swap-tick',
   path: '/api/public/hooks/swap-tick',
@@ -110,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/swap/$orderId': typeof SwapOrderIdRoute
   '/swap/': typeof SwapIndexRoute
   '/api/public/hooks/swap-tick': typeof ApiPublicHooksSwapTickRoute
+  '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -125,6 +133,7 @@ export interface FileRoutesByTo {
   '/swap/$orderId': typeof SwapOrderIdRoute
   '/swap': typeof SwapIndexRoute
   '/api/public/hooks/swap-tick': typeof ApiPublicHooksSwapTickRoute
+  '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -142,6 +151,7 @@ export interface FileRoutesById {
   '/swap/$orderId': typeof SwapOrderIdRoute
   '/swap/': typeof SwapIndexRoute
   '/api/public/hooks/swap-tick': typeof ApiPublicHooksSwapTickRoute
+  '/lovable/email/queue/process': typeof LovableEmailQueueProcessRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -160,6 +170,7 @@ export interface FileRouteTypes {
     | '/swap/$orderId'
     | '/swap/'
     | '/api/public/hooks/swap-tick'
+    | '/lovable/email/queue/process'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -175,6 +186,7 @@ export interface FileRouteTypes {
     | '/swap/$orderId'
     | '/swap'
     | '/api/public/hooks/swap-tick'
+    | '/lovable/email/queue/process'
   id:
     | '__root__'
     | '/'
@@ -191,6 +203,7 @@ export interface FileRouteTypes {
     | '/swap/$orderId'
     | '/swap/'
     | '/api/public/hooks/swap-tick'
+    | '/lovable/email/queue/process'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -206,6 +219,7 @@ export interface RootRouteChildren {
   SwapRoute: typeof SwapRouteWithChildren
   TermsRoute: typeof TermsRoute
   ApiPublicHooksSwapTickRoute: typeof ApiPublicHooksSwapTickRoute
+  LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -301,6 +315,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SwapOrderIdRouteImport
       parentRoute: typeof SwapRoute
     }
+    '/lovable/email/queue/process': {
+      id: '/lovable/email/queue/process'
+      path: '/lovable/email/queue/process'
+      fullPath: '/lovable/email/queue/process'
+      preLoaderRoute: typeof LovableEmailQueueProcessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/swap-tick': {
       id: '/api/public/hooks/swap-tick'
       path: '/api/public/hooks/swap-tick'
@@ -336,17 +357,8 @@ const rootRouteChildren: RootRouteChildren = {
   SwapRoute: SwapRouteWithChildren,
   TermsRoute: TermsRoute,
   ApiPublicHooksSwapTickRoute: ApiPublicHooksSwapTickRoute,
+  LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
