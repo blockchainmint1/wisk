@@ -751,6 +751,13 @@ function TreasuryTab() {
     refetchInterval: 60_000,
   });
 
+  const hotFn = useServerFn(adminHotWalletBalances);
+  const hot = useQuery({
+    queryKey: ["admin", "hot-wallet-balances"],
+    queryFn: () => hotFn({}),
+    refetchInterval: 60_000,
+  });
+
   const [bulkAmount, setBulkAmount] = useState("");
   const bulkBuy = useMutation({
     mutationFn: (notionalUsdt: number) => bulkBuyFn({ data: { notionalUsdt } }),
@@ -772,20 +779,63 @@ function TreasuryTab() {
             Treasury
           </div>
           <p className="text-xs font-mono text-muted-foreground mt-2 max-w-xl leading-relaxed">
-            Live balances across every xpub-derived receive address. Index{" "}
-            <span className="text-foreground">#0</span> is the admin treasury;
-            customer deposits rotate through index #1+.
+            Live balances across the TXC hot wallet and every xpub-derived EVM
+            receive address. Index <span className="text-foreground">#0</span> is the admin
+            treasury; customer deposits rotate through index #1+.
           </p>
         </div>
         <button
-          onClick={() => scan.refetch()}
+          onClick={() => { scan.refetch(); hot.refetch(); }}
           className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-2 rounded hover:bg-foreground hover:text-background"
         >
-          {scan.isFetching ? "Scanning…" : "Refresh"}
+          {scan.isFetching || hot.isFetching ? "Scanning…" : "Refresh"}
         </button>
       </div>
 
-      {/* Reconciliation — are we holding the cash we should? */}
+      {/* TXC hot wallet treasury address */}
+      {(() => {
+        const txc = hot.data?.txc;
+        if (!txc || txc.ok === false) {
+          return txc?.ok === false ? (
+            <div className="text-xs font-mono text-accent">TXC hot wallet: {txc.error}</div>
+          ) : (
+            <div className="text-[10px] font-mono text-muted-foreground">Loading TXC treasury…</div>
+          );
+        }
+        return (
+          <div className="border border-accent/40 bg-accent/5 rounded-xl p-5 space-y-3">
+            <div className="flex justify-between items-start gap-3 flex-wrap">
+              <div>
+                <div className="text-[10px] font-mono uppercase tracking-widest text-accent">
+                  TXC treasury · hot wallet
+                </div>
+                <div className="font-mono text-sm mt-2 break-all">{txc.address}</div>
+              </div>
+              <button
+                onClick={() => navigator.clipboard.writeText(txc.address)}
+                className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-1.5 rounded hover:bg-foreground hover:text-background"
+              >
+                Copy
+              </button>
+            </div>
+            <div className="pt-2 border-t border-border">
+              <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                Balance
+              </div>
+              <div className="font-mono text-lg mt-1">
+                {txc.confirmed.toFixed(4)} TXC
+                {txc.unconfirmed ? (
+                  <span className="text-muted-foreground text-sm">
+                    {" "}(+{txc.unconfirmed.toFixed(4)} pending)
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Reconciliation — asset debt */}
       {reconcile.data ? (
         <ReconcilePanel data={reconcile.data} onRefetch={() => reconcile.refetch()} loading={reconcile.isFetching} />
       ) : reconcile.error ? (
