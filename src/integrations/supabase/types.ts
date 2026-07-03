@@ -60,6 +60,8 @@ export type Database = {
           notify_min_usd_created: number
           paused: boolean
           paused_reason: string | null
+          payouts_frozen: boolean
+          payouts_frozen_reason: string | null
           premium_bps: number
           unwrap_fee_bps: number
           updated_at: string
@@ -76,6 +78,8 @@ export type Database = {
           notify_min_usd_created?: number
           paused?: boolean
           paused_reason?: string | null
+          payouts_frozen?: boolean
+          payouts_frozen_reason?: string | null
           premium_bps?: number
           unwrap_fee_bps?: number
           updated_at?: string
@@ -92,6 +96,8 @@ export type Database = {
           notify_min_usd_created?: number
           paused?: boolean
           paused_reason?: string | null
+          payouts_frozen?: boolean
+          payouts_frozen_reason?: string | null
           premium_bps?: number
           unwrap_fee_bps?: number
           updated_at?: string

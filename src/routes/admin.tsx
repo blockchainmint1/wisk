@@ -1243,6 +1243,8 @@ function SettingsTab() {
     notify_min_usd_created: number;
     low_txc_threshold: number;
     low_wtxc_threshold: number;
+    payouts_frozen: boolean;
+    payouts_frozen_reason: string;
   }>(null);
 
   useEffect(() => {
@@ -1257,6 +1259,9 @@ function SettingsTab() {
         notify_min_usd_created: Number(settings.data.notify_min_usd_created),
         low_txc_threshold: Number(settings.data.low_txc_threshold ?? 10_000),
         low_wtxc_threshold: Number(settings.data.low_wtxc_threshold ?? 10_000),
+        payouts_frozen: Boolean((settings.data as { payouts_frozen?: boolean }).payouts_frozen),
+        payouts_frozen_reason:
+          (settings.data as { payouts_frozen_reason?: string | null }).payouts_frozen_reason ?? "",
       });
     }
   }, [settings.data, form]);
@@ -1267,6 +1272,7 @@ function SettingsTab() {
         data: {
           ...form!,
           paused_reason: form!.paused_reason.trim() || null,
+          payouts_frozen_reason: form!.payouts_frozen_reason.trim() || null,
         },
       }),
     onSuccess: () => {
@@ -1320,6 +1326,29 @@ function SettingsTab() {
               placeholder="Reason shown to users…"
               value={form.paused_reason}
               onChange={(e) => set("paused_reason", e.target.value)}
+              className="mt-2 w-full bg-background border border-border rounded p-2 font-mono text-sm"
+            />
+          ) : null}
+        </Field>
+        <Field label="Freeze payouts (halt all outbound sends)">
+          <label className="flex items-center gap-2 mt-2">
+            <input
+              type="checkbox"
+              checked={form.payouts_frozen}
+              onChange={(e) => set("payouts_frozen", e.target.checked)}
+            />
+            <span className="text-sm font-mono">
+              {form.payouts_frozen
+                ? "FROZEN — confirmed orders stay queued, no funds leave the wallet"
+                : "Payouts flowing"}
+            </span>
+          </label>
+          {form.payouts_frozen ? (
+            <input
+              type="text"
+              placeholder="Reason (internal, shown in logs)…"
+              value={form.payouts_frozen_reason}
+              onChange={(e) => set("payouts_frozen_reason", e.target.value)}
               className="mt-2 w-full bg-background border border-border rounded p-2 font-mono text-sm"
             />
           ) : null}

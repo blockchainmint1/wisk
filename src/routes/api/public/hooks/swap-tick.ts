@@ -479,6 +479,17 @@ async function watchTxcDeposits() {
  * in the background after the customer is paid.
  */
 async function settleConfirmed() {
+  // Kill-switch: admin-controlled freeze halts ALL outbound customer payouts.
+  // Orders stay in `confirmed` and resume on the next tick after unfreezing.
+  const settings = await getSettings();
+  if (settings.payouts_frozen) {
+    console.warn(
+      "[settle] payouts frozen — skipping",
+      settings.payouts_frozen_reason ?? "(no reason set)",
+    );
+    return { sent: 0, queuedForBitmart: 0, frozen: true as const };
+  }
+
   const { data: orders } = await supabaseAdmin
     .from("orders")
     .select("id,public_id,quoted_dest_out,dest_address,dest_asset,paid_amount_usd")
