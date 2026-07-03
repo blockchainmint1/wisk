@@ -950,9 +950,6 @@ function BalanceSparkline({ points }: { points: Array<{ balance: number; takenAt
 // ===== ETH Wallet Tab =====
 function EthWalletTab() {
   const scanFn = useServerFn(adminWalletScan);
-  const debtFn = useServerFn(adminTreasuryDebt);
-  const bulkBuyFn = useServerFn(adminBulkReplenish);
-  const reconcileFn = useServerFn(adminReconcile);
   const derivedFn = useServerFn(adminEthDerivedBalances);
   const sweepFn = useServerFn(adminSweepWtxc);
   const fundWtxcFn = useServerFn(adminFundWtxc);
@@ -967,29 +964,10 @@ function EthWalletTab() {
     queryFn: () => scanFn({ data: { chains: ALL_CHAINS as unknown as never } }),
     refetchInterval: 60_000,
   });
-  const debt = useQuery({
-    queryKey: ["admin", "treasury-debt"],
-    queryFn: () => debtFn(),
-    refetchInterval: 30_000,
-  });
-  const reconcile = useQuery({
-    queryKey: ["admin", "reconcile"],
-    queryFn: () => reconcileFn({}),
-    refetchInterval: 60_000,
-  });
   const derived = useQuery({
     queryKey: ["admin", "eth-derived", derivedCount],
     queryFn: () => derivedFn({ data: { count: derivedCount } }),
     refetchInterval: 60_000,
-  });
-
-  const [bulkAmount, setBulkAmount] = useState("");
-  const bulkBuy = useMutation({
-    mutationFn: (notionalUsdt: number) => bulkBuyFn({ data: { notionalUsdt } }),
-    onSuccess: () => {
-      setBulkAmount("");
-      qc.invalidateQueries({ queryKey: ["admin", "treasury-debt"] });
-    },
   });
 
   const sweep = useMutation({
@@ -999,6 +977,27 @@ function EthWalletTab() {
 
   const [fundTarget, setFundTarget] = useState<{ index: number; kind: "wtxc" | "gas" } | null>(null);
   const [fundAmount, setFundAmount] = useState("");
+  const fundWtxc = useMutation({
+    mutationFn: (v: { toIndex: number; amountWtxc: number }) => fundWtxcFn({ data: v }),
+    onSuccess: () => {
+      setFundTarget(null);
+      setFundAmount("");
+      qc.invalidateQueries({ queryKey: ["admin", "eth-derived"] });
+    },
+  });
+  const fundGas = useMutation({
+    mutationFn: (v: { toIndex: number; amountEth: number }) => fundGasFn({ data: v }),
+    onSuccess: () => {
+      setFundTarget(null);
+      setFundAmount("");
+      qc.invalidateQueries({ queryKey: ["admin", "eth-derived"] });
+    },
+  });
+
+  const data = scan.data;
+  const admin = data?.addresses.find((a) => a.index === 0) ?? null;
+
+  return (
   const fundWtxc = useMutation({
     mutationFn: (v: { toIndex: number; amountWtxc: number }) => fundWtxcFn({ data: v }),
     onSuccess: () => {
