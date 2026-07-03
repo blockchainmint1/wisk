@@ -192,7 +192,7 @@ export const getOrder = createServerFn({ method: "POST" })
     const { data: order, error } = await supabaseAdmin
       .from("orders")
       .select(
-        "public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_asset,dest_address,quoted_dest_out,quoted_dest_per_usd,premium_bps,bitmart_spot_price,created_at,expires_at,paid_tx_hash,paid_amount_usd,bitmart_avg_price,bitmart_filled_dest,dest_tx_hash,error_message",
+        "id,public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_asset,dest_address,quoted_dest_out,quoted_dest_per_usd,premium_bps,bitmart_spot_price,created_at,expires_at,paid_tx_hash,paid_amount_usd,bitmart_avg_price,bitmart_filled_dest,dest_tx_hash,error_message,original_quoted_dest_out,underpayment_ack",
       )
       .eq("public_id", data.publicId)
       .maybeSingle();
