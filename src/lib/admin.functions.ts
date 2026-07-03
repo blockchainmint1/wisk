@@ -548,8 +548,7 @@ export const adminUpdateSettings = createServerFn({ method: "POST" })
     }
     const { error } = await supabaseAdmin
       .from("app_settings")
-      .update({ ...data, updated_by: context.userId })
-      .eq("id", 1);
+      .upsert({ id: 1, ...data, updated_by: context.userId }, { onConflict: "id" });
     if (error) throw new Error(error.message);
     invalidateSettingsCache();
     await audit(context.userId, "settings_update", data);
