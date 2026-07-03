@@ -390,7 +390,7 @@ function OrdersTab() {
               ))}
             {!filteredOrders.length && !orders.isLoading ? (
               <tr>
-                <td colSpan={10} className="p-8 text-center text-muted-foreground">
+                <td colSpan={9} className="p-8 text-center text-muted-foreground">
                   No orders match this filter.
                 </td>
               </tr>
