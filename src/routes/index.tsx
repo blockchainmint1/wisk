@@ -103,7 +103,20 @@ function HomePage() {
             <Principle
               n="01"
               title="One custodian, no smart-contract magic."
-              body="TXC you send is held 1:1 in the operator wallet. wTXC (0x9FC6…bb88) is issued against it. Low-tech, auditable, boring on purpose."
+              body={
+                <>
+                  TXC you send is held 1:1 in the operator wallet.{" "}
+                  <a
+                    href="https://texitcoin.org/wtxc"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-foreground underline hover:text-accent transition-colors"
+                  >
+                    wTXC (0x9FC6…bb88)
+                  </a>{" "}
+                  is issued against it. Low-tech, auditable, boring on purpose.
+                </>
+              }
             />
             <Principle
               n="02"
