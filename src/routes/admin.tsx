@@ -357,7 +357,6 @@ function OrdersTab() {
               <th className="text-left p-3">Order</th>
               <th className="text-left p-3">Status</th>
               <th className="text-left p-3">Source</th>
-              <th className="text-right p-3">USD</th>
               <th className="text-right p-3">TXC</th>
               <th className="text-right p-3">wTXC</th>
               <th className="text-left p-3">Dest</th>
