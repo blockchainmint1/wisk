@@ -53,6 +53,8 @@ export type Database = {
         Row: {
           expiry_minutes: number
           id: number
+          low_txc_threshold: number
+          low_wtxc_threshold: number
           max_usd: number
           min_usd: number
           notify_min_usd_created: number
@@ -67,6 +69,8 @@ export type Database = {
         Insert: {
           expiry_minutes?: number
           id?: number
+          low_txc_threshold?: number
+          low_wtxc_threshold?: number
           max_usd?: number
           min_usd?: number
           notify_min_usd_created?: number
@@ -81,6 +85,8 @@ export type Database = {
         Update: {
           expiry_minutes?: number
           id?: number
+          low_txc_threshold?: number
+          low_wtxc_threshold?: number
           max_usd?: number
           min_usd?: number
           notify_min_usd_created?: number
