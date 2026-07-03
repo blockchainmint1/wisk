@@ -44,8 +44,8 @@ export function SwapForm({ compact = false }: { compact?: boolean }) {
   });
 
   const txcPriceUsd = quote?.ok ? quote.spotPriceUsd : null;
-  const unwrapFeeBps = quote?.ok ? (quote.unwrapFeeBps ?? 100) : 100;
-  const wrapFeeBps = quote?.ok ? (quote.wrapFeeBps ?? 0) : 0;
+  const unwrapFeeBps = quote?.ok ? (quote.unwrapFeeBps ?? 0) : 0;
+  const wrapFeeBps = quote?.ok ? (quote.wrapFeeBps ?? 500) : 500;
   const unwrapFeePct = unwrapFeeBps / 100;
   const wrapFeePct = wrapFeeBps / 100;
 
