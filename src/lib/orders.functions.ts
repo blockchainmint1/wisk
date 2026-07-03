@@ -91,6 +91,19 @@ export const createOrder = createServerFn({ method: "POST" })
       throw new Error(`Maximum order is $${settings.max_usd.toLocaleString()}`);
     }
 
+    // Blocked-address check — reject if destination wallet is on the blacklist.
+    // Compared case-insensitively (EVM addresses stored lowercased).
+    const destAddrNorm = data.destAddress.trim().toLowerCase();
+    const { data: blocked } = await supabaseAdmin
+      .from("blocked_addresses")
+      .select("address,reason")
+      .eq("address", destAddrNorm)
+      .maybeSingle();
+    if (blocked) {
+      throw new Error("This wallet address cannot be used for new orders.");
+    }
+
+
     // Quote calculation:
     //  - Wrap (source = native TXC → dest = wTXC): 1 TXC = (1 - wrap fee) wTXC.
     //  - Bridge unwrap (source = wTXC → dest = TXC): 1 wTXC = (1 - unwrap fee) TXC.
