@@ -10,8 +10,11 @@ import {
   adminAddBlockedAddress,
   adminAuditLog,
   adminBulkReplenish,
+  adminEthDerivedBalances,
   adminForceComplete,
   adminForceFail,
+  adminFundEthGas,
+  adminFundWtxc,
   adminGetSettings,
   adminHotWalletBalances,
   adminInviteAdmin,
@@ -25,11 +28,15 @@ import {
   adminOrderDetail,
   adminRetryOrder,
   adminRevokeAdmin,
+  adminSweepWtxc,
   adminTelegramTest,
   adminTreasuryDebt,
+  adminTxcBalanceHistory,
+  adminTxcTxHistory,
   adminUpdateSettings,
   adminWalletScan,
 } from "@/lib/admin.functions";
+
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
