@@ -983,3 +983,55 @@ export const adminDeleteCustomToken = createServerFn({ method: "POST" })
     await audit(context.userId, "custom_token_delete", { id: data.id });
     return { ok: true as const };
   });
+
+// ===== Blocklist =====
+export const adminListBlockedAddresses = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context.userId);
+    const { data, error } = await supabaseAdmin
+      .from("blocked_addresses")
+      .select("id,address,reason,notes,created_at")
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const adminAddBlockedAddress = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        address: z.string().trim().min(20).max(120),
+        reason: z.string().trim().max(280).optional(),
+        notes: z.string().trim().max(2000).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const address = data.address.toLowerCase();
+    const { error } = await supabaseAdmin.from("blocked_addresses").insert({
+      address,
+      reason: data.reason || null,
+      notes: data.notes || null,
+      created_by: context.userId,
+    });
+    if (error) throw new Error(error.message);
+    await audit(context.userId, "blocked_address_add", { address });
+    return { ok: true as const };
+  });
+
+export const adminRemoveBlockedAddress = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { error } = await supabaseAdmin
+      .from("blocked_addresses")
+      .delete()
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    await audit(context.userId, "blocked_address_remove", { id: data.id });
+    return { ok: true as const };
+  });
