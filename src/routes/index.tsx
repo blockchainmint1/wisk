@@ -69,8 +69,7 @@ function HomePage() {
               TXC ↔ wTXC bridge
             </div>
             <h1 className="text-6xl md:text-7xl font-extrabold tracking-tighter leading-none mb-6 text-balance">
-              THE <span className="text-accent underline decoration-4 underline-offset-8">BRIDGE</span> <br />
-              FOR wTXC.
+              Swap TXC, wTXC, and stables.
             </h1>
             <p className="text-lg text-muted-foreground max-w-[46ch] font-medium leading-relaxed text-balance">
               Move native TXC onto Ethereum as wTXC, or bring it home again. Custodial, fast, and settled straight to your wallet.
