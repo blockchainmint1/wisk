@@ -247,3 +247,25 @@ export const listChainOptions = createServerFn({ method: "GET" }).handler(async 
     tokens: c.tokens.map((t) => ({ symbol: t.symbol, isNative: !!t.isNative })),
   }));
 });
+
+const AcceptUnderpaymentInput = z.object({ publicId: z.string().min(3).max(40) });
+
+/**
+ * Customer chose "continue with what I sent" from the underpayment prompt.
+ * Flips underpayment_ack from 'pending' → 'accepted' so the next tick
+ * advances the order to `confirmed` and pays out the repriced amount.
+ * Public (no auth) — keyed by the unguessable public order id.
+ */
+export const acceptUnderpayment = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => AcceptUnderpaymentInput.parse(input))
+  .handler(async ({ data }) => {
+    const { data: updated, error } = await supabaseAdmin
+      .from("orders")
+      .update({ underpayment_ack: "accepted" })
+      .eq("public_id", data.publicId)
+      .eq("underpayment_ack", "pending")
+      .select("id")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return { ok: !!updated };
+  });
