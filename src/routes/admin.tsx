@@ -984,7 +984,6 @@ function TreasuryTab() {
                     <th className="text-left p-3">#</th>
                     <th className="text-left p-3">Address</th>
                     <th className="text-left p-3">Chain</th>
-                    <th className="text-right p-3">Stables (USD)</th>
                     <th className="text-right p-3">Native</th>
                     <th className="text-left p-3">Linked order</th>
                   </tr>
@@ -996,9 +995,6 @@ function TreasuryTab() {
                       <td className="p-3 truncate max-w-[20ch]">{a.address}</td>
                       <td className="p-3">{a.chainName}</td>
                       <td className="p-3 text-right">
-                        {a.totalUsd > 0 ? `$${a.totalUsd.toFixed(2)}` : "—"}
-                      </td>
-                      <td className="p-3 text-right">
                         {a.native > 0 ? `${a.native.toFixed(6)} ${a.nativeSymbol}` : "—"}
                       </td>
                       <td className="p-3 text-muted-foreground">{a.linkedOrderId ?? "—"}</td>
@@ -1006,7 +1002,7 @@ function TreasuryTab() {
                   ))}
                   {!customer.length ? (
                     <tr>
-                      <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                      <td colSpan={5} className="p-8 text-center text-muted-foreground">
                         No customer slots currently hold a balance.
                       </td>
                     </tr>
