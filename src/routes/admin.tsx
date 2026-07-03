@@ -9,7 +9,6 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   adminAddBlockedAddress,
   adminAuditLog,
-  adminBulkReplenish,
   adminEthDerivedBalances,
   adminForceComplete,
   adminForceFail,
@@ -21,7 +20,6 @@ import {
   adminListAdmins,
   adminListBlockedAddresses,
   adminListOrders,
-  adminReconcile,
   adminRemoveBlockedAddress,
   adminSearchOrders,
 
@@ -30,7 +28,6 @@ import {
   adminRevokeAdmin,
   adminSweepWtxc,
   adminTelegramTest,
-  adminTreasuryDebt,
   adminTxcBalanceHistory,
   adminTxcTxHistory,
   adminUpdateSettings,
