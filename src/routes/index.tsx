@@ -2,21 +2,34 @@ import { createFileRoute } from "@tanstack/react-router";
 import { LiveTicker } from "@/components/live-ticker";
 import { SiteFooter, SiteHeader } from "@/components/site-shell";
 import { SwapForm } from "@/components/swap-form";
+import { getPublicFees } from "@/lib/public-settings.functions";
+
+const fmtPct = (bps: number) => {
+  const pct = bps / 100;
+  return Number.isInteger(pct) ? `${pct}%` : `${pct.toFixed(2)}%`;
+};
 
 export const Route = createFileRoute("/")({
+  loader: async () => {
+    try {
+      return await getPublicFees();
+    } catch {
+      return { wrap_fee_bps: 500, unwrap_fee_bps: 0 };
+    }
+  },
   head: () => ({
     meta: [
-      { title: "SWAP — The TXC ↔ wTXC bridge & on-ramp" },
+      { title: "SWAP — The TXC ↔ wTXC bridge" },
       {
         name: "description",
         content:
-          "Wrap TXC to wTXC (free), unwrap wTXC back to TXC (1%), or on-ramp from any major stablecoin or ETH on 5 EVM chains. Custodial bridge, live Bitmart pricing, settled direct to your wallet.",
+          "Wrap native TXC into wTXC on Ethereum, or unwrap wTXC back to TXC. Custodial bridge, live Bitmart pricing, settled direct to your wallet.",
       },
-      { property: "og:title", content: "SWAP — The TXC ↔ wTXC bridge & on-ramp" },
+      { property: "og:title", content: "SWAP — The TXC ↔ wTXC bridge" },
       {
         property: "og:description",
         content:
-          "Wrap free. Unwrap 1%. On-ramp from stables or ETH. The bridge for TEXITcoin.",
+          "The custodial bridge for TEXITcoin — wrap TXC to wTXC and back.",
       },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "https://swap.texitcoin.org/" },
@@ -31,8 +44,7 @@ export const Route = createFileRoute("/")({
           "@type": "WebSite",
           name: "SWAP",
           url: "https://swap.texitcoin.org/",
-          description:
-            "TXC ↔ wTXC bridge with a stablecoin on-ramp across 5 EVM chains.",
+          description: "TXC ↔ wTXC custodial bridge.",
         }),
       },
     ],
@@ -41,6 +53,12 @@ export const Route = createFileRoute("/")({
 });
 
 function HomePage() {
+  const { wrap_fee_bps, unwrap_fee_bps } = Route.useLoaderData();
+  const wrapPct = fmtPct(wrap_fee_bps);
+  const unwrapPct = fmtPct(unwrap_fee_bps);
+  const unwrapLabel = unwrap_fee_bps === 0 ? "free" : unwrapPct;
+  const wrapLabel = wrap_fee_bps === 0 ? "free" : wrapPct;
+
   return (
     <div className="min-h-screen">
       <SiteHeader ticker={<LiveTicker />} />
@@ -56,7 +74,7 @@ function HomePage() {
               FOR wTXC.
             </h1>
             <p className="text-lg text-muted-foreground max-w-[46ch] font-medium leading-relaxed text-balance">
-              Move native TXC onto Ethereum as wTXC, or bring it home again. Or on-ramp from any major stablecoin — or ETH itself — on five EVM chains. Custodial, fast, and settled straight to your wallet.
+              Move native TXC onto Ethereum as wTXC, or bring it home again. Custodial, fast, and settled straight to your wallet.
             </p>
             <div className="flex gap-4">
               <a
@@ -66,10 +84,9 @@ function HomePage() {
                 How it works
               </a>
             </div>
-            <div className="grid grid-cols-3 gap-4 border-t border-border pt-8">
-              <Stat label="Wrap fee" value="0%" sub="TXC → wTXC" />
-              <Stat label="Unwrap fee" value="1%" sub="wTXC → TXC" />
-              <Stat label="On-ramp" value="+5%" sub="STABLES / ETH" />
+            <div className="grid grid-cols-2 gap-4 border-t border-border pt-8">
+              <Stat label="Wrap fee" value={wrapPct} sub="TXC → wTXC" />
+              <Stat label="Unwrap fee" value={unwrapPct} sub="wTXC → TXC" />
             </div>
           </div>
 
@@ -82,7 +99,7 @@ function HomePage() {
           <h2 className="font-mono text-sm uppercase tracking-[0.3em] font-bold mb-12">
             How the bridge works
           </h2>
-          <div className="grid md:grid-cols-3 gap-10">
+          <div className="grid md:grid-cols-2 gap-10">
             <Principle
               n="01"
               title="One custodian, no smart-contract magic."
@@ -90,38 +107,9 @@ function HomePage() {
             />
             <Principle
               n="02"
-              title="Wrap free. Unwrap 1%."
-              body="Wrapping is free forever. Unwrapping charges 1% — that's the bridge's only ongoing cost, and it funds continued operation."
+              title={`Wrap ${wrapLabel}. Unwrap ${unwrapLabel}.`}
+              body={`Wrapping charges ${wrapPct} and unwrapping charges ${unwrapPct}. That's the bridge's only ongoing cost, and it funds continued operation.`}
             />
-            <Principle
-              n="03"
-              title="Stables in, TXC or wTXC out."
-              body="Prefer to buy in with USDC, USDT, pyUSD, DAI or ETH? The on-ramp fills your order at live Bitmart TXC/USDT pricing plus a 5% protocol fee."
-            />
-          </div>
-        </section>
-
-        <section className="mt-24 border-t border-border pt-16">
-          <h2 className="font-mono text-sm uppercase tracking-[0.3em] font-bold mb-8">
-            Supported networks
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 font-mono text-xs">
-            {[
-              { name: "Ethereum", note: "USDC · USDT · pyUSD · DAI · ETH · wTXC" },
-              { name: "Base", note: "USDC · USDbC · USDT · ETH" },
-              { name: "Arbitrum", note: "USDC · USDC.e · USDT · DAI · ETH" },
-              { name: "Polygon", note: "USDC · USDC.e · USDT · DAI" },
-              { name: "BNB Chain", note: "USDT · USDC" },
-            ].map((c) => (
-              <div key={c.name} className="border border-border p-4">
-                <div className="text-foreground font-bold uppercase tracking-widest text-[11px]">
-                  {c.name}
-                </div>
-                <div className="text-muted-foreground mt-2 text-[10px] leading-relaxed">
-                  {c.note}
-                </div>
-              </div>
-            ))}
           </div>
         </section>
       </main>
