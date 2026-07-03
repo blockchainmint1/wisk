@@ -1241,6 +1241,8 @@ function SettingsTab() {
     paused: boolean;
     paused_reason: string;
     notify_min_usd_created: number;
+    low_txc_threshold: number;
+    low_wtxc_threshold: number;
   }>(null);
 
   useEffect(() => {
@@ -1253,6 +1255,8 @@ function SettingsTab() {
         paused: settings.data.paused,
         paused_reason: settings.data.paused_reason ?? "",
         notify_min_usd_created: Number(settings.data.notify_min_usd_created),
+        low_txc_threshold: Number(settings.data.low_txc_threshold ?? 10_000),
+        low_wtxc_threshold: Number(settings.data.low_wtxc_threshold ?? 10_000),
       });
     }
   }, [settings.data, form]);
@@ -1290,6 +1294,14 @@ function SettingsTab() {
         </Field>
         <Field label="Order expiry (minutes)">
           <NumberInput value={form.expiry_minutes} onChange={(v) => set("expiry_minutes", Math.round(v))} />
+        </Field>
+        <Field label="Low TXC alert threshold">
+          <NumberInput value={form.low_txc_threshold} onChange={(v) => set("low_txc_threshold", v)} />
+          <Hint>Telegram alert fires when TXC hot wallet drops below this</Hint>
+        </Field>
+        <Field label="Low wTXC alert threshold">
+          <NumberInput value={form.low_wtxc_threshold} onChange={(v) => set("low_wtxc_threshold", v)} />
+          <Hint>Telegram alert fires when wTXC operator wallet drops below this</Hint>
         </Field>
         <Field label="Kill switch (block new orders)">
           <label className="flex items-center gap-2 mt-2">

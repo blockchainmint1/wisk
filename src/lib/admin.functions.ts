@@ -532,6 +532,8 @@ const UpdateSettingsInput = z.object({
   paused: z.boolean(),
   paused_reason: z.string().trim().max(280).nullable(),
   notify_min_usd_created: z.number().min(0).max(1_000_000),
+  low_txc_threshold: z.number().min(0).max(10_000_000),
+  low_wtxc_threshold: z.number().min(0).max(10_000_000),
 });
 
 export const adminUpdateSettings = createServerFn({ method: "POST" })

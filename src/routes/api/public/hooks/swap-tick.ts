@@ -634,16 +634,15 @@ async function pollBitmartFillsDecoupled() {
 
 /**
  * Read hot-wallet balances (TXC + wTXC) each tick; fire a deduped admin
- * Telegram alert when either drops below its configured floor. Thresholds
- * are env-configurable so we can tune without a deploy:
- *   TELEGRAM_LOW_TXC_THRESHOLD   (default 1000 TXC)
- *   TELEGRAM_LOW_WTXC_THRESHOLD  (default 1000 wTXC)
- * sendAdminAlert has a 15-min cooldown per (title, dedupeKey), so a
- * sustained low balance produces at most 4 pings/hr per asset.
+ * Telegram alert when either drops below the admin-configured floor
+ * (app_settings.low_txc_threshold / low_wtxc_threshold). sendAdminAlert
+ * has a 15-min cooldown per (title, dedupeKey), so a sustained low
+ * balance produces at most 4 pings/hr per asset.
  */
 async function checkHotBalances(): Promise<{ txc: number | null; wtxc: number | null }> {
-  const txcFloor = Number(process.env.TELEGRAM_LOW_TXC_THRESHOLD ?? 1000);
-  const wtxcFloor = Number(process.env.TELEGRAM_LOW_WTXC_THRESHOLD ?? 1000);
+  const settings = await getSettings();
+  const txcFloor = Number(settings.low_txc_threshold ?? 10_000);
+  const wtxcFloor = Number(settings.low_wtxc_threshold ?? 10_000);
   const out: { txc: number | null; wtxc: number | null } = { txc: null, wtxc: null };
 
   try {
