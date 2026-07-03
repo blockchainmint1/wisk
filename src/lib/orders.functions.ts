@@ -192,7 +192,7 @@ export const getOrder = createServerFn({ method: "POST" })
     const { data: order, error } = await supabaseAdmin
       .from("orders")
       .select(
-        "public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_asset,dest_address,quoted_dest_out,quoted_dest_per_usd,premium_bps,bitmart_spot_price,created_at,expires_at,paid_tx_hash,paid_amount_usd,bitmart_avg_price,bitmart_filled_dest,dest_tx_hash,error_message",
+        "id,public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_asset,dest_address,quoted_dest_out,quoted_dest_per_usd,premium_bps,bitmart_spot_price,created_at,expires_at,paid_tx_hash,paid_amount_usd,bitmart_avg_price,bitmart_filled_dest,dest_tx_hash,error_message,original_quoted_dest_out,underpayment_ack",
       )
       .eq("public_id", data.publicId)
       .maybeSingle();
@@ -247,3 +247,25 @@ export const listChainOptions = createServerFn({ method: "GET" }).handler(async 
     tokens: c.tokens.map((t) => ({ symbol: t.symbol, isNative: !!t.isNative })),
   }));
 });
+
+const AcceptUnderpaymentInput = z.object({ publicId: z.string().min(3).max(40) });
+
+/**
+ * Customer chose "continue with what I sent" from the underpayment prompt.
+ * Flips underpayment_ack from 'pending' → 'accepted' so the next tick
+ * advances the order to `confirmed` and pays out the repriced amount.
+ * Public (no auth) — keyed by the unguessable public order id.
+ */
+export const acceptUnderpayment = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => AcceptUnderpaymentInput.parse(input))
+  .handler(async ({ data }) => {
+    const { data: updated, error } = await supabaseAdmin
+      .from("orders")
+      .update({ underpayment_ack: "accepted" })
+      .eq("public_id", data.publicId)
+      .eq("underpayment_ack", "pending")
+      .select("id")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return { ok: !!updated };
+  });

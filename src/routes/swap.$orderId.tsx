@@ -1,13 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
+import { toast } from "sonner";
 import { z } from "zod";
 import { EmbedResize } from "@/components/embed-resize";
 import { LiveTicker } from "@/components/live-ticker";
 import { SiteFooter, SiteHeader } from "@/components/site-shell";
-import { getOrder } from "@/lib/orders.functions";
+import { acceptUnderpayment, getOrder } from "@/lib/orders.functions";
 import { recordSwap } from "@/lib/swap-history";
 
 export const Route = createFileRoute("/swap/$orderId")({
@@ -129,6 +130,34 @@ function OrderPage() {
     steps.findIndex((s) => s.key === order.status),
   );
   const failed = order.status === "failed" || order.status === "expired";
+
+  // Underpayment prompt: backend flags `underpayment_ack='pending'` when
+  // the paid amount is >0.5% short of the original quote. Ask the user
+  // to top up OR continue with the repriced (smaller) payout.
+  const isTxcSource = order.source_chain === "txc";
+  const feeMul = 1 - Math.abs(Number(order.premium_bps ?? 0)) / 10_000;
+  const paidTxc = feeMul > 0 ? Number(order.quoted_dest_out) / feeMul : 0;
+  const requiredTxc =
+    feeMul > 0 && order.original_quoted_dest_out
+      ? Number(order.original_quoted_dest_out) / feeMul
+      : 0;
+  const shortfallTxc = Math.max(0, requiredTxc - paidTxc);
+  const isUnderpayment =
+    isTxcSource && order.underpayment_ack === "pending" && shortfallTxc > 0;
+
+  const [dismissed, setDismissed] = useState(false);
+  const showUnderpayment = isUnderpayment && !dismissed;
+  const qc = useQueryClient();
+  const acceptFn = useServerFn(acceptUnderpayment);
+  const accept = useMutation({
+    mutationFn: () => acceptFn({ data: { publicId: order.public_id } }),
+    onSuccess: () => {
+      toast.success("Continuing with the amount you sent");
+      setDismissed(true);
+      qc.invalidateQueries({ queryKey: ["order", orderId] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
 
   return (
     <div className="min-h-screen">
@@ -263,6 +292,66 @@ function OrderPage() {
         </div>
       </main>
       {isEmbed ? null : <SiteFooter />}
+
+      {showUnderpayment ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-background border border-border rounded-xl p-6 space-y-5 shadow-2xl">
+            <div>
+              <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">
+                Underpayment
+              </div>
+              <h2 className="font-mono text-lg font-bold mt-1">
+                We received less than the quote
+              </h2>
+            </div>
+            <div className="bg-secondary/50 border border-border rounded-lg p-4 font-mono text-xs space-y-2">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Received</span>
+                <span>{paidTxc.toFixed(6)} TXC</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Quote called for</span>
+                <span>{requiredTxc.toFixed(6)} TXC</span>
+              </div>
+              <div className="flex justify-between border-t border-border pt-2">
+                <span className="text-muted-foreground">Short by</span>
+                <span className="text-accent">
+                  {shortfallTxc.toFixed(6)} TXC
+                </span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground font-mono leading-relaxed">
+              Send the missing {shortfallTxc.toFixed(6)} TXC to the same
+              deposit address and we'll pay the full quote — or continue now
+              and receive{" "}
+              <span className="text-foreground">
+                {Number(order.quoted_dest_out).toFixed(4)} {destAsset}
+              </span>{" "}
+              for what you sent.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => setDismissed(true)}
+                className="w-full text-[11px] font-mono uppercase tracking-widest border border-border py-3 rounded hover:bg-foreground hover:text-background transition-colors"
+              >
+                I'll send the difference
+              </button>
+              <button
+                onClick={() => accept.mutate()}
+                disabled={accept.isPending}
+                className="w-full text-[11px] font-mono uppercase tracking-widest bg-accent text-accent-foreground py-3 rounded hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {accept.isPending
+                  ? "Continuing…"
+                  : `Continue with ${paidTxc.toFixed(6)} TXC`}
+              </button>
+            </div>
+            <div className="text-[10px] font-mono text-muted-foreground text-center">
+              No action? We'll auto-continue when the quote timer runs out.
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
