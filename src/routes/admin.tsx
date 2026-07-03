@@ -779,20 +779,57 @@ function TreasuryTab() {
             Treasury
           </div>
           <p className="text-xs font-mono text-muted-foreground mt-2 max-w-xl leading-relaxed">
-            Live balances across every xpub-derived receive address. Index{" "}
-            <span className="text-foreground">#0</span> is the admin treasury;
-            customer deposits rotate through index #1+.
+            Live balances across the TXC hot wallet and every xpub-derived EVM
+            receive address. Index <span className="text-foreground">#0</span> is the admin
+            treasury; customer deposits rotate through index #1+.
           </p>
         </div>
         <button
-          onClick={() => scan.refetch()}
+          onClick={() => { scan.refetch(); hot.refetch(); }}
           className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-2 rounded hover:bg-foreground hover:text-background"
         >
-          {scan.isFetching ? "Scanning…" : "Refresh"}
+          {scan.isFetching || hot.isFetching ? "Scanning…" : "Refresh"}
         </button>
       </div>
 
-      {/* Reconciliation — are we holding the cash we should? */}
+      {/* TXC hot wallet treasury address */}
+      <div className="border border-accent/40 bg-accent/5 rounded-xl p-5 space-y-3">
+        <div className="flex justify-between items-start gap-3 flex-wrap">
+          <div>
+            <div className="text-[10px] font-mono uppercase tracking-widest text-accent">
+              TXC treasury · hot wallet
+            </div>
+            <div className="font-mono text-sm mt-2 break-all">
+              {hot.data?.txc.ok ? hot.data.txc.address : hot.data?.txc.ok === false ? hot.data.txc.error : "Loading…"}
+            </div>
+          </div>
+          {hot.data?.txc.ok ? (
+            <button
+              onClick={() => navigator.clipboard.writeText(hot.data.txc.address)}
+              className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-1.5 rounded hover:bg-foreground hover:text-background"
+            >
+              Copy
+            </button>
+          ) : null}
+        </div>
+        {hot.data?.txc.ok ? (
+          <div className="pt-2 border-t border-border">
+            <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+              Balance
+            </div>
+            <div className="font-mono text-lg mt-1">
+              {hot.data.txc.confirmed.toFixed(4)} TXC
+              {hot.data.txc.unconfirmed ? (
+                <span className="text-muted-foreground text-sm">
+                  {" "}(+{hot.data.txc.unconfirmed.toFixed(4)} pending)
+                </span>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      {/* Reconciliation — asset debt */}
       {reconcile.data ? (
         <ReconcilePanel data={reconcile.data} onRefetch={() => reconcile.refetch()} loading={reconcile.isFetching} />
       ) : reconcile.error ? (
