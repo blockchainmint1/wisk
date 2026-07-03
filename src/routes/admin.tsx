@@ -264,9 +264,10 @@ function OrdersTab() {
   const filteredOrders = (orders.data ?? []).filter((o) => {
     if (statusFilter === "all") return true;
     if (statusFilter === "completed") return o.status === "completed";
+    if (statusFilter === "canceled") return o.status === "canceled";
     if (statusFilter === "failed") return FAILED_STATUSES.has(o.status);
-    // open = anything not completed and not in a failed/terminal state
-    return !FAILED_STATUSES.has(o.status) && o.status !== "completed";
+    // open = anything not completed, canceled, or in a failed/terminal state
+    return !FAILED_STATUSES.has(o.status) && o.status !== "completed" && o.status !== "canceled";
   });
 
   return (
