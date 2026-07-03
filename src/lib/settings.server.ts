@@ -14,6 +14,8 @@ export interface AppSettings {
   unwrap_fee_bps: number;
   low_txc_threshold: number;
   low_wtxc_threshold: number;
+  payouts_frozen: boolean;
+  payouts_frozen_reason: string | null;
   updated_at: string;
 }
 
@@ -29,6 +31,8 @@ const DEFAULTS: AppSettings = {
   unwrap_fee_bps: 100,
   low_txc_threshold: 10_000,
   low_wtxc_threshold: 10_000,
+  payouts_frozen: false,
+  payouts_frozen_reason: null,
   updated_at: new Date(0).toISOString(),
 };
 
