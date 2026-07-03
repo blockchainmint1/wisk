@@ -8,17 +8,13 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { supabase } from "@/integrations/supabase/client";
 import {
   adminAuditLog,
-  adminBitmartBalances,
   adminBulkReplenish,
-  adminCreateCustomToken,
-  adminDeleteCustomToken,
   adminForceComplete,
   adminForceFail,
   adminGetSettings,
   adminHotWalletBalances,
   adminInviteAdmin,
   adminListAdmins,
-  adminListCustomTokens,
   adminListOrders,
   adminReconcile,
   adminSearchOrders,
@@ -28,7 +24,6 @@ import {
   adminRevokeAdmin,
   adminTelegramTest,
   adminTreasuryDebt,
-  adminUpdateCustomToken,
   adminUpdateSettings,
   adminWalletScan,
 } from "@/lib/admin.functions";
