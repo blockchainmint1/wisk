@@ -584,7 +584,6 @@ function OrderDetail({ publicId }: { publicId: string }) {
       {/* Deposit */}
       <DetailGrid title="Deposit">
         <KV k="Address" v={order.deposit_address} mono />
-        <KV k="Paid" v={order.paid_amount_usd != null ? `$${Number(order.paid_amount_usd).toFixed(2)}` : "—"} />
         <KV k="Tx" v={order.paid_tx_hash ?? "—"} mono />
         <KV k="Deposits" v={String(deposits.length)} />
       </DetailGrid>
