@@ -144,6 +144,7 @@ export type Database = {
       }
       deposits: {
         Row: {
+          amount_source: number | null
           amount_usd: number
           block_number: number
           chain: string
@@ -158,6 +159,7 @@ export type Database = {
           tx_hash: string
         }
         Insert: {
+          amount_source?: number | null
           amount_usd: number
           block_number: number
           chain: string
@@ -172,6 +174,7 @@ export type Database = {
           tx_hash: string
         }
         Update: {
+          amount_source?: number | null
           amount_usd?: number
           block_number?: number
           chain?: string
