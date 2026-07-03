@@ -1258,6 +1258,8 @@ function SettingsTab() {
     paused: boolean;
     paused_reason: string;
     notify_min_usd_created: number;
+    wrap_fee_bps: number;
+    unwrap_fee_bps: number;
     low_txc_threshold: number;
     low_wtxc_threshold: number;
     payouts_frozen: boolean;
@@ -1275,6 +1277,8 @@ function SettingsTab() {
         paused: settings.data.paused,
         paused_reason: settings.data.paused_reason ?? "",
         notify_min_usd_created: Number(settings.data.notify_min_usd_created),
+        wrap_fee_bps: Number(settings.data.wrap_fee_bps ?? 500),
+        unwrap_fee_bps: Number(settings.data.unwrap_fee_bps ?? 0),
         low_txc_threshold: Number(settings.data.low_txc_threshold ?? 10_000),
         low_wtxc_threshold: Number(settings.data.low_wtxc_threshold ?? 10_000),
         payouts_frozen: Boolean((settings.data as { payouts_frozen?: boolean }).payouts_frozen),
@@ -1321,6 +1325,14 @@ function SettingsTab() {
         </Field>
         <Field label="Order expiry (minutes)">
           <NumberInput value={form.expiry_minutes} onChange={(v) => set("expiry_minutes", Math.round(v))} />
+        </Field>
+        <Field label="Wrap fee (basis points, 100 = 1%)">
+          <NumberInput value={form.wrap_fee_bps} onChange={(v) => set("wrap_fee_bps", Math.round(v))} />
+          <Hint>{(form.wrap_fee_bps / 100).toFixed(2)}% charged on TXC → wTXC (shown on homepage)</Hint>
+        </Field>
+        <Field label="Unwrap fee (basis points, 100 = 1%)">
+          <NumberInput value={form.unwrap_fee_bps} onChange={(v) => set("unwrap_fee_bps", Math.round(v))} />
+          <Hint>{(form.unwrap_fee_bps / 100).toFixed(2)}% charged on wTXC → TXC (shown on homepage)</Hint>
         </Field>
         <Field label="Low TXC alert threshold">
           <NumberInput value={form.low_txc_threshold} onChange={(v) => set("low_txc_threshold", v)} />
