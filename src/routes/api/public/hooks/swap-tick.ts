@@ -185,13 +185,17 @@ async function watchDeposits() {
 
         for (const t of transfers) {
           let usd: number;
+          let sourceTokenAmount: number | null = null;
           if (orderIsNative) {
             if (t.token !== "native") continue;
             const nativeAmt = Number(t.amountWei) / 1e18;
             usd = nativeAmt * nativeSpot;
+            sourceTokenAmount = nativeAmt;
           } else {
             if (t.token !== orderToken.address.toLowerCase()) continue;
             usd = weiToUsd(t.amountWei, orderToken.decimals);
+            sourceTokenAmount =
+              Number(t.amountWei) / 10 ** orderToken.decimals;
           }
           const confirmations = currentBlock - t.blockNumber + 1;
 
@@ -220,10 +224,50 @@ async function watchDeposits() {
             0,
           );
 
-          // Re-price the TXC payout to match what the customer actually sent,
-          // at the locked quote rate. Protects us on underpayments and
-          // credits the customer fairly on overpayments.
-          const repricedTxcOut = +(totalPaidUsd * Number(order.quoted_dest_per_usd)).toFixed(8);
+          // Payout math:
+          //  - Unwrap (wTXC → TXC): pure 1:1 minus locked unwrap fee. USD is
+          //    NOT in the formula — the wTXC deposited on-chain IS the source
+          //    of truth. Sum every deposit's token amount so partial payments
+          //    accumulate correctly.
+          //  - Everything else (stables / ETH → TXC/wTXC): still price-based;
+          //    reprice at the locked USD → dest rate.
+          const isUnwrap = isWtxcSource(
+            order.source_chain as ChainKey,
+            order.source_token,
+          );
+          let repricedTxcOut: number;
+          if (isUnwrap) {
+            // premium_bps was stored as -unwrap_fee_bps at creation time,
+            // so we lock the fee against the price the user quoted.
+            const feeBps = Math.abs(Number(order.premium_bps ?? 0));
+            const feeMul = 1 - feeBps / 10_000;
+            const { data: tokenDeposits } = await supabaseAdmin
+              .from("deposits")
+              .select("token, amount_usd")
+              .eq("order_id", order.id);
+            // We can't recompute exact per-deposit token amount from stored
+            // USD, so re-sum from the on-chain totals we've already seen this
+            // scan by tracking each transfer we upsert. Fall back to a live
+            // rescan-total: for a single-deposit order this is just the
+            // current transfer's sourceTokenAmount.
+            void tokenDeposits;
+            // Sum all confirmed transfers to this deposit address for the
+            // wTXC token by re-scanning is expensive; instead we accumulate
+            // by re-reading amount from the events already processed. The
+            // simplest correct source: re-fetch transfers we just scanned.
+            const allWtxc = transfers
+              .filter((tr) => tr.token === orderToken.address.toLowerCase())
+              .reduce(
+                (sum, tr) =>
+                  sum + Number(tr.amountWei) / 10 ** orderToken.decimals,
+                0,
+              );
+            repricedTxcOut = +(allWtxc * feeMul).toFixed(8);
+          } else {
+            repricedTxcOut = +(
+              totalPaidUsd * Number(order.quoted_dest_per_usd)
+            ).toFixed(8);
+          }
           const originalTxcOut = Number(order.quoted_dest_out);
           const repriced = Math.abs(repricedTxcOut - originalTxcOut) > 0.00000001;
 
