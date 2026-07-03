@@ -1330,6 +1330,29 @@ function SettingsTab() {
             />
           ) : null}
         </Field>
+        <Field label="Freeze payouts (halt all outbound sends)">
+          <label className="flex items-center gap-2 mt-2">
+            <input
+              type="checkbox"
+              checked={form.payouts_frozen}
+              onChange={(e) => set("payouts_frozen", e.target.checked)}
+            />
+            <span className="text-sm font-mono">
+              {form.payouts_frozen
+                ? "FROZEN — confirmed orders stay queued, no funds leave the wallet"
+                : "Payouts flowing"}
+            </span>
+          </label>
+          {form.payouts_frozen ? (
+            <input
+              type="text"
+              placeholder="Reason (internal, shown in logs)…"
+              value={form.payouts_frozen_reason}
+              onChange={(e) => set("payouts_frozen_reason", e.target.value)}
+              className="mt-2 w-full bg-background border border-border rounded p-2 font-mono text-sm"
+            />
+          ) : null}
+        </Field>
       </div>
 
       <div className="flex flex-wrap gap-3">
