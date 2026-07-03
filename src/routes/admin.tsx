@@ -1722,3 +1722,137 @@ function ReconcilePanel({
     </div>
   );
 }
+
+// ===== Blocklist Tab =====
+function BlocklistTab() {
+  const listFn = useServerFn(adminListBlockedAddresses);
+  const addFn = useServerFn(adminAddBlockedAddress);
+  const removeFn = useServerFn(adminRemoveBlockedAddress);
+  const qc = useQueryClient();
+
+  const blocked = useQuery({
+    queryKey: ["admin", "blocklist"],
+    queryFn: () => listFn({}),
+  });
+
+  const [address, setAddress] = useState("");
+  const [reason, setReason] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const add = useMutation({
+    mutationFn: () =>
+      addFn({
+        data: {
+          address: address.trim(),
+          reason: reason.trim() || undefined,
+          notes: notes.trim() || undefined,
+        },
+      }),
+    onSuccess: () => {
+      setAddress("");
+      setReason("");
+      setNotes("");
+      qc.invalidateQueries({ queryKey: ["admin", "blocklist"] });
+    },
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => removeFn({ data: { id } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "blocklist"] }),
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="border border-border rounded p-4 space-y-3">
+        <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+          Add address
+        </div>
+        <input
+          type="text"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          placeholder="0x… or txc1q…"
+          className="w-full bg-background border border-border rounded p-2 font-mono text-xs focus:outline-none focus:border-accent"
+        />
+        <input
+          type="text"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="Reason (short)"
+          className="w-full bg-background border border-border rounded p-2 font-mono text-xs focus:outline-none focus:border-accent"
+        />
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Notes (optional)"
+          rows={2}
+          className="w-full bg-background border border-border rounded p-2 font-mono text-xs focus:outline-none focus:border-accent"
+        />
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => add.mutate()}
+            disabled={add.isPending || !address.trim()}
+            className="bg-accent text-accent-foreground px-4 py-2 rounded font-mono text-xs uppercase tracking-widest hover:opacity-90 disabled:opacity-50"
+          >
+            {add.isPending ? "Blocking…" : "Block address"}
+          </button>
+          {add.error ? (
+            <span className="text-[10px] font-mono text-accent">
+              {(add.error as Error).message}
+            </span>
+          ) : null}
+        </div>
+        <div className="text-[10px] font-mono text-muted-foreground">
+          Blocks the address from being used as a destination on new orders. Compared
+          case-insensitively. Existing orders are not affected.
+        </div>
+      </div>
+
+      {blocked.isLoading ? (
+        <div className="text-[10px] font-mono text-muted-foreground">Loading…</div>
+      ) : blocked.error ? (
+        <div className="text-xs font-mono text-accent">
+          {(blocked.error as Error).message}
+        </div>
+      ) : (blocked.data ?? []).length === 0 ? (
+        <div className="text-[10px] font-mono text-muted-foreground">No blocked addresses.</div>
+      ) : (
+        <div className="border border-border rounded overflow-hidden">
+          <table className="w-full text-xs font-mono">
+            <thead className="bg-secondary/40">
+              <tr>
+                <th className="text-left p-2 font-normal text-[10px] uppercase tracking-widest text-muted-foreground">Address</th>
+                <th className="text-left p-2 font-normal text-[10px] uppercase tracking-widest text-muted-foreground">Reason</th>
+                <th className="text-left p-2 font-normal text-[10px] uppercase tracking-widest text-muted-foreground">Notes</th>
+                <th className="text-left p-2 font-normal text-[10px] uppercase tracking-widest text-muted-foreground">Blocked</th>
+                <th className="p-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {(blocked.data ?? []).map((b) => (
+                <tr key={b.id} className="border-t border-border">
+                  <td className="p-2 break-all">{b.address}</td>
+                  <td className="p-2">{b.reason ?? "—"}</td>
+                  <td className="p-2 whitespace-pre-wrap max-w-md">{b.notes ?? "—"}</td>
+                  <td className="p-2 text-muted-foreground">
+                    {new Date(b.created_at).toLocaleString()}
+                  </td>
+                  <td className="p-2 text-right">
+                    <button
+                      onClick={() => {
+                        if (confirm(`Unblock ${b.address}?`)) remove.mutate(b.id);
+                      }}
+                      disabled={remove.isPending}
+                      className="text-[10px] font-mono uppercase tracking-widest border border-border px-2 py-1 rounded hover:bg-foreground hover:text-background disabled:opacity-50"
+                    >
+                      Unblock
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
