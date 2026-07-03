@@ -47,13 +47,24 @@ export function SiteHeader({ ticker }: { ticker?: ReactNode }) {
 }
 
 export function SiteFooter() {
+  const feesFn = useServerFn(getPublicFees);
+  const { data } = useQuery({
+    queryKey: ["publicFees"],
+    queryFn: () => feesFn(),
+    initialData: { wrap_fee_bps: 500, unwrap_fee_bps: 0 },
+  });
+
+  const wrapPct = fmtPct(data.wrap_fee_bps ?? 500);
+  const unwrapPct = fmtPct(data.unwrap_fee_bps ?? 0);
+  const unwrapLabel = data.unwrap_fee_bps === 0 ? "free" : unwrapPct;
+
   return (
     <footer className="border-t border-border py-12 mt-24">
       <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between gap-8 opacity-70">
         <div className="text-[10px] font-mono uppercase tracking-widest space-y-4">
           <p className="font-bold text-foreground">TXC ↔ wTXC Bridge</p>
           <p className="max-w-xs leading-relaxed">
-            Wrap free. Unwrap 1%. Stablecoin on-ramp at live Bitmart pricing.
+            Wrap {wrapPct}. Unwrap {unwrapLabel}. No stablecoin on-ramp.
           </p>
           <a href="https://honest.money" className="text-muted-foreground hover:text-accent transition-colors">
             Part of the honest.money ecosystem
@@ -71,8 +82,7 @@ export function SiteFooter() {
           <div className="space-y-2">
             <p className="font-bold text-foreground">Status</p>
             <p className="text-success">Bridge Online</p>
-            <p>Wrap 0% · Unwrap 1%</p>
-            <p>On-ramp +5%</p>
+            <p>Wrap {wrapPct} · Unwrap {unwrapPct}</p>
           </div>
 
           <div className="space-y-2">
