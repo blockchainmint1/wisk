@@ -55,6 +55,8 @@ interface OrderRow {
   source_amount_usd: number;
   deposit_address: string;
   dest_address: string;
+  dest_asset: string;
+  premium_bps: number;
   quoted_dest_out: number;
   quoted_dest_per_usd: number;
   expires_at: string;
