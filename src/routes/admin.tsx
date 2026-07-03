@@ -1273,6 +1273,8 @@ function SettingsTab() {
         payouts_frozen: Boolean((settings.data as { payouts_frozen?: boolean }).payouts_frozen),
         payouts_frozen_reason:
           (settings.data as { payouts_frozen_reason?: string | null }).payouts_frozen_reason ?? "",
+        telegram_chat_id:
+          (settings.data as { telegram_chat_id?: string | null }).telegram_chat_id ?? "",
       });
     }
   }, [settings.data, form]);
