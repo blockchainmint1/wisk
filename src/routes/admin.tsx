@@ -939,9 +939,6 @@ function TreasuryTab() {
                       <div className="uppercase tracking-widest text-muted-foreground">
                         {c.chainName}
                       </div>
-                      <div className="text-foreground mt-1">
-                        ${row?.totalUsd.toFixed(2) ?? "0.00"}
-                      </div>
                       <div className="text-muted-foreground">
                         {(row?.native ?? 0).toFixed(6)} {c.nativeSymbol}
                       </div>
