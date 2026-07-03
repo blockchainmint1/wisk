@@ -185,7 +185,7 @@ async function watchDeposits() {
 
         for (const t of transfers) {
           let usd: number;
-          let sourceTokenAmount: number | null = null;
+          let sourceTokenAmount: number;
           if (orderIsNative) {
             if (t.token !== "native") continue;
             const nativeAmt = Number(t.amountWei) / 1e18;
@@ -194,8 +194,7 @@ async function watchDeposits() {
           } else {
             if (t.token !== orderToken.address.toLowerCase()) continue;
             usd = weiToUsd(t.amountWei, orderToken.decimals);
-            sourceTokenAmount =
-              Number(t.amountWei) / 10 ** orderToken.decimals;
+            sourceTokenAmount = Number(t.amountWei) / 10 ** orderToken.decimals;
           }
           const confirmations = currentBlock - t.blockNumber + 1;
 
@@ -209,6 +208,7 @@ async function watchDeposits() {
               from_address: t.from,
               to_address: t.to,
               amount_usd: usd,
+              amount_source: sourceTokenAmount,
               block_number: t.blockNumber,
               confirmations,
             },
@@ -217,52 +217,33 @@ async function watchDeposits() {
 
           const { data: allDeposits } = await supabaseAdmin
             .from("deposits")
-            .select("amount_usd")
+            .select("amount_usd, amount_source")
             .eq("order_id", order.id);
           const totalPaidUsd = (allDeposits ?? []).reduce(
             (sum, d) => sum + Number(d.amount_usd ?? 0),
             0,
           );
+          const totalPaidSource = (allDeposits ?? []).reduce(
+            (sum, d) => sum + Number(d.amount_source ?? 0),
+            0,
+          );
 
           // Payout math:
-          //  - Unwrap (wTXC → TXC): pure 1:1 minus locked unwrap fee. USD is
+          //  - Unwrap (wTXC → TXC): 1:1 minus the locked unwrap fee. USD is
           //    NOT in the formula — the wTXC deposited on-chain IS the source
-          //    of truth. Sum every deposit's token amount so partial payments
-          //    accumulate correctly.
+          //    of truth. This is a swap, not a trade.
           //  - Everything else (stables / ETH → TXC/wTXC): still price-based;
-          //    reprice at the locked USD → dest rate.
+          //    reprice at the locked USD → dest rate the customer accepted.
           const isUnwrap = isWtxcSource(
             order.source_chain as ChainKey,
             order.source_token,
           );
           let repricedTxcOut: number;
           if (isUnwrap) {
-            // premium_bps was stored as -unwrap_fee_bps at creation time,
-            // so we lock the fee against the price the user quoted.
+            // premium_bps was stored as -unwrap_fee_bps at creation time.
             const feeBps = Math.abs(Number(order.premium_bps ?? 0));
             const feeMul = 1 - feeBps / 10_000;
-            const { data: tokenDeposits } = await supabaseAdmin
-              .from("deposits")
-              .select("token, amount_usd")
-              .eq("order_id", order.id);
-            // We can't recompute exact per-deposit token amount from stored
-            // USD, so re-sum from the on-chain totals we've already seen this
-            // scan by tracking each transfer we upsert. Fall back to a live
-            // rescan-total: for a single-deposit order this is just the
-            // current transfer's sourceTokenAmount.
-            void tokenDeposits;
-            // Sum all confirmed transfers to this deposit address for the
-            // wTXC token by re-scanning is expensive; instead we accumulate
-            // by re-reading amount from the events already processed. The
-            // simplest correct source: re-fetch transfers we just scanned.
-            const allWtxc = transfers
-              .filter((tr) => tr.token === orderToken.address.toLowerCase())
-              .reduce(
-                (sum, tr) =>
-                  sum + Number(tr.amountWei) / 10 ** orderToken.decimals,
-                0,
-              );
-            repricedTxcOut = +(allWtxc * feeMul).toFixed(8);
+            repricedTxcOut = +(totalPaidSource * feeMul).toFixed(8);
           } else {
             repricedTxcOut = +(
               totalPaidUsd * Number(order.quoted_dest_per_usd)
