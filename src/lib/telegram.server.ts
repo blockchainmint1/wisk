@@ -4,8 +4,20 @@
 // detail panel has a full timeline per order.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { getSettings } from "./settings.server";
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/telegram";
+
+async function getTelegramChatId(): Promise<string | undefined> {
+  try {
+    const s = await getSettings();
+    const v = s.telegram_chat_id?.trim();
+    if (v) return v;
+  } catch {
+    /* fall through to env */
+  }
+  return process.env.TELEGRAM_CHAT_ID;
+}
 
 export type OrderNotifyEvent =
   | "created"
@@ -191,7 +203,7 @@ export async function notifyOrderEvent(
 ): Promise<void> {
   const lovableKey = process.env.LOVABLE_API_KEY;
   const telegramKey = process.env.TELEGRAM_API_KEY;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const chatId = await getTelegramChatId();
 
   const balance = await getHotBalance(order);
 
@@ -270,7 +282,7 @@ export async function sendAdminAlert(
 
   const lovableKey = process.env.LOVABLE_API_KEY;
   const telegramKey = process.env.TELEGRAM_API_KEY;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const chatId = await getTelegramChatId();
   if (!lovableKey || !telegramKey || !chatId) {
     console.warn("[telegram] admin alert skipped; missing config:", title);
     return;

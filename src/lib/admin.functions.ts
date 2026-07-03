@@ -536,6 +536,7 @@ const UpdateSettingsInput = z.object({
   low_wtxc_threshold: z.number().min(0).max(10_000_000),
   payouts_frozen: z.boolean(),
   payouts_frozen_reason: z.string().trim().max(280).nullable(),
+  telegram_chat_id: z.string().trim().max(64).nullable(),
 });
 
 export const adminUpdateSettings = createServerFn({ method: "POST" })
@@ -708,11 +709,14 @@ export const adminTelegramTest = createServerFn({ method: "POST" })
     await assertAdmin(context.userId);
     const lovableKey = process.env.LOVABLE_API_KEY;
     const telegramKey = process.env.TELEGRAM_API_KEY;
-    const chatId = process.env.TELEGRAM_CHAT_ID;
+    const settings = await getSettings();
+    const chatId = settings.telegram_chat_id?.trim() || process.env.TELEGRAM_CHAT_ID;
     if (!lovableKey || !telegramKey || !chatId) {
       return {
         ok: false as const,
-        error: "Missing config — set TELEGRAM_API_KEY (connector) and TELEGRAM_CHAT_ID.",
+        error: !lovableKey || !telegramKey
+          ? "Missing Telegram connector — link it in project connectors."
+          : "Missing Telegram chat/group ID — set it in Settings above.",
       };
     }
     try {

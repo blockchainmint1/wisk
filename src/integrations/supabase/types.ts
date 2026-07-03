@@ -63,6 +63,7 @@ export type Database = {
           payouts_frozen: boolean
           payouts_frozen_reason: string | null
           premium_bps: number
+          telegram_chat_id: string | null
           unwrap_fee_bps: number
           updated_at: string
           updated_by: string | null
@@ -81,6 +82,7 @@ export type Database = {
           payouts_frozen?: boolean
           payouts_frozen_reason?: string | null
           premium_bps?: number
+          telegram_chat_id?: string | null
           unwrap_fee_bps?: number
           updated_at?: string
           updated_by?: string | null
@@ -99,6 +101,7 @@ export type Database = {
           payouts_frozen?: boolean
           payouts_frozen_reason?: string | null
           premium_bps?: number
+          telegram_chat_id?: string | null
           unwrap_fee_bps?: number
           updated_at?: string
           updated_by?: string | null
