@@ -159,19 +159,16 @@ export function SwapForm({ compact = false }: { compact?: boolean }) {
         </div>
 
         <div className="mt-3 text-xs font-mono text-muted-foreground">
-          {txcPriceUsd
-            ? `1 TXC ≈ $${txcPriceUsd.toFixed(6)}`
-            : "Fetching TXC price…"}
           {isUnwrap ? (
-            <span className="ml-2 opacity-70">
-              · {unwrapFeePct.toFixed(unwrapFeePct % 1 === 0 ? 0 : 2)}% fee
+            <span className="opacity-70">
+              {unwrapFeePct.toFixed(unwrapFeePct % 1 === 0 ? 0 : 2)}% fee
             </span>
           ) : wrapFeeBps > 0 ? (
-            <span className="ml-2 opacity-70">
-              · {wrapFeePct.toFixed(wrapFeePct % 1 === 0 ? 0 : 2)}% fee
+            <span className="opacity-70">
+              {wrapFeePct.toFixed(wrapFeePct % 1 === 0 ? 0 : 2)}% fee
             </span>
           ) : (
-            <span className="ml-2 opacity-70">· 1:1, no fee</span>
+            <span className="opacity-70">1:1, no fee</span>
           )}
         </div>
       </div>
