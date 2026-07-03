@@ -763,11 +763,6 @@ function TreasuryTab() {
   const data = scan.data;
   const admin = data?.addresses.find((a) => a.index === 0) ?? null;
   const customer = data?.addresses.filter((a) => a.index !== 0) ?? [];
-  const totalUsd = data
-    ? data.chains.reduce((s, c) => s + c.totalStableUsd, 0)
-    : 0;
-  const adminUsd = admin?.totalUsd ?? 0;
-  const customerUsd = customer.reduce((s, a) => s + a.totalUsd, 0);
 
   return (
     <div className="space-y-6">
