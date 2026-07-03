@@ -34,6 +34,7 @@ const DEFAULTS: AppSettings = {
   low_wtxc_threshold: 10_000,
   payouts_frozen: false,
   payouts_frozen_reason: null,
+  telegram_chat_id: null,
   updated_at: new Date(0).toISOString(),
 };
 
