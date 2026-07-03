@@ -1109,7 +1109,7 @@ function WalletTab() {
                   <th className="text-left p-3">Address</th>
                   <th className="text-left p-3">Chain</th>
                   <th className="text-right p-3">Native</th>
-                  <th className="text-right p-3">Stables (USD)</th>
+                  <th className="text-left p-3">Tokens</th>
                   <th className="text-left p-3">Linked order</th>
                 </tr>
               </thead>
@@ -1122,8 +1122,7 @@ function WalletTab() {
                     <td className="p-3 text-right">
                       {a.native > 0 ? `${a.native.toFixed(6)} ${a.nativeSymbol}` : "—"}
                     </td>
-                    <td className="p-3 text-right">
-                      {a.totalUsd > 0 ? `$${a.totalUsd.toFixed(2)}` : "—"}
+                    <td className="p-3 text-left">
                       {a.tokens.some((t) => t.balance > 0) ? (
                         <div className="text-[10px] text-muted-foreground">
                           {a.tokens
@@ -1131,7 +1130,9 @@ function WalletTab() {
                             .map((t) => `${t.balance.toFixed(2)} ${t.symbol}`)
                             .join(" · ")}
                         </div>
-                      ) : null}
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className="p-3 text-muted-foreground">
                       {a.linkedOrderId ?? "—"}
