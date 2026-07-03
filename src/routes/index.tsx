@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import { LiveTicker } from "@/components/live-ticker";
 import { SiteFooter, SiteHeader } from "@/components/site-shell";
 import { SwapForm } from "@/components/swap-form";
@@ -103,7 +104,20 @@ function HomePage() {
             <Principle
               n="01"
               title="One custodian, no smart-contract magic."
-              body="TXC you send is held 1:1 in the operator wallet. wTXC (0x9FC6…bb88) is issued against it. Low-tech, auditable, boring on purpose."
+              body={
+                <>
+                  TXC you send is held 1:1 in the operator wallet.{" "}
+                  <a
+                    href="https://texitcoin.org/wtxc"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-foreground underline hover:text-accent transition-colors"
+                  >
+                    wTXC (0x9FC6…bb88)
+                  </a>{" "}
+                  is issued against it. Low-tech, auditable, boring on purpose.
+                </>
+              }
             />
             <Principle
               n="02"
@@ -132,7 +146,7 @@ function Stat({ label, value, sub }: { label: string; value: string; sub: string
 }
 
 
-function Principle({ n, title, body }: { n: string; title: string; body: string }) {
+function Principle({ n, title, body }: { n: string; title: string; body: ReactNode }) {
   return (
     <div className="space-y-3">
       <div className="font-mono text-[10px] text-accent uppercase tracking-[0.3em]">{n}</div>
