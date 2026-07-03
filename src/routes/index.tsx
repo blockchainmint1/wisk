@@ -54,8 +54,10 @@ export const Route = createFileRoute("/")({
 });
 
 function HomePage() {
-  const { wrap_fee_bps } = Route.useLoaderData();
+  const { wrap_fee_bps, unwrap_fee_bps } = Route.useLoaderData();
   const wrapPct = fmtPct(wrap_fee_bps);
+  const unwrapPct = fmtPct(unwrap_fee_bps);
+  const unwrapLabel = unwrap_fee_bps === 0 ? "free" : unwrapPct;
   const wrapLabel = wrap_fee_bps === 0 ? "free" : wrapPct;
 
   return (
@@ -69,7 +71,8 @@ function HomePage() {
               TXC ↔ wTXC bridge
             </div>
             <h1 className="text-6xl md:text-7xl font-extrabold tracking-tighter leading-none mb-6 text-balance">
-              Swap TXC, wTXC, and stables.
+              THE <span className="text-accent underline decoration-4 underline-offset-8">BRIDGE</span> <br />
+              FOR wTXC.
             </h1>
             <p className="text-lg text-muted-foreground max-w-[46ch] font-medium leading-relaxed text-balance">
               Move native TXC onto Ethereum as wTXC, or bring it home again. Custodial, fast, and settled straight to your wallet.
@@ -82,8 +85,9 @@ function HomePage() {
                 How it works
               </a>
             </div>
-            <div className="grid grid-cols-1 gap-4 border-t border-border pt-8">
+            <div className="grid grid-cols-2 gap-4 border-t border-border pt-8">
               <Stat label="Wrap fee" value={wrapPct} sub="TXC → wTXC" />
+              <Stat label="Unwrap fee" value={unwrapPct} sub="wTXC → TXC" />
             </div>
           </div>
 
@@ -117,8 +121,8 @@ function HomePage() {
             />
             <Principle
               n="02"
-              title={`Wrap ${wrapLabel}.`}
-              body={`Wrapping charges ${wrapPct}. That's the bridge's only ongoing cost, and it funds continued operation.`}
+              title={`Wrap ${wrapLabel}. Unwrap ${unwrapLabel}.`}
+              body={`Wrapping charges ${wrapPct} and unwrapping charges ${unwrapPct}. That's the bridge's only ongoing cost, and it funds continued operation.`}
             />
           </div>
         </section>
