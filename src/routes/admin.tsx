@@ -601,24 +601,6 @@ function OrderDetail({ publicId }: { publicId: string }) {
                 : "—"
           }
         />
-        <KV
-          k="Avg price"
-          v={
-            order.bitmart_avg_price != null
-              ? `$${Number(order.bitmart_avg_price).toFixed(6)}`
-              : bitmartLive && "price_avg" in bitmartLive
-                ? `$${Number(bitmartLive.price_avg).toFixed(6)}`
-                : "—"
-          }
-        />
-        <KV
-          k="Notional spent"
-          v={
-            order.paid_amount_usd
-              ? `$${(Number(order.paid_amount_usd) / 1.05).toFixed(2)}`
-              : "—"
-          }
-        />
       </DetailGrid>
 
       {/* Payout */}
