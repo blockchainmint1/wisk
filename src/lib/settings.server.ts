@@ -12,6 +12,8 @@ export interface AppSettings {
   notify_min_usd_created: number;
   wrap_fee_bps: number;
   unwrap_fee_bps: number;
+  low_txc_threshold: number;
+  low_wtxc_threshold: number;
   updated_at: string;
 }
 
@@ -25,6 +27,8 @@ const DEFAULTS: AppSettings = {
   notify_min_usd_created: 0,
   wrap_fee_bps: 0,
   unwrap_fee_bps: 100,
+  low_txc_threshold: 10_000,
+  low_wtxc_threshold: 10_000,
   updated_at: new Date(0).toISOString(),
 };
 
@@ -38,7 +42,7 @@ export async function getSettings(): Promise<AppSettings> {
   const { data, error } = await supabaseAdmin
     .from("app_settings")
     .select(
-      "premium_bps,expiry_minutes,min_usd,max_usd,paused,paused_reason,notify_min_usd_created,wrap_fee_bps,unwrap_fee_bps,updated_at",
+      "premium_bps,expiry_minutes,min_usd,max_usd,paused,paused_reason,notify_min_usd_created,wrap_fee_bps,unwrap_fee_bps,low_txc_threshold,low_wtxc_threshold,updated_at",
     )
     .eq("id", 1)
     .maybeSingle();
@@ -59,6 +63,8 @@ export async function getSettings(): Promise<AppSettings> {
     notify_min_usd_created: number | string;
     wrap_fee_bps?: number | null;
     unwrap_fee_bps?: number | null;
+    low_txc_threshold?: number | string | null;
+    low_wtxc_threshold?: number | string | null;
     updated_at: string;
   };
   const value: AppSettings = {
@@ -71,6 +77,8 @@ export async function getSettings(): Promise<AppSettings> {
     notify_min_usd_created: Number(row.notify_min_usd_created),
     wrap_fee_bps: row.wrap_fee_bps ?? 0,
     unwrap_fee_bps: row.unwrap_fee_bps ?? 100,
+    low_txc_threshold: row.low_txc_threshold != null ? Number(row.low_txc_threshold) : 10_000,
+    low_wtxc_threshold: row.low_wtxc_threshold != null ? Number(row.low_wtxc_threshold) : 10_000,
     updated_at: row.updated_at,
   };
   cache = { value, expires: now + TTL_MS };
