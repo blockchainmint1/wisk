@@ -55,6 +55,8 @@ interface OrderRow {
   source_amount_usd: number;
   deposit_address: string;
   dest_address: string;
+  dest_asset: string;
+  premium_bps: number;
   quoted_dest_out: number;
   quoted_dest_per_usd: number;
   expires_at: string;
@@ -123,7 +125,7 @@ async function watchDeposits() {
   const { data: orders } = await supabaseAdmin
     .from("orders")
     .select(
-      "id,public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_address,quoted_dest_out,quoted_dest_per_usd,expires_at,paid_amount_usd,bitmart_order_id,bitmart_filled_dest,withdrawal_id",
+      "id,public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_address,dest_asset,premium_bps,quoted_dest_out,quoted_dest_per_usd,expires_at,paid_amount_usd,bitmart_order_id,bitmart_filled_dest,withdrawal_id",
     )
     .in("status", ["awaiting_payment", "payment_detected"])
     .neq("source_chain", "txc")
@@ -183,13 +185,16 @@ async function watchDeposits() {
 
         for (const t of transfers) {
           let usd: number;
+          let sourceTokenAmount: number;
           if (orderIsNative) {
             if (t.token !== "native") continue;
             const nativeAmt = Number(t.amountWei) / 1e18;
             usd = nativeAmt * nativeSpot;
+            sourceTokenAmount = nativeAmt;
           } else {
             if (t.token !== orderToken.address.toLowerCase()) continue;
             usd = weiToUsd(t.amountWei, orderToken.decimals);
+            sourceTokenAmount = Number(t.amountWei) / 10 ** orderToken.decimals;
           }
           const confirmations = currentBlock - t.blockNumber + 1;
 
@@ -203,6 +208,7 @@ async function watchDeposits() {
               from_address: t.from,
               to_address: t.to,
               amount_usd: usd,
+              amount_source: sourceTokenAmount,
               block_number: t.blockNumber,
               confirmations,
             },
@@ -211,17 +217,38 @@ async function watchDeposits() {
 
           const { data: allDeposits } = await supabaseAdmin
             .from("deposits")
-            .select("amount_usd")
+            .select("amount_usd, amount_source")
             .eq("order_id", order.id);
           const totalPaidUsd = (allDeposits ?? []).reduce(
             (sum, d) => sum + Number(d.amount_usd ?? 0),
             0,
           );
+          const totalPaidSource = (allDeposits ?? []).reduce(
+            (sum, d) => sum + Number(d.amount_source ?? 0),
+            0,
+          );
 
-          // Re-price the TXC payout to match what the customer actually sent,
-          // at the locked quote rate. Protects us on underpayments and
-          // credits the customer fairly on overpayments.
-          const repricedTxcOut = +(totalPaidUsd * Number(order.quoted_dest_per_usd)).toFixed(8);
+          // Payout math:
+          //  - Unwrap (wTXC → TXC): 1:1 minus the locked unwrap fee. USD is
+          //    NOT in the formula — the wTXC deposited on-chain IS the source
+          //    of truth. This is a swap, not a trade.
+          //  - Everything else (stables / ETH → TXC/wTXC): still price-based;
+          //    reprice at the locked USD → dest rate the customer accepted.
+          const isUnwrap = isWtxcSource(
+            order.source_chain as ChainKey,
+            order.source_token,
+          );
+          let repricedTxcOut: number;
+          if (isUnwrap) {
+            // premium_bps was stored as -unwrap_fee_bps at creation time.
+            const feeBps = Math.abs(Number(order.premium_bps ?? 0));
+            const feeMul = 1 - feeBps / 10_000;
+            repricedTxcOut = +(totalPaidSource * feeMul).toFixed(8);
+          } else {
+            repricedTxcOut = +(
+              totalPaidUsd * Number(order.quoted_dest_per_usd)
+            ).toFixed(8);
+          }
           const originalTxcOut = Number(order.quoted_dest_out);
           const repriced = Math.abs(repricedTxcOut - originalTxcOut) > 0.00000001;
 
@@ -297,7 +324,7 @@ async function watchTxcDeposits() {
   const { data: orders } = await supabaseAdmin
     .from("orders")
     .select(
-      "id,public_id,status,source_amount_usd,deposit_address,quoted_dest_out,quoted_dest_per_usd",
+      "id,public_id,status,source_amount_usd,deposit_address,premium_bps,quoted_dest_out,quoted_dest_per_usd",
     )
     .in("status", ["awaiting_payment", "payment_detected"])
     .eq("source_chain", "txc")
@@ -308,6 +335,7 @@ async function watchTxcDeposits() {
         status: string;
         source_amount_usd: number;
         deposit_address: string;
+        premium_bps: number;
         quoted_dest_out: number;
         quoted_dest_per_usd: number;
       }>
@@ -326,12 +354,13 @@ async function watchTxcDeposits() {
     console.error("[watch-txc] tip failed", e);
     return { detected: 0 };
   }
+  // Spot price is only used for display USD accounting on the deposits row.
+  // Wrap payout math is pure 1:1 minus locked wrap fee — no spot involved.
   let txcSpot = 0;
   try {
     txcSpot = await getSpotPrice("TXC_USDT");
   } catch (e) {
-    console.error("[watch-txc] spot failed", e);
-    return { detected: 0 };
+    console.warn("[watch-txc] spot lookup failed; USD display will be 0", e);
   }
 
   for (const order of orders) {
@@ -353,6 +382,7 @@ async function watchTxcDeposits() {
             from_address: t.fromAddress ?? "",
             to_address: order.deposit_address,
             amount_usd: usd,
+            amount_source: txcAmount,
             block_number: t.blockHeight ?? 0,
             confirmations: t.confirmations,
           },
@@ -361,16 +391,22 @@ async function watchTxcDeposits() {
 
         const { data: allDeposits } = await supabaseAdmin
           .from("deposits")
-          .select("amount_usd")
+          .select("amount_usd, amount_source")
           .eq("order_id", order.id);
         const totalPaidUsd = (allDeposits ?? []).reduce(
           (sum, d) => sum + Number(d.amount_usd ?? 0),
           0,
         );
+        const totalPaidTxc = (allDeposits ?? []).reduce(
+          (sum, d) => sum + Number(d.amount_source ?? 0),
+          0,
+        );
 
-        const repricedOut = +(
-          totalPaidUsd * Number(order.quoted_dest_per_usd)
-        ).toFixed(8);
+        // Wrap payout: 1:1 minus the locked wrap fee. USD is not in the
+        // formula — the TXC deposited on-chain IS the source of truth.
+        const feeBps = Math.abs(Number(order.premium_bps ?? 0));
+        const feeMul = 1 - feeBps / 10_000;
+        const repricedOut = +(totalPaidTxc * feeMul).toFixed(8);
         const originalOut = Number(order.quoted_dest_out);
         const repriced = Math.abs(repricedOut - originalOut) > 0.00000001;
 
