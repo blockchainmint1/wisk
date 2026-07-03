@@ -1,7 +1,15 @@
 import { Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import type { ReactNode } from "react";
 import logoAsset from "@/assets/honest-money-logo.png.asset.json";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { getPublicFees } from "@/lib/public-settings.functions";
+
+const fmtPct = (bps: number) => {
+  const pct = bps / 100;
+  return Number.isInteger(pct) ? `${pct}%` : `${pct.toFixed(2)}%`;
+};
 
 
 export function SiteHeader({ ticker }: { ticker?: ReactNode }) {
