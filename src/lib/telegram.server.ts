@@ -65,10 +65,8 @@ function escapeHtml(value: unknown): string {
     .replace(/>/g, "&gt;");
 }
 
-function fmtUsd(n: number | null | undefined): string {
-  if (n == null || Number.isNaN(Number(n))) return "—";
-  return `$${Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-}
+
+
 
 function fmtAsset(n: number | null | undefined, asset: string): string {
   if (n == null || Number.isNaN(Number(n))) return "—";
