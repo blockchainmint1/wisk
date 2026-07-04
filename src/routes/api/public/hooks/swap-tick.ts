@@ -916,6 +916,7 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           settle: { sent: 0, queuedForBitmart: 0 },
           replenish: { submitted: 0 },
           balances: { txc: null as number | null, wtxc: null as number | null },
+          reconcile: { reconciled: 0 },
           ms: 0,
         };
         // Run each phase independently so one failure doesn't starve the
@@ -934,9 +935,12 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
         try {
           await runPhase("expireStale", expireStale);
           result.stuck = (await runPhase("detectStuck", detectStuck)) ?? result.stuck;
+          result.reconcile =
+            (await runPhase("reconcileStuckSending", reconcileStuckSending)) ?? result.reconcile;
           result.watch = (await runPhase("watchDeposits", watchDeposits)) ?? result.watch;
           result.watchTxc = (await runPhase("watchTxcDeposits", watchTxcDeposits)) ?? result.watchTxc;
           result.settle = (await runPhase("settleConfirmed", settleConfirmed)) ?? result.settle;
+
           result.replenish = (await runPhase("replenishTreasury", replenishTreasury)) ?? result.replenish;
           result.fills = (await runPhase("pollBitmartFillsDecoupled", pollBitmartFillsDecoupled)) ?? result.fills;
           result.balances = (await runPhase("checkHotBalances", checkHotBalances)) ?? result.balances;
