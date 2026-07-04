@@ -65,10 +65,8 @@ function escapeHtml(value: unknown): string {
     .replace(/>/g, "&gt;");
 }
 
-function fmtUsd(n: number | null | undefined): string {
-  if (n == null || Number.isNaN(Number(n))) return "—";
-  return `$${Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-}
+
+
 
 function fmtAsset(n: number | null | undefined, asset: string): string {
   if (n == null || Number.isNaN(Number(n))) return "—";
@@ -102,21 +100,27 @@ function buildMessage(
   if (o.source_chain || o.source_token) {
     lines.push(`Pay: ${escapeHtml(o.source_token ?? "?")} on ${escapeHtml(o.source_chain ?? "?")}`);
   }
+  const quoteRatio =
+    o.source_amount_usd && o.quoted_dest_out && o.source_amount_usd > 0
+      ? o.quoted_dest_out / o.source_amount_usd
+      : null;
+  const paidInAsset =
+    o.paid_amount_usd != null && quoteRatio != null
+      ? o.paid_amount_usd * quoteRatio
+      : null;
+
   if (event === "created") {
-    lines.push(`Quote: ${fmtUsd(o.source_amount_usd)} → ${fmtAsset(o.quoted_dest_out, asset)}`);
+    lines.push(`Quote: ${fmtAsset(o.quoted_dest_out, asset)}`);
   }
   if (event === "payment_detected" || event === "payment_confirmed") {
-    lines.push(`Received: ${fmtUsd(o.paid_amount_usd)}`);
+    lines.push(`Received: ${fmtAsset(paidInAsset ?? o.quoted_dest_out, asset)}`);
     if (o.paid_tx_hash) lines.push(`Tx: <code>${escapeHtml(o.paid_tx_hash)}</code>`);
   }
   if (event === "bitmart_filled") {
-    lines.push(
-      `Filled: ${fmtAsset(o.bitmart_filled_dest, asset)} @ ${
-        o.bitmart_avg_price != null ? fmtUsd(o.bitmart_avg_price) : "—"
-      }`,
-    );
+    lines.push(`Filled: ${fmtAsset(o.bitmart_filled_dest, asset)}`);
     if (o.bitmart_order_id) lines.push(`Bitmart: <code>${escapeHtml(o.bitmart_order_id)}</code>`);
   }
+
   if (event === "sending") {
     lines.push(`Sending: ${fmtAsset(o.bitmart_filled_dest ?? o.quoted_dest_out, asset)}`);
     lines.push(`To: <code>${escapeHtml(o.dest_address)}</code>`);
