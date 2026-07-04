@@ -20,6 +20,7 @@ import {
   chainStartScanBlock,
   getBlockNumber,
   scanIncomingTransfers,
+  scanOutgoingTransfers,
   weiToUsd,
 } from "@/lib/evm-scan.server";
 import { isNativeToken, isWtxcSource, type ChainKey } from "@/lib/chains";
@@ -28,9 +29,11 @@ import { getDestination } from "@/lib/destinations";
 import { notifyOrderEvent, logOrderEvent, sendAdminAlert } from "@/lib/telegram.server";
 import { getSettings } from "@/lib/settings.server";
 import { sendTxc } from "@/lib/txc-sign.server";
-import { sendWtxc } from "@/lib/wtxc.server";
+import { sendWtxc, WTXC_CONTRACT, WTXC_DECIMALS } from "@/lib/wtxc.server";
+import { getOperatorEvmAddress } from "@/lib/bridge-wallet.server";
 import { getSpotPrice } from "@/lib/bitmart.server";
 import { scanTxcIncoming, getTxcTipHeight } from "@/lib/txc-scan.server";
+
 
 async function notifyById(
   event: Parameters<typeof notifyOrderEvent>[0],
@@ -135,8 +138,107 @@ async function detectStuck() {
   return { stuck: stuck.length };
 }
 
+/**
+ * Recover orders stranded in `sending` because the sender broadcast the
+ * on-chain transfer but the DB write flipping the order to `completed` was
+ * lost (worker eviction, RPC timeout mid-flight). We scan the operator
+ * wallet's recent outbound wTXC transfers and, if we find a unique match on
+ * (dest_address, amount), record the tx hash and mark completed.
+ *
+ * SAFETY: this only reconciles state — it never re-broadcasts. If no match
+ * is found the order stays in `sending` and the stuck watchdog alerts admins
+ * for manual review. Amount tolerance is 1 wei-decimal (rounding safety on
+ * `Number` → `parseUnits`).
+ */
+async function reconcileStuckSending() {
+  // Look for wTXC payouts that have been in `sending` for >3 min with no
+  // recorded tx hash. Cap to 10 per tick.
+  const cutoff = new Date(Date.now() - 3 * 60_000).toISOString();
+  const { data: stuck } = await supabaseAdmin
+    .from("orders")
+    .select("id,public_id,dest_address,quoted_dest_out,updated_at")
+    .eq("status", "sending")
+    .eq("dest_asset", "wTXC")
+    .is("dest_tx_hash", null)
+    .lt("updated_at", cutoff)
+    .limit(10)
+    .returns<
+      Array<{
+        id: string;
+        public_id: string;
+        dest_address: string;
+        quoted_dest_out: number;
+        updated_at: string;
+      }>
+    >();
+  if (!stuck?.length) return { reconciled: 0 };
+
+  let reconciled = 0;
+  try {
+    const operator = getOperatorEvmAddress();
+    const currentBlock = await getBlockNumber("ethereum");
+    // ~1 hour of Ethereum blocks — well beyond any single tick's send window.
+    const fromBlock = chainStartScanBlock("ethereum", currentBlock);
+    const transfers = await scanOutgoingTransfers({
+      chain: "ethereum",
+      fromAddress: operator,
+      tokenAddresses: [WTXC_CONTRACT],
+      fromBlock,
+      toBlock: currentBlock,
+    });
+
+    for (const o of stuck) {
+      const dest = o.dest_address.toLowerCase();
+      // parseUnits-equivalent: convert quoted amount to raw 8-decimal units.
+      const expectedRaw = BigInt(Math.round(Number(o.quoted_dest_out) * 10 ** WTXC_DECIMALS));
+      // Accept ±1 unit of the smallest denomination for float rounding.
+      const matches = transfers.filter(
+        (t) =>
+          t.to === dest &&
+          (t.amountWei === expectedRaw ||
+            t.amountWei === expectedRaw - 1n ||
+            t.amountWei === expectedRaw + 1n),
+      );
+      if (matches.length === 0) continue;
+      if (matches.length > 1) {
+        await logOrderEvent(o.id, "error", "reconcile_ambiguous", {
+          candidates: matches.map((m) => m.txHash),
+        });
+        void sendAdminAlert(
+          `Ambiguous reconcile for ${o.public_id}`,
+          `Found ${matches.length} outbound wTXC txs from operator to ${dest} matching ${o.quoted_dest_out}. Resolve manually.`,
+          `reconcile-ambiguous-${o.public_id}`,
+        );
+        continue;
+      }
+      const m = matches[0];
+      await supabaseAdmin
+        .from("orders")
+        .update({
+          status: "completed",
+          dest_tx_hash: m.txHash,
+          dest_from_address: operator,
+          error_message: null,
+        })
+        .eq("id", o.id);
+      await logOrderEvent(o.id, "payout", "reconciled", {
+        tx_hash: m.txHash,
+        block: m.blockNumber,
+        source: "operator_outbound_scan",
+      });
+      await notifyById("completed", o.id);
+      reconciled += 1;
+    }
+  } catch (e) {
+    console.error("[reconcile] scan failed", e);
+    throw e;
+  }
+  return { reconciled };
+}
+
 async function watchDeposits() {
   const { data: orders } = await supabaseAdmin
+
     .from("orders")
     .select(
       "id,public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_address,dest_asset,premium_bps,quoted_dest_out,quoted_dest_per_usd,expires_at,paid_amount_usd,bitmart_order_id,bitmart_filled_dest,withdrawal_id",
@@ -814,6 +916,7 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           settle: { sent: 0, queuedForBitmart: 0 },
           replenish: { submitted: 0 },
           balances: { txc: null as number | null, wtxc: null as number | null },
+          reconcile: { reconciled: 0 },
           ms: 0,
         };
         // Run each phase independently so one failure doesn't starve the
@@ -832,9 +935,12 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
         try {
           await runPhase("expireStale", expireStale);
           result.stuck = (await runPhase("detectStuck", detectStuck)) ?? result.stuck;
+          result.reconcile =
+            (await runPhase("reconcileStuckSending", reconcileStuckSending)) ?? result.reconcile;
           result.watch = (await runPhase("watchDeposits", watchDeposits)) ?? result.watch;
           result.watchTxc = (await runPhase("watchTxcDeposits", watchTxcDeposits)) ?? result.watchTxc;
           result.settle = (await runPhase("settleConfirmed", settleConfirmed)) ?? result.settle;
+
           result.replenish = (await runPhase("replenishTreasury", replenishTreasury)) ?? result.replenish;
           result.fills = (await runPhase("pollBitmartFillsDecoupled", pollBitmartFillsDecoupled)) ?? result.fills;
           result.balances = (await runPhase("checkHotBalances", checkHotBalances)) ?? result.balances;

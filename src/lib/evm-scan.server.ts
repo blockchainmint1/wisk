@@ -133,6 +133,49 @@ export async function scanIncomingTransfers(opts: {
   return out;
 }
 
+/**
+ * Find outgoing ERC-20 transfers *from* `fromAddress` since `fromBlock`.
+ * Used to reconcile payouts where our sender broadcast the tx but the DB
+ * write flipping the order to `completed` was lost (worker crash/timeout).
+ */
+export async function scanOutgoingTransfers(opts: {
+  chain: ChainKey;
+  fromAddress: string;
+  tokenAddresses: string[];
+  fromBlock: number;
+  toBlock?: number;
+}): Promise<DetectedTransfer[]> {
+  const { chain, fromAddress, tokenAddresses, fromBlock } = opts;
+  if (!tokenAddresses.length) return [];
+  const params = {
+    fromBlock: "0x" + fromBlock.toString(16),
+    toBlock: opts.toBlock !== undefined ? "0x" + opts.toBlock.toString(16) : "latest",
+    fromAddress,
+    withMetadata: false,
+    excludeZeroValue: true,
+    maxCount: "0x3e8",
+    order: "asc",
+    contractAddresses: tokenAddresses.map((a) => a.toLowerCase()),
+    category: ["erc20"],
+  } as const;
+  const result = await rpc<{ transfers?: AlchemyTransfer[] }>(
+    chain,
+    "alchemy_getAssetTransfers",
+    [params],
+  );
+  return (result.transfers ?? []).map((t, i) => ({
+    chain,
+    txHash: t.hash,
+    logIndex: i,
+    blockNumber: Number.parseInt(t.blockNum, 16),
+    token: t.rawContract.address.toLowerCase(),
+    from: t.from.toLowerCase(),
+    to: t.to.toLowerCase(),
+    amountWei: BigInt(t.rawContract.value),
+  }));
+}
+
+
 export function weiToUsd(amountWei: bigint, decimals: number): number {
   if (decimals <= 6) {
     const scale = 10n ** BigInt(decimals);
