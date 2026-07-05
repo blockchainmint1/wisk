@@ -101,20 +101,19 @@ function buildMessage(
   if (o.source_chain || o.source_token) {
     lines.push(`Pay: ${escapeHtml(o.source_token ?? "?")} on ${escapeHtml(o.source_chain ?? "?")}`);
   }
-  const quoteRatio =
-    o.source_amount_usd && o.quoted_dest_out && o.source_amount_usd > 0
-      ? o.quoted_dest_out / o.source_amount_usd
-      : null;
-  const paidInAsset =
-    o.paid_amount_usd != null && quoteRatio != null
-      ? o.paid_amount_usd * quoteRatio
-      : null;
+  const srcToken = o.source_token ?? "";
 
   if (event === "created") {
     lines.push(`Quote: ${fmtAsset(o.quoted_dest_out, asset)}`);
   }
   if (event === "payment_detected" || event === "payment_confirmed") {
-    lines.push(`Received: ${fmtAsset(paidInAsset ?? o.quoted_dest_out, asset)}`);
+    // Always show the actual on-chain source amount in its native token
+    // (e.g. wTXC on unwrap). Never derive from USD — that math is bogus
+    // for tokens Bitmart doesn't treat as $1.
+    const received = o.paid_amount_source ?? null;
+    if (received != null && srcToken) {
+      lines.push(`Received: ${fmtAsset(received, srcToken)}`);
+    }
     if (o.paid_tx_hash) lines.push(`Tx: <code>${escapeHtml(o.paid_tx_hash)}</code>`);
   }
   if (event === "bitmart_filled") {
