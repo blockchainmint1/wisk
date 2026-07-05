@@ -202,6 +202,11 @@ async function getHotBalance(
   }
 }
 
+// Events we intentionally don't push to Telegram — they still land in
+// order_events for the admin timeline. Trims a happy-path swap from 4
+// pings down to 2 (confirmed + completed) so the group stays useful.
+const SILENT_EVENTS = new Set<OrderNotifyEvent>(["payment_detected", "sending"]);
+
 export async function notifyOrderEvent(
   event: OrderNotifyEvent,
   order: OrderSummary,
@@ -210,14 +215,17 @@ export async function notifyOrderEvent(
   const telegramKey = process.env.TELEGRAM_API_KEY;
   const chatId = await getTelegramChatId();
 
-  const balance = await getHotBalance(order);
+  const isSilent = SILENT_EVENTS.has(event);
+  const balance = isSilent ? null : await getHotBalance(order);
 
-  // Always record in order_events even if Telegram isn't configured.
+  // Always record in order_events even when we're skipping the push.
   await recordEvent(order.id, "telegram", event, {
-    sent: !!(lovableKey && telegramKey && chatId),
+    sent: !isSilent && !!(lovableKey && telegramKey && chatId),
+    silenced: isSilent || undefined,
     balance,
   });
 
+  if (isSilent) return;
   if (!lovableKey || !telegramKey || !chatId) {
     console.warn("[telegram] skipping notify; missing config");
     return;
