@@ -37,6 +37,7 @@ interface OrderSummary {
   source_token?: string | null;
   source_amount_usd?: number | null;
   paid_amount_usd?: number | null;
+  paid_amount_source?: number | null;
   dest_asset?: string | null;
   dest_address?: string | null;
   quoted_dest_out?: number | null;
