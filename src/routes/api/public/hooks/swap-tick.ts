@@ -46,8 +46,24 @@ async function notifyById(
     )
     .eq("id", orderId)
     .maybeSingle();
-  if (data) void notifyOrderEvent(event, data);
+  if (!data) return;
+  // Sum on-chain source amount from deposits so Telegram can display the
+  // real received amount in the source token (wTXC, ETH, USDC, …) rather
+  // than a USD-derived approximation.
+  const { data: deps } = await supabaseAdmin
+    .from("deposits")
+    .select("amount_source")
+    .eq("order_id", orderId);
+  const paidAmountSource = (deps ?? []).reduce(
+    (sum, d) => sum + Number(d.amount_source ?? 0),
+    0,
+  );
+  void notifyOrderEvent(event, {
+    ...data,
+    paid_amount_source: paidAmountSource > 0 ? paidAmountSource : null,
+  });
 }
+
 
 interface OrderRow {
   id: string;
