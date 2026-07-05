@@ -590,6 +590,18 @@ function OrderDetail({ publicId }: { publicId: string }) {
         ? Number(firstDeposit.amount_usd)
         : null;
   const quotedInLabel = order.source_token ?? "—";
+  // For wrap/unwrap the source token has a 1:1 (minus fee) relationship to
+  // the destination, so we can derive the expected source-token amount from
+  // the quote. `source_amount_usd` is USD and would render as e.g.
+  // "10.5930 wTXC" — misleading. For price-based swaps, keep the USD value.
+  const isWrapUnwrap = service === "Wrap" || service === "Unwrap";
+  const feeMul = isWrapUnwrap
+    ? 1 - Math.abs(Number(order.premium_bps ?? 0)) / 10_000
+    : 1;
+  const quotedInValue = isWrapUnwrap && feeMul > 0
+    ? Number(order.quoted_dest_out) / feeMul
+    : Number(order.source_amount_usd);
+  const quotedInLabelResolved = isWrapUnwrap ? quotedInLabel : "USD";
 
   return (
     <div className="p-5 space-y-5">
@@ -598,7 +610,7 @@ function OrderDetail({ publicId }: { publicId: string }) {
         <KV k="Service" v={service} />
         <KV k="Premium" v={`${(order.premium_bps / 100).toFixed(2)}%`} />
         <KV k="Timestamp" v={new Date(order.created_at).toLocaleString()} />
-        <KV k="Quoted in" v={`${Number(order.source_amount_usd).toFixed(4)} ${quotedInLabel}`} />
+        <KV k="Quoted in" v={`${quotedInValue.toFixed(4)} ${quotedInLabelResolved}`} />
         <KV k="Quoted out" v={`${Number(order.quoted_dest_out).toFixed(4)} ${asset}`} />
         <KV k="Expires" v={new Date(order.expires_at).toLocaleString()} />
       </DetailGrid>

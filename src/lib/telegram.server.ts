@@ -37,6 +37,7 @@ interface OrderSummary {
   source_token?: string | null;
   source_amount_usd?: number | null;
   paid_amount_usd?: number | null;
+  paid_amount_source?: number | null;
   dest_asset?: string | null;
   dest_address?: string | null;
   quoted_dest_out?: number | null;
@@ -100,20 +101,19 @@ function buildMessage(
   if (o.source_chain || o.source_token) {
     lines.push(`Pay: ${escapeHtml(o.source_token ?? "?")} on ${escapeHtml(o.source_chain ?? "?")}`);
   }
-  const quoteRatio =
-    o.source_amount_usd && o.quoted_dest_out && o.source_amount_usd > 0
-      ? o.quoted_dest_out / o.source_amount_usd
-      : null;
-  const paidInAsset =
-    o.paid_amount_usd != null && quoteRatio != null
-      ? o.paid_amount_usd * quoteRatio
-      : null;
+  const srcToken = o.source_token ?? "";
 
   if (event === "created") {
     lines.push(`Quote: ${fmtAsset(o.quoted_dest_out, asset)}`);
   }
   if (event === "payment_detected" || event === "payment_confirmed") {
-    lines.push(`Received: ${fmtAsset(paidInAsset ?? o.quoted_dest_out, asset)}`);
+    // Always show the actual on-chain source amount in its native token
+    // (e.g. wTXC on unwrap). Never derive from USD — that math is bogus
+    // for tokens Bitmart doesn't treat as $1.
+    const received = o.paid_amount_source ?? null;
+    if (received != null && srcToken) {
+      lines.push(`Received: ${fmtAsset(received, srcToken)}`);
+    }
     if (o.paid_tx_hash) lines.push(`Tx: <code>${escapeHtml(o.paid_tx_hash)}</code>`);
   }
   if (event === "bitmart_filled") {
@@ -202,6 +202,11 @@ async function getHotBalance(
   }
 }
 
+// Events we intentionally don't push to Telegram — they still land in
+// order_events for the admin timeline. Trims a happy-path swap from 4
+// pings down to 2 (confirmed + completed) so the group stays useful.
+const SILENT_EVENTS = new Set<OrderNotifyEvent>(["payment_detected", "sending"]);
+
 export async function notifyOrderEvent(
   event: OrderNotifyEvent,
   order: OrderSummary,
@@ -210,14 +215,17 @@ export async function notifyOrderEvent(
   const telegramKey = process.env.TELEGRAM_API_KEY;
   const chatId = await getTelegramChatId();
 
-  const balance = await getHotBalance(order);
+  const isSilent = SILENT_EVENTS.has(event);
+  const balance = isSilent ? null : await getHotBalance(order);
 
-  // Always record in order_events even if Telegram isn't configured.
+  // Always record in order_events even when we're skipping the push.
   await recordEvent(order.id, "telegram", event, {
-    sent: !!(lovableKey && telegramKey && chatId),
+    sent: !isSilent && !!(lovableKey && telegramKey && chatId),
+    silenced: isSilent || undefined,
     balance,
   });
 
+  if (isSilent) return;
   if (!lovableKey || !telegramKey || !chatId) {
     console.warn("[telegram] skipping notify; missing config");
     return;
