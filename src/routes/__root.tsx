@@ -116,6 +116,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         src: "https://help.honest.money/api/public/widget.js",
         async: true,
         "data-ecosystem": "wtxc",
+        "data-folder": "wtxc",
         "data-brand-name": "wTXC",
         "data-context": "wTXC",
         "data-theme": "auto",
