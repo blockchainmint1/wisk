@@ -606,8 +606,8 @@ function OrderDetail({ publicId }: { publicId: string }) {
         <KV k="Premium" v={`${(order.premium_bps / 100).toFixed(2)}%`} />
         <KV k="Timestamp" v={new Date(order.created_at).toLocaleString()} />
         <KV k="Quoted in" v={`${quotedInValue.toFixed(4)} ${quotedInLabel}`} />
-        <KV k="Quoted out" v={`${Number(order.quoted_dest_out).toFixed(4)} ${asset}`} />
         <KV k="Expires" v={new Date(order.expires_at).toLocaleString()} />
+        <KV k="Quoted out" v={`${Number(order.quoted_dest_out).toFixed(4)} ${asset}`} />
       </DetailGrid>
 
       {/* Deposit */}
