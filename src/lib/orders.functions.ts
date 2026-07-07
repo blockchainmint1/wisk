@@ -181,6 +181,20 @@ export const createOrder = createServerFn({ method: "POST" })
 
     const expiresAt = new Date(Date.now() + settings.expiry_minutes * 60_000).toISOString();
 
+    // Snapshot the source-chain tip at creation time. The scanner will
+    // reject any deposit whose block predates this — that's the second
+    // layer of replay protection: even if the (chain,tx_hash,log_index)
+    // dedupe misses (e.g. row deletion), a stale on-chain deposit at a
+    // recycled HD address can't credit a fresh order.
+    let depositStartBlock: number | null = null;
+    try {
+      depositStartBlock = isWrap
+        ? await getTxcTipHeight()
+        : await getBlockNumber(data.sourceChain as ChainKey);
+    } catch (e) {
+      console.warn("[createOrder] start-block snapshot failed", e);
+    }
+
     const { data: order, error } = await supabaseAdmin
       .from("orders")
       .insert({
@@ -189,6 +203,7 @@ export const createOrder = createServerFn({ method: "POST" })
         source_amount_usd: data.usdAmount,
         deposit_address: isWrap ? depositAddress : depositAddress.toLowerCase(),
         deposit_index: idxData,
+        deposit_start_block: depositStartBlock,
         dest_asset: dest.key,
         dest_address: data.destAddress,
         quoted_dest_per_usd: assetPerUsd,
