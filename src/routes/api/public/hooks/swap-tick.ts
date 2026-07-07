@@ -531,6 +531,30 @@ async function watchTxcDeposits() {
         const txcAmount = t.amountSats / 1e8;
         const usd = txcAmount * txcSpot;
 
+        // REPLAY GUARD: reject any TXC tx that was already credited to a
+        // different order (address recycling means the same on-chain deposit
+        // must never be counted twice).
+        const { data: existingDep } = await supabaseAdmin
+          .from("deposits")
+          .select("order_id")
+          .eq("chain", "txc")
+          .eq("tx_hash", t.txid)
+          .eq("log_index", 0)
+          .maybeSingle();
+        if (existingDep && existingDep.order_id !== order.id) {
+          await sendAdminAlert(
+            "Replay blocked",
+            `TXC tx ${t.txid} at ${order.deposit_address} was already credited to order ${existingDep.order_id}; refusing to credit ${order.public_id}.`,
+            `replay:txc:${t.txid}`,
+          );
+          await logOrderEvent(order.id, "note", "replay_blocked", {
+            tx_hash: t.txid,
+            original_order_id: existingDep.order_id,
+          });
+          continue;
+        }
+
+
         await supabaseAdmin.from("deposits").upsert(
           {
             order_id: order.id,
