@@ -9,6 +9,16 @@ import { DEST_ASSETS, getDestination, type DestAsset } from "./destinations";
 import { deriveDepositAddress } from "./hd.server";
 import { getSettings } from "./settings.server";
 import { notifyOrderEvent } from "./telegram.server";
+import { getBlockNumber } from "./evm-scan.server";
+import { getTxcTipHeight } from "./txc-scan.server";
+
+// Anti-abuse limits on order creation, keyed on destination address.
+// - MAX_OPEN_PER_DEST: cap concurrent unpaid orders per destination.
+// - MIN_INTERVAL_MS: minimum spacing between orders for the same destination.
+// Prevents a client from spamming createOrder and burning HD indices, and
+// (combined with deposit_start_block) makes stale-deposit replay unprofitable.
+const MAX_OPEN_PER_DEST = 3;
+const MIN_INTERVAL_MS = 20_000;
 
 const EVM_CHAIN_KEYS = Object.keys(CHAINS) as [ChainKey, ...ChainKey[]];
 // "txc" is the native TEXITcoin chain used as a *source* for the wrap
