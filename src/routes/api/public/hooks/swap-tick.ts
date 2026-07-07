@@ -83,6 +83,7 @@ interface OrderRow {
   bitmart_order_id: string | null;
   bitmart_filled_dest: number | null;
   withdrawal_id: string | null;
+  deposit_start_block: number | null;
 }
 
 async function failOrder(orderId: string, message: string) {
@@ -257,7 +258,7 @@ async function watchDeposits() {
 
     .from("orders")
     .select(
-      "id,public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_address,dest_asset,premium_bps,quoted_dest_out,quoted_dest_per_usd,expires_at,paid_amount_usd,bitmart_order_id,bitmart_filled_dest,withdrawal_id",
+      "id,public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_address,dest_asset,premium_bps,quoted_dest_out,quoted_dest_per_usd,expires_at,paid_amount_usd,bitmart_order_id,bitmart_filled_dest,withdrawal_id,deposit_start_block",
     )
     .in("status", ["awaiting_payment", "payment_detected"])
     .neq("source_chain", "txc")
@@ -329,6 +330,29 @@ async function watchDeposits() {
             sourceTokenAmount = Number(t.amountWei) / 10 ** orderToken.decimals;
           }
           const confirmations = currentBlock - t.blockNumber + 1;
+
+          // BLOCK-HEIGHT GUARD: reject any deposit mined before the order
+          // was created. Second-layer defence against HD address recycling:
+          // even if the (chain,tx_hash,log_index) dedupe row is missing,
+          // a stale on-chain tx at a recycled address can't credit a fresh
+          // order because its block predates the order's start snapshot.
+          if (
+            order.deposit_start_block != null &&
+            t.blockNumber < order.deposit_start_block
+          ) {
+            await sendAdminAlert(
+              "Stale deposit blocked",
+              `${chainKey} tx ${t.txHash} at block ${t.blockNumber} predates order ${order.public_id} (start block ${order.deposit_start_block}). Refusing to credit.`,
+              `stale:${t.txHash}:${t.logIndex}`,
+            );
+            await logOrderEvent(order.id, "note", "stale_deposit_blocked", {
+              tx_hash: t.txHash,
+              tx_block: t.blockNumber,
+              order_start_block: order.deposit_start_block,
+            });
+            continue;
+          }
+
 
           // REPLAY GUARD: reject any on-chain deposit whose (chain,tx_hash,
           // log_index) was already credited to a DIFFERENT order. HD deposit
@@ -481,7 +505,7 @@ async function watchTxcDeposits() {
   const { data: orders } = await supabaseAdmin
     .from("orders")
     .select(
-      "id,public_id,status,source_amount_usd,deposit_address,premium_bps,quoted_dest_out,quoted_dest_per_usd,original_quoted_dest_out,underpayment_ack",
+      "id,public_id,status,source_amount_usd,deposit_address,premium_bps,quoted_dest_out,quoted_dest_per_usd,original_quoted_dest_out,underpayment_ack,deposit_start_block",
     )
     .in("status", ["awaiting_payment", "payment_detected"])
     .eq("source_chain", "txc")
@@ -497,6 +521,7 @@ async function watchTxcDeposits() {
         quoted_dest_per_usd: number;
         original_quoted_dest_out: number | null;
         underpayment_ack: string | null;
+        deposit_start_block: number | null;
       }>
     >();
   if (!orders?.length) return { detected: 0 };
@@ -530,6 +555,30 @@ async function watchTxcDeposits() {
       for (const t of transfers) {
         const txcAmount = t.amountSats / 1e8;
         const usd = txcAmount * txcSpot;
+
+        // BLOCK-HEIGHT GUARD: reject any TXC deposit mined before the order
+        // was created. Blocks stale-deposit replay at recycled addresses.
+        // Skip when blockHeight is 0 (unconfirmed mempool) since TXC pays on
+        // 0-conf and mempool txs have no block yet — those can't be stale.
+        const txBlock = t.blockHeight ?? 0;
+        if (
+          order.deposit_start_block != null &&
+          txBlock > 0 &&
+          txBlock < order.deposit_start_block
+        ) {
+          await sendAdminAlert(
+            "Stale deposit blocked",
+            `TXC tx ${t.txid} at block ${txBlock} predates order ${order.public_id} (start block ${order.deposit_start_block}). Refusing to credit.`,
+            `stale:txc:${t.txid}`,
+          );
+          await logOrderEvent(order.id, "note", "stale_deposit_blocked", {
+            tx_hash: t.txid,
+            tx_block: txBlock,
+            order_start_block: order.deposit_start_block,
+          });
+          continue;
+        }
+
 
         // REPLAY GUARD: reject any TXC tx that was already credited to a
         // different order (address recycling means the same on-chain deposit

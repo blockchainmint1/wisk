@@ -396,6 +396,7 @@ export type Database = {
           created_at: string
           deposit_address: string
           deposit_index: number
+          deposit_start_block: number | null
           dest_address: string
           dest_asset: string
           dest_fee_sats: number | null
@@ -428,6 +429,7 @@ export type Database = {
           created_at?: string
           deposit_address: string
           deposit_index: number
+          deposit_start_block?: number | null
           dest_address: string
           dest_asset?: string
           dest_fee_sats?: number | null
@@ -460,6 +462,7 @@ export type Database = {
           created_at?: string
           deposit_address?: string
           deposit_index?: number
+          deposit_start_block?: number | null
           dest_address?: string
           dest_asset?: string
           dest_fee_sats?: number | null
