@@ -344,7 +344,9 @@ async function watchDeposits() {
             .maybeSingle();
           if (existingDep && existingDep.order_id !== order.id) {
             await sendAdminAlert(
-              `🚨 Replay blocked (${chainKey}): tx ${t.txHash} at ${order.deposit_address} was already credited to order ${existingDep.order_id}; refusing to credit ${order.public_id}.`,
+              "Replay blocked",
+              `${chainKey} tx ${t.txHash} at ${order.deposit_address} was already credited to order ${existingDep.order_id}; refusing to credit ${order.public_id}.`,
+              `replay:${t.txHash}:${t.logIndex}`,
             );
             await logOrderEvent(order.id, "note", "replay_blocked", {
               tx_hash: t.txHash,
