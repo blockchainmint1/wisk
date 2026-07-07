@@ -330,6 +330,29 @@ async function watchDeposits() {
           }
           const confirmations = currentBlock - t.blockNumber + 1;
 
+          // REPLAY GUARD: reject any on-chain deposit whose (chain,tx_hash,
+          // log_index) was already credited to a DIFFERENT order. HD deposit
+          // addresses are recycled after 1h, so without this check the scanner
+          // would credit a stale tx (from a prior order at the same address)
+          // to a freshly-created order.
+          const { data: existingDep } = await supabaseAdmin
+            .from("deposits")
+            .select("order_id")
+            .eq("chain", chainKey)
+            .eq("tx_hash", t.txHash)
+            .eq("log_index", t.logIndex)
+            .maybeSingle();
+          if (existingDep && existingDep.order_id !== order.id) {
+            await sendAdminAlert(
+              `🚨 Replay blocked (${chainKey}): tx ${t.txHash} at ${order.deposit_address} was already credited to order ${existingDep.order_id}; refusing to credit ${order.public_id}.`,
+            );
+            await logOrderEvent(order.id, "note", "replay_blocked", {
+              tx_hash: t.txHash,
+              original_order_id: existingDep.order_id,
+            });
+            continue;
+          }
+
           await supabaseAdmin.from("deposits").upsert(
             {
               order_id: order.id,
