@@ -83,6 +83,7 @@ interface OrderRow {
   bitmart_order_id: string | null;
   bitmart_filled_dest: number | null;
   withdrawal_id: string | null;
+  deposit_start_block: number | null;
 }
 
 async function failOrder(orderId: string, message: string) {
