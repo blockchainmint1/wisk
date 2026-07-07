@@ -113,6 +113,34 @@ export const createOrder = createServerFn({ method: "POST" })
       throw new Error("This wallet address cannot be used for new orders.");
     }
 
+    // Per-destination rate limits. Both keyed on lowercased address so EVM
+    // casing games don't bypass. TXC addresses are already case-sensitive.
+    const { count: openCount } = await supabaseAdmin
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .eq("dest_address", data.destAddress)
+      .in("status", ["awaiting_payment", "payment_detected"]);
+    if ((openCount ?? 0) >= MAX_OPEN_PER_DEST) {
+      throw new Error(
+        `Too many open orders for this destination. Finish or wait for existing orders to expire before creating another.`,
+      );
+    }
+
+    const { data: recent } = await supabaseAdmin
+      .from("orders")
+      .select("created_at")
+      .eq("dest_address", data.destAddress)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (recent?.created_at) {
+      const ageMs = Date.now() - new Date(recent.created_at).getTime();
+      if (ageMs < MIN_INTERVAL_MS) {
+        const wait = Math.ceil((MIN_INTERVAL_MS - ageMs) / 1000);
+        throw new Error(`Please wait ${wait}s before creating another order for this destination.`);
+      }
+    }
+
 
     // Quote calculation:
     //  - Wrap (source = native TXC → dest = wTXC): 1 TXC = (1 - wrap fee) wTXC.
