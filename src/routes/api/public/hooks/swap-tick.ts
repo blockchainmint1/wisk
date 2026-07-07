@@ -331,6 +331,29 @@ async function watchDeposits() {
           }
           const confirmations = currentBlock - t.blockNumber + 1;
 
+          // BLOCK-HEIGHT GUARD: reject any deposit mined before the order
+          // was created. Second-layer defence against HD address recycling:
+          // even if the (chain,tx_hash,log_index) dedupe row is missing,
+          // a stale on-chain tx at a recycled address can't credit a fresh
+          // order because its block predates the order's start snapshot.
+          if (
+            order.deposit_start_block != null &&
+            t.blockNumber < order.deposit_start_block
+          ) {
+            await sendAdminAlert(
+              "Stale deposit blocked",
+              `${chainKey} tx ${t.txHash} at block ${t.blockNumber} predates order ${order.public_id} (start block ${order.deposit_start_block}). Refusing to credit.`,
+              `stale:${t.txHash}:${t.logIndex}`,
+            );
+            await logOrderEvent(order.id, "note", "stale_deposit_blocked", {
+              tx_hash: t.txHash,
+              tx_block: t.blockNumber,
+              order_start_block: order.deposit_start_block,
+            });
+            continue;
+          }
+
+
           // REPLAY GUARD: reject any on-chain deposit whose (chain,tx_hash,
           // log_index) was already credited to a DIFFERENT order. HD deposit
           // addresses are recycled after 1h, so without this check the scanner
