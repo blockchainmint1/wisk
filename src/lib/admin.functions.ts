@@ -191,38 +191,50 @@ export const adminOrderDetail = createServerFn({ method: "POST" })
       }
     }
 
-    // Hot wallet balance (TXC + wTXC)
+    // Hot wallet balance (TXC + wTXC). Bounded with a hard timeout so a
+    // slow/stalled chain RPC (Esplora, Alchemy) can never wedge the admin
+    // detail panel — the panel just renders without the balance if the
+    // lookup misses the deadline.
     let hotBalance: {
       address: string;
       confirmedTxc: number;
       unconfirmedTxc: number;
     } | null = null;
     const destAsset = order.dest_asset ?? "TXC";
+    const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
+      Promise.race([
+        p,
+        new Promise<T>((_r, rej) =>
+          setTimeout(() => rej(new Error(`hotBalance timeout after ${ms}ms`)), ms),
+        ),
+      ]);
     if (destAsset === "TXC") {
       try {
         const { getTxcHotAddress, getTxcAddressBalanceSats } = await import(
           "./txc-sign.server"
         );
         const address = getTxcHotAddress();
-        const bal = await getTxcAddressBalanceSats(address);
+        const bal = await withTimeout(getTxcAddressBalanceSats(address), 4000);
         hotBalance = {
           address,
           confirmedTxc: bal.confirmed / 1e8,
           unconfirmedTxc: bal.unconfirmed / 1e8,
         };
-      } catch {
+      } catch (e) {
+        console.warn("[adminOrderDetail] TXC hotBalance failed:", (e as Error)?.message);
         hotBalance = null;
       }
     } else if (destAsset === "wTXC") {
       try {
         const address = getOperatorEvmAddress();
-        const bal = await getWtxcBalance(address);
+        const bal = await withTimeout(getWtxcBalance(address), 4000);
         hotBalance = {
           address,
           confirmedTxc: bal,
           unconfirmedTxc: 0,
         };
-      } catch {
+      } catch (e) {
+        console.warn("[adminOrderDetail] wTXC hotBalance failed:", (e as Error)?.message);
         hotBalance = null;
       }
     }
