@@ -11,6 +11,7 @@
 // Auth: route lives under /api/public/* which bypasses Lovable's site auth.
 
 import { createFileRoute } from "@tanstack/react-router";
+import { getRequest } from "@tanstack/react-start/server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   getOrderDetail,
@@ -29,7 +30,7 @@ import { getDestination } from "@/lib/destinations";
 import { notifyOrderEvent, logOrderEvent, sendAdminAlert } from "@/lib/telegram.server";
 import { getSettings } from "@/lib/settings.server";
 import { sendTxc } from "@/lib/txc-sign.server";
-import { sendWtxc, WTXC_CONTRACT, WTXC_DECIMALS, getEvmNonce } from "@/lib/wtxc.server";
+import { WTXC_CONTRACT, WTXC_DECIMALS, getEvmNonce } from "@/lib/wtxc.server";
 import { getOperatorEvmAddress } from "@/lib/bridge-wallet.server";
 import { getSpotPrice } from "@/lib/bitmart.server";
 import { scanTxcIncoming, getTxcTipHeight } from "@/lib/txc-scan.server";
@@ -871,6 +872,19 @@ async function settleConfirmed() {
   let sent = 0;
   const queuedForBitmart = 0;
 
+  // Same-origin base URL for firing off the dedicated payout endpoint. The
+  // request context is guaranteed to exist here because settleConfirmed is
+  // only called from inside the swap-tick POST handler.
+  let originForPayout: string | null = null;
+  try {
+    const req = getRequest();
+    originForPayout = new URL(req.url).origin;
+  } catch {
+    // If we somehow lost request context, wTXC payouts fall back to inline
+    // (which is what caused the original problem, but at least the order
+    // doesn't just sit forever — the reconciler still runs).
+  }
+
   for (const o of orders) {
     const asset = o.dest_asset || "TXC";
     try {
@@ -893,6 +907,10 @@ async function settleConfirmed() {
           status: "sending",
           send_attempts: nextAttempt,
           dest_broadcast_nonce: attemptNonce,
+          // Clear any prior tx hash so payout-send is allowed to broadcast
+          // again on this attempt. (The reconciler only sets tx_hash from a
+          // real on-chain match; if we're here it wasn't found.)
+          dest_tx_hash: null,
         })
         .eq("id", o.id);
       await logOrderEvent(o.id, "state", "sending", { asset, amount: o.quoted_dest_out });
@@ -905,40 +923,33 @@ async function settleConfirmed() {
       // Only fire the customer-facing "sending" telegram on the first attempt.
       if (nextAttempt === 1) await notifyById("sending", o.id);
 
-      const result =
-        asset === "TXC"
-          ? await sendTxc({
-              toAddress: o.dest_address,
-              amountTxc: Number(o.quoted_dest_out),
-            })
-          : asset === "wTXC"
-            ? await (async () => {
-                const r = await sendWtxc({
-                  toAddress: o.dest_address,
-                  amountWtxc: Number(o.quoted_dest_out),
-                  // Persist the tx hash the instant the tx is submitted, so
-                  // if the Worker is killed during tx.wait(1) we can still
-                  // recover on the next tick via receipt lookup.
-                  onSubmitted: async ({ txHash, nonce }) => {
-                    await supabaseAdmin
-                      .from("orders")
-                      .update({ dest_tx_hash: txHash })
-                      .eq("id", o.id);
-                    await logOrderEvent(o.id, "note", "broadcast_submitted", {
-                      tx_hash: txHash,
-                      nonce,
-                    });
-                  },
-                });
-                return {
-                  txid: r.txid,
-                  fromAddress: r.fromAddress,
-                  feeSats: r.feeSats,
-                };
-              })()
-            : (() => {
-                throw new Error(`Unsupported dest_asset: ${asset}`);
-              })();
+      if (asset === "wTXC" && originForPayout) {
+        // Fire-and-forget: kick a dedicated Worker invocation so the send has
+        // its own fresh CPU / wall-clock budget. We do NOT await; the
+        // reconciler will roll back and retry if this invocation dies or the
+        // broadcast never lands.
+        const url = `${originForPayout}/api/public/hooks/payout-send`;
+        try {
+          void fetch(url, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ orderId: o.id }),
+          }).catch((err) => {
+            console.warn("[settle] payout-send kick failed", o.public_id, err);
+          });
+        } catch (err) {
+          console.warn("[settle] payout-send kick threw sync", o.public_id, err);
+        }
+        sent += 1;
+        continue;
+      }
+
+      // TXC (native) payouts stay inline — our own RPC node is fast and
+      // doesn't have the multi-round-trip pre-flight ethers does on EVM.
+      const result = await sendTxc({
+        toAddress: o.dest_address,
+        amountTxc: Number(o.quoted_dest_out),
+      });
 
       await supabaseAdmin
         .from("orders")
