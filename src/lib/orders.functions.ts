@@ -8,7 +8,7 @@ import { getMergedChain, getMergedChains, getMergedToken } from "./chains.server
 import { DEST_ASSETS, getDestination, type DestAsset } from "./destinations";
 import { deriveDepositAddress } from "./hd.server";
 import { getSettings } from "./settings.server";
-import { notifyOrderEvent } from "./telegram.server";
+import { notifyOrderEvent, sendAdminAlert } from "./telegram.server";
 import { getBlockNumber } from "./evm-scan.server";
 import { getTxcTipHeight } from "./txc-scan.server";
 
@@ -181,19 +181,30 @@ export const createOrder = createServerFn({ method: "POST" })
 
     const expiresAt = new Date(Date.now() + settings.expiry_minutes * 60_000).toISOString();
 
-    // Snapshot the source-chain tip at creation time. The scanner will
-    // reject any deposit whose block predates this — that's the second
-    // layer of replay protection: even if the (chain,tx_hash,log_index)
-    // dedupe misses (e.g. row deletion), a stale on-chain deposit at a
-    // recycled HD address can't credit a fresh order.
+    // Snapshot the source-chain tip at creation time, minus a small reorg
+    // cushion. The scanner rejects any deposit whose block predates this,
+    // which blocks stale-deposit replay at recycled HD addresses. The cushion
+    // absorbs shallow reorgs / RPC tip lag so a legit deposit that lands
+    // 1-2 blocks "behind" the reported tip still credits normally.
+    const REORG_CUSHION_BLOCKS = 3; // same for EVM and TXC
     let depositStartBlock: number | null = null;
     try {
-      depositStartBlock = isWrap
+      const tip = isWrap
         ? await getTxcTipHeight()
         : await getBlockNumber(data.sourceChain as ChainKey);
+      depositStartBlock = Math.max(0, tip - REORG_CUSHION_BLOCKS);
     } catch (e) {
+      // Don't fail the order — we need swaps to keep working even if a
+      // chain RPC is temporarily unreachable. But this DOES temporarily
+      // disable the block-height guard for this order, so page the admin.
       console.warn("[createOrder] start-block snapshot failed", e);
+      void sendAdminAlert(
+        "Chain tip unavailable — replay guard disabled for this order",
+        `Could not read ${data.sourceChain} tip during order creation. Order will be created without a deposit_start_block, so the stale-deposit guard cannot protect it. Check the chain's RPC health. Error: ${(e as Error)?.message ?? String(e)}`,
+        `tip-fail:${data.sourceChain}:${Math.floor(Date.now() / 300_000)}`, // dedupe: 1 alert per chain per 5min
+      );
     }
+
 
     const { data: order, error } = await supabaseAdmin
       .from("orders")
