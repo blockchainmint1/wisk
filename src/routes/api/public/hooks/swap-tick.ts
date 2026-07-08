@@ -206,15 +206,15 @@ async function detectStuck() {
  * `Number` → `parseUnits`).
  */
 async function reconcileStuckSending() {
-  // Look for wTXC payouts that have been in `sending` for >3 min with no
-  // recorded tx hash. Cap to 10 per tick.
+  // Look for wTXC payouts that have been in `sending` for >3 min. Cap to 10 per tick.
   const cutoff = new Date(Date.now() - 3 * 60_000).toISOString();
   const { data: stuck } = await supabaseAdmin
     .from("orders")
-    .select("id,public_id,dest_address,quoted_dest_out,updated_at")
+    .select(
+      "id,public_id,dest_address,quoted_dest_out,dest_tx_hash,dest_broadcast_nonce,send_attempts,updated_at",
+    )
     .eq("status", "sending")
     .eq("dest_asset", "wTXC")
-    .is("dest_tx_hash", null)
     .lt("updated_at", cutoff)
     .limit(10)
     .returns<
@@ -223,16 +223,20 @@ async function reconcileStuckSending() {
         public_id: string;
         dest_address: string;
         quoted_dest_out: number;
+        dest_tx_hash: string | null;
+        dest_broadcast_nonce: number | null;
+        send_attempts: number | null;
         updated_at: string;
       }>
     >();
-  if (!stuck?.length) return { reconciled: 0 };
+  if (!stuck?.length) return { reconciled: 0, retried: 0 };
 
+  const MAX_ATTEMPTS = 3;
   let reconciled = 0;
+  let retried = 0;
   try {
     const operator = getOperatorEvmAddress();
     const currentBlock = await getBlockNumber("ethereum");
-    // ~1 hour of Ethereum blocks — well beyond any single tick's send window.
     const fromBlock = chainStartScanBlock("ethereum", currentBlock);
     const transfers = await scanOutgoingTransfers({
       chain: "ethereum",
@@ -242,54 +246,115 @@ async function reconcileStuckSending() {
       toBlock: currentBlock,
     });
 
+    // Read current pending nonce ONCE — used to decide whether it's safe to
+    // retry orders that show no matching outbound transfer.
+    let currentPendingNonce: number | null = null;
+    try {
+      currentPendingNonce = await getEvmNonce(operator, "pending");
+    } catch (e) {
+      console.warn("[reconcile] could not read operator nonce", e);
+    }
+
     for (const o of stuck) {
       const dest = o.dest_address.toLowerCase();
-      // parseUnits-equivalent: convert quoted amount to raw 8-decimal units.
       const expectedRaw = BigInt(Math.round(Number(o.quoted_dest_out) * 10 ** WTXC_DECIMALS));
-      // Accept ±1 unit of the smallest denomination for float rounding.
-      const matches = transfers.filter(
-        (t) =>
-          t.to === dest &&
-          (t.amountWei === expectedRaw ||
-            t.amountWei === expectedRaw - 1n ||
-            t.amountWei === expectedRaw + 1n),
-      );
-      if (matches.length === 0) continue;
-      if (matches.length > 1) {
-        await logOrderEvent(o.id, "error", "reconcile_ambiguous", {
-          candidates: matches.map((m) => m.txHash),
-        });
-        void sendAdminAlert(
-          `Ambiguous reconcile for ${o.public_id}`,
-          `Found ${matches.length} outbound wTXC txs from operator to ${dest} matching ${o.quoted_dest_out}. Resolve manually.`,
-          `reconcile-ambiguous-${o.public_id}`,
+
+      // 1) Prefer matching by the tx hash we recorded at broadcast_submitted.
+      let match = o.dest_tx_hash
+        ? transfers.find((t) => t.txHash.toLowerCase() === o.dest_tx_hash!.toLowerCase())
+        : undefined;
+
+      // 2) Otherwise match by (dest_address, amount) with ±1 unit tolerance.
+      if (!match) {
+        const candidates = transfers.filter(
+          (t) =>
+            t.to === dest &&
+            (t.amountWei === expectedRaw ||
+              t.amountWei === expectedRaw - 1n ||
+              t.amountWei === expectedRaw + 1n),
         );
+        if (candidates.length > 1) {
+          await logOrderEvent(o.id, "error", "reconcile_ambiguous", {
+            candidates: candidates.map((m) => m.txHash),
+          });
+          void sendAdminAlert(
+            `Ambiguous reconcile for ${o.public_id}`,
+            `Found ${candidates.length} outbound wTXC txs from operator to ${dest} matching ${o.quoted_dest_out}. Resolve manually.`,
+            `reconcile-ambiguous-${o.public_id}`,
+          );
+          continue;
+        }
+        match = candidates[0];
+      }
+
+      if (match) {
+        await supabaseAdmin
+          .from("orders")
+          .update({
+            status: "completed",
+            dest_tx_hash: match.txHash,
+            dest_from_address: operator,
+            error_message: null,
+          })
+          .eq("id", o.id);
+        await logOrderEvent(o.id, "payout", "reconciled", {
+          tx_hash: match.txHash,
+          block: match.blockNumber,
+          source: o.dest_tx_hash ? "submitted_hash_lookup" : "operator_outbound_scan",
+        });
+        await notifyById("completed", o.id);
+        reconciled += 1;
         continue;
       }
-      const m = matches[0];
-      await supabaseAdmin
-        .from("orders")
-        .update({
-          status: "completed",
-          dest_tx_hash: m.txHash,
-          dest_from_address: operator,
-          error_message: null,
-        })
-        .eq("id", o.id);
-      await logOrderEvent(o.id, "payout", "reconciled", {
-        tx_hash: m.txHash,
-        block: m.blockNumber,
-        source: "operator_outbound_scan",
-      });
-      await notifyById("completed", o.id);
-      reconciled += 1;
+
+      // 3) No on-chain match. Decide whether to retry.
+      // Safe to retry only when we can PROVE nothing was broadcast:
+      //   - we recorded a pending nonce at attempt time, AND
+      //   - the current pending nonce has NOT advanced past it, AND
+      //   - we have not recorded a submitted tx hash for this order, AND
+      //   - we're under the retry cap.
+      const attempts = o.send_attempts ?? 0;
+      const safeToRetry =
+        !o.dest_tx_hash &&
+        o.dest_broadcast_nonce !== null &&
+        currentPendingNonce !== null &&
+        currentPendingNonce <= o.dest_broadcast_nonce &&
+        attempts < MAX_ATTEMPTS;
+
+      if (safeToRetry) {
+        // Roll back to `confirmed` so settleConfirmed picks it up next tick.
+        await supabaseAdmin
+          .from("orders")
+          .update({ status: "confirmed" })
+          .eq("id", o.id);
+        await logOrderEvent(o.id, "note", "retry_scheduled", {
+          reason: "no_broadcast_detected",
+          attempts_used: attempts,
+          recorded_nonce: o.dest_broadcast_nonce,
+          current_pending_nonce: currentPendingNonce,
+        });
+        retried += 1;
+        continue;
+      }
+
+      // Otherwise: ambiguous (nonce advanced but no matching transfer found)
+      // or exceeded retry cap. Alert admin once via existing stuck watchdog;
+      // do not double-alert here.
+      if (attempts >= MAX_ATTEMPTS) {
+        void sendAdminAlert(
+          `Payout retry cap for ${o.public_id}`,
+          `Order ${o.public_id} has reached ${attempts} send attempts with no on-chain match. Investigate manually.`,
+          `retry-cap-${o.public_id}`,
+        );
+      }
     }
   } catch (e) {
     console.error("[reconcile] scan failed", e);
     throw e;
   }
-  return { reconciled };
+  return { reconciled, retried };
 }
+
 
 async function watchDeposits() {
   const { data: orders } = await supabaseAdmin
