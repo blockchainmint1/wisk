@@ -336,20 +336,18 @@ async function watchDeposits() {
           // even if the (chain,tx_hash,log_index) dedupe row is missing,
           // a stale on-chain tx at a recycled address can't credit a fresh
           // order because its block predates the order's start snapshot.
+          //
+          // NOTE: the *common* cause of this is innocent — a customer got a
+          // recycled address that happened to have an old deposit sitting on
+          // it. So we DO NOT admin-alert on every hit (that just spams the
+          // channel). We log the event once per (order, tx) for audit, and
+          // only page when the SAME tx has been blocked against 2+ distinct
+          // orders — that's the actual replay-attack signal.
           if (
             order.deposit_start_block != null &&
             t.blockNumber < order.deposit_start_block
           ) {
-            await sendAdminAlert(
-              "Stale deposit blocked",
-              `${chainKey} tx ${t.txHash} at block ${t.blockNumber} predates order ${order.public_id} (start block ${order.deposit_start_block}). Refusing to credit.`,
-              `stale:${t.txHash}:${t.logIndex}`,
-            );
-            await logOrderEvent(order.id, "note", "stale_deposit_blocked", {
-              tx_hash: t.txHash,
-              tx_block: t.blockNumber,
-              order_start_block: order.deposit_start_block,
-            });
+            await maybeLogStaleDeposit(order.id, order.public_id, chainKey, t.txHash, t.blockNumber, order.deposit_start_block);
             continue;
           }
 
