@@ -123,6 +123,8 @@ async function sendWtxcInner(opts: {
   fromIndex: number;
   toAddress: string;
   amountWtxc: number;
+  onSubmitted?: (info: { txHash: string; nonce: number }) => Promise<void> | void;
+  timeoutMs?: number;
 }): Promise<WtxcSendResult> {
   if (!/^0x[a-fA-F0-9]{40}$/.test(opts.toAddress)) {
     throw new Error(`Invalid wTXC destination address: ${opts.toAddress}`);
@@ -130,12 +132,36 @@ async function sendWtxcInner(opts: {
   if (!Number.isFinite(opts.amountWtxc) || opts.amountWtxc <= 0) {
     throw new Error(`Invalid wTXC amount: ${opts.amountWtxc}`);
   }
+  const timeoutMs = opts.timeoutMs ?? 22_000;
   const provider = getProvider();
   const wallet = deriveEvmWallet(opts.fromIndex).connect(provider);
   const contract = new Contract(WTXC_CONTRACT, ERC20_ABI, wallet);
   const amountRaw = parseUnits(opts.amountWtxc.toFixed(WTXC_DECIMALS), WTXC_DECIMALS);
 
-  const tx = await contract.transfer(opts.toAddress, amountRaw);
+  // Hard timeout: without this, a stalled Alchemy pre-flight (estimateGas /
+  // getFeeData / getTransactionCount) can silently run past the Cloudflare
+  // Worker wall-clock limit and the isolate dies with no error thrown.
+  const submitted: Promise<{ tx: Awaited<ReturnType<typeof contract.transfer>>; nonce: number }> =
+    (async () => {
+      const tx = await contract.transfer(opts.toAddress, amountRaw);
+      return { tx, nonce: Number(tx.nonce) };
+    })();
+  const timer = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`sendWtxc: broadcast timed out after ${timeoutMs}ms`)), timeoutMs),
+  );
+  const { tx, nonce } = await Promise.race([submitted, timer]);
+
+  // Broadcast succeeded — persist the hash immediately via the callback so
+  // that even if `tx.wait(1)` is killed by a worker eviction, the reconciler
+  // can complete the order by looking up this hash next tick.
+  if (opts.onSubmitted) {
+    try {
+      await opts.onSubmitted({ txHash: tx.hash, nonce });
+    } catch (e) {
+      console.error("[sendWtxc] onSubmitted callback failed", e);
+    }
+  }
+
   const receipt = await tx.wait(1);
   return {
     txid: tx.hash,
@@ -145,4 +171,5 @@ async function sendWtxcInner(opts: {
     feeSats: Number(receipt?.gasUsed ?? 0n),
   };
 }
+
 
