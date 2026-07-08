@@ -85,27 +85,19 @@ interface OrderRow {
   withdrawal_id: string | null;
   deposit_start_block: number | null;
 }
-
-// Threshold at which a repeatedly-blocked stale deposit stops being "unlucky
-// address reuse" and starts looking like an actual replay attack. If the same
-// on-chain tx has been rejected against N distinct orders, page the admin.
-const STALE_DEPOSIT_ALERT_THRESHOLD = 2;
-
 /**
- * Record a blocked stale deposit for audit — but stay quiet in Telegram
- * unless the pattern is actually suspicious.
+ * A deposit tx mined before the order's start block cannot possibly belong
+ * to this order — deposit addresses are recycled no sooner than 1h after
+ * their last order, and TXC blocks are ~3min, so any legit deposit lands at
+ * or after `order.deposit_start_block`. Anything older is just an old
+ * on-chain tx sitting at a recycled address; we silently ignore it.
  *
- * Rules:
- * - Log at most once per (order, tx). Otherwise the tick loop spams the same
- *   event every ~15s for the entire order lifetime.
- * - Only fire an admin alert when the SAME tx_hash has been blocked against
- *   `STALE_DEPOSIT_ALERT_THRESHOLD`+ distinct orders. A single hit is almost
- *   always an innocent customer whose recycled deposit address happens to
- *   have an old on-chain deposit sitting on it.
+ * We DO log the block once per (order, tx) for audit — but never alert.
+ * Repeated ticks on the same stale tx are dropped so the timeline stays clean.
  */
 async function maybeLogStaleDeposit(
   orderId: string,
-  publicId: string,
+  _publicId: string,
   chain: string,
   txHash: string,
   txBlock: number,
@@ -115,34 +107,21 @@ async function maybeLogStaleDeposit(
     .from("order_events")
     .select("id")
     .eq("order_id", orderId)
-    .eq("event", "stale_deposit_blocked")
+    .eq("event", "stale_deposit_ignored")
     .contains("details", { tx_hash: txHash })
     .limit(1)
     .maybeSingle();
   if (existing) return;
 
-  await logOrderEvent(orderId, "note", "stale_deposit_blocked", {
+  await logOrderEvent(orderId, "note", "stale_deposit_ignored", {
     chain,
     tx_hash: txHash,
     tx_block: txBlock,
     order_start_block: orderStartBlock,
   });
-
-  const { data: allHits } = await supabaseAdmin
-    .from("order_events")
-    .select("order_id")
-    .eq("event", "stale_deposit_blocked")
-    .contains("details", { tx_hash: txHash });
-  const distinctOrders = new Set((allHits ?? []).map((r) => r.order_id)).size;
-
-  if (distinctOrders >= STALE_DEPOSIT_ALERT_THRESHOLD) {
-    await sendAdminAlert(
-      "Possible replay attack",
-      `${chain} tx ${txHash} at block ${txBlock} has been blocked against ${distinctOrders} orders (latest: ${publicId}, start block ${orderStartBlock}). Same on-chain deposit is being pointed at multiple recycled addresses — investigate.`,
-      `stale-attack:${txHash}:${distinctOrders}`,
-    );
-  }
 }
+
+
 
 
 async function failOrder(orderId: string, message: string) {
