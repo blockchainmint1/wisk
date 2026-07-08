@@ -1163,7 +1163,7 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           settle: { sent: 0, queuedForBitmart: 0 },
           replenish: { submitted: 0 },
           balances: { txc: null as number | null, wtxc: null as number | null },
-          reconcile: { reconciled: 0 },
+          reconcile: { reconciled: 0, retried: 0 },
           ms: 0,
         };
         // Run each phase independently so one failure doesn't starve the
