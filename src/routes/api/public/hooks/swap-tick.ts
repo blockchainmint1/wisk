@@ -86,6 +86,65 @@ interface OrderRow {
   deposit_start_block: number | null;
 }
 
+// Threshold at which a repeatedly-blocked stale deposit stops being "unlucky
+// address reuse" and starts looking like an actual replay attack. If the same
+// on-chain tx has been rejected against N distinct orders, page the admin.
+const STALE_DEPOSIT_ALERT_THRESHOLD = 2;
+
+/**
+ * Record a blocked stale deposit for audit — but stay quiet in Telegram
+ * unless the pattern is actually suspicious.
+ *
+ * Rules:
+ * - Log at most once per (order, tx). Otherwise the tick loop spams the same
+ *   event every ~15s for the entire order lifetime.
+ * - Only fire an admin alert when the SAME tx_hash has been blocked against
+ *   `STALE_DEPOSIT_ALERT_THRESHOLD`+ distinct orders. A single hit is almost
+ *   always an innocent customer whose recycled deposit address happens to
+ *   have an old on-chain deposit sitting on it.
+ */
+async function maybeLogStaleDeposit(
+  orderId: string,
+  publicId: string,
+  chain: string,
+  txHash: string,
+  txBlock: number,
+  orderStartBlock: number,
+) {
+  const { data: existing } = await supabaseAdmin
+    .from("order_events")
+    .select("id")
+    .eq("order_id", orderId)
+    .eq("event", "stale_deposit_blocked")
+    .contains("details", { tx_hash: txHash })
+    .limit(1)
+    .maybeSingle();
+  if (existing) return;
+
+  await logOrderEvent(orderId, "note", "stale_deposit_blocked", {
+    chain,
+    tx_hash: txHash,
+    tx_block: txBlock,
+    order_start_block: orderStartBlock,
+  });
+
+  const { data: allHits } = await supabaseAdmin
+    .from("order_events")
+    .select("order_id")
+    .eq("event", "stale_deposit_blocked")
+    .contains("details", { tx_hash: txHash });
+  const distinctOrders = new Set((allHits ?? []).map((r) => r.order_id)).size;
+
+  if (distinctOrders >= STALE_DEPOSIT_ALERT_THRESHOLD) {
+    await sendAdminAlert(
+      "Possible replay attack",
+      `${chain} tx ${txHash} at block ${txBlock} has been blocked against ${distinctOrders} orders (latest: ${publicId}, start block ${orderStartBlock}). Same on-chain deposit is being pointed at multiple recycled addresses — investigate.`,
+      `stale-attack:${txHash}:${distinctOrders}`,
+    );
+  }
+}
+
+
 async function failOrder(orderId: string, message: string) {
   await supabaseAdmin
     .from("orders")
@@ -336,20 +395,18 @@ async function watchDeposits() {
           // even if the (chain,tx_hash,log_index) dedupe row is missing,
           // a stale on-chain tx at a recycled address can't credit a fresh
           // order because its block predates the order's start snapshot.
+          //
+          // NOTE: the *common* cause of this is innocent — a customer got a
+          // recycled address that happened to have an old deposit sitting on
+          // it. So we DO NOT admin-alert on every hit (that just spams the
+          // channel). We log the event once per (order, tx) for audit, and
+          // only page when the SAME tx has been blocked against 2+ distinct
+          // orders — that's the actual replay-attack signal.
           if (
             order.deposit_start_block != null &&
             t.blockNumber < order.deposit_start_block
           ) {
-            await sendAdminAlert(
-              "Stale deposit blocked",
-              `${chainKey} tx ${t.txHash} at block ${t.blockNumber} predates order ${order.public_id} (start block ${order.deposit_start_block}). Refusing to credit.`,
-              `stale:${t.txHash}:${t.logIndex}`,
-            );
-            await logOrderEvent(order.id, "note", "stale_deposit_blocked", {
-              tx_hash: t.txHash,
-              tx_block: t.blockNumber,
-              order_start_block: order.deposit_start_block,
-            });
+            await maybeLogStaleDeposit(order.id, order.public_id, chainKey, t.txHash, t.blockNumber, order.deposit_start_block);
             continue;
           }
 
@@ -557,25 +614,15 @@ async function watchTxcDeposits() {
         const usd = txcAmount * txcSpot;
 
         // BLOCK-HEIGHT GUARD: reject any TXC deposit mined before the order
-        // was created. Blocks stale-deposit replay at recycled addresses.
-        // Skip when blockHeight is 0 (unconfirmed mempool) since TXC pays on
-        // 0-conf and mempool txs have no block yet — those can't be stale.
+        // was created. Same reasoning as EVM path — usually innocent address
+        // reuse, so no admin alert unless it hits 2+ orders (see helper).
         const txBlock = t.blockHeight ?? 0;
         if (
           order.deposit_start_block != null &&
           txBlock > 0 &&
           txBlock < order.deposit_start_block
         ) {
-          await sendAdminAlert(
-            "Stale deposit blocked",
-            `TXC tx ${t.txid} at block ${txBlock} predates order ${order.public_id} (start block ${order.deposit_start_block}). Refusing to credit.`,
-            `stale:txc:${t.txid}`,
-          );
-          await logOrderEvent(order.id, "note", "stale_deposit_blocked", {
-            tx_hash: t.txid,
-            tx_block: txBlock,
-            order_start_block: order.deposit_start_block,
-          });
+          await maybeLogStaleDeposit(order.id, order.public_id, "txc", t.txid, txBlock, order.deposit_start_block);
           continue;
         }
 
