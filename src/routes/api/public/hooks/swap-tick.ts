@@ -787,7 +787,7 @@ async function settleConfirmed() {
 
   const { data: orders } = await supabaseAdmin
     .from("orders")
-    .select("id,public_id,quoted_dest_out,dest_address,dest_asset,paid_amount_usd")
+    .select("id,public_id,quoted_dest_out,dest_address,dest_asset,paid_amount_usd,send_attempts")
     .eq("status", "confirmed")
     .limit(10)
     .returns<
@@ -798,6 +798,7 @@ async function settleConfirmed() {
         dest_address: string;
         dest_asset: string;
         paid_amount_usd: number | null;
+        send_attempts: number | null;
       }>
     >();
   if (!orders?.length) return { sent: 0, queuedForBitmart: 0 };
@@ -808,9 +809,36 @@ async function settleConfirmed() {
   for (const o of orders) {
     const asset = o.dest_asset || "TXC";
     try {
-      await supabaseAdmin.from("orders").update({ status: "sending" }).eq("id", o.id);
+      // Capture the operator's pending nonce BEFORE marking `sending`. If the
+      // send never lands on-chain, the reconciler compares this against the
+      // current pending nonce to prove nothing was broadcast, and safely retries.
+      let attemptNonce: number | null = null;
+      if (asset === "wTXC") {
+        try {
+          attemptNonce = await getEvmNonce(getOperatorEvmAddress(), "pending");
+        } catch (e) {
+          console.warn("[settle] could not read operator nonce", e);
+        }
+      }
+
+      const nextAttempt = (o.send_attempts ?? 0) + 1;
+      await supabaseAdmin
+        .from("orders")
+        .update({
+          status: "sending",
+          send_attempts: nextAttempt,
+          dest_broadcast_nonce: attemptNonce,
+        })
+        .eq("id", o.id);
       await logOrderEvent(o.id, "state", "sending", { asset, amount: o.quoted_dest_out });
-      await notifyById("sending", o.id);
+      await logOrderEvent(o.id, "note", "broadcast_attempt", {
+        asset,
+        amount: o.quoted_dest_out,
+        attempt: nextAttempt,
+        pending_nonce: attemptNonce,
+      });
+      // Only fire the customer-facing "sending" telegram on the first attempt.
+      if (nextAttempt === 1) await notifyById("sending", o.id);
 
       const result =
         asset === "TXC"
@@ -823,6 +851,19 @@ async function settleConfirmed() {
                 const r = await sendWtxc({
                   toAddress: o.dest_address,
                   amountWtxc: Number(o.quoted_dest_out),
+                  // Persist the tx hash the instant the tx is submitted, so
+                  // if the Worker is killed during tx.wait(1) we can still
+                  // recover on the next tick via receipt lookup.
+                  onSubmitted: async ({ txHash, nonce }) => {
+                    await supabaseAdmin
+                      .from("orders")
+                      .update({ dest_tx_hash: txHash })
+                      .eq("id", o.id);
+                    await logOrderEvent(o.id, "note", "broadcast_submitted", {
+                      tx_hash: txHash,
+                      nonce,
+                    });
+                  },
                 });
                 return {
                   txid: r.txid,
@@ -852,6 +893,7 @@ async function settleConfirmed() {
   }
   return { sent, queuedForBitmart };
 }
+
 
 /**
  * Treasury replenishment — runs AFTER the customer is paid.
