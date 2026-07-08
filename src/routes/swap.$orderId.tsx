@@ -125,9 +125,13 @@ function OrderPage() {
 
   const destAsset = order.dest_asset || "TXC";
   const steps = makeSteps(destAsset);
+  // Backend uses "sending" for the wrap flow (TXC→wTXC) where the operator
+  // wallet is broadcasting the payout — map it to the "Issuing" step so the
+  // UI advances instead of appearing stuck on "Awaiting Payment".
+  const normalizedStatus = order.status === "sending" ? "buying_on_bitmart" : order.status;
   const stepIdx = Math.max(
     0,
-    steps.findIndex((s) => s.key === order.status),
+    steps.findIndex((s) => s.key === normalizedStatus),
   );
   const failed = order.status === "failed" || order.status === "expired";
 
