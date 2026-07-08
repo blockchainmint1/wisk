@@ -8,7 +8,7 @@ import { getMergedChain, getMergedChains, getMergedToken } from "./chains.server
 import { DEST_ASSETS, getDestination, type DestAsset } from "./destinations";
 import { deriveDepositAddress } from "./hd.server";
 import { getSettings } from "./settings.server";
-import { notifyOrderEvent } from "./telegram.server";
+import { notifyOrderEvent, sendAdminAlert } from "./telegram.server";
 import { getBlockNumber } from "./evm-scan.server";
 import { getTxcTipHeight } from "./txc-scan.server";
 
