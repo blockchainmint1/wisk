@@ -29,7 +29,7 @@ import { getDestination } from "@/lib/destinations";
 import { notifyOrderEvent, logOrderEvent, sendAdminAlert } from "@/lib/telegram.server";
 import { getSettings } from "@/lib/settings.server";
 import { sendTxc } from "@/lib/txc-sign.server";
-import { sendWtxc, WTXC_CONTRACT, WTXC_DECIMALS } from "@/lib/wtxc.server";
+import { sendWtxc, WTXC_CONTRACT, WTXC_DECIMALS, getEvmNonce } from "@/lib/wtxc.server";
 import { getOperatorEvmAddress } from "@/lib/bridge-wallet.server";
 import { getSpotPrice } from "@/lib/bitmart.server";
 import { scanTxcIncoming, getTxcTipHeight } from "@/lib/txc-scan.server";
