@@ -399,6 +399,7 @@ export type Database = {
           deposit_start_block: number | null
           dest_address: string
           dest_asset: string
+          dest_broadcast_nonce: number | null
           dest_fee_sats: number | null
           dest_from_address: string | null
           dest_tx_hash: string | null
@@ -412,6 +413,7 @@ export type Database = {
           public_id: string
           quoted_dest_out: number
           quoted_dest_per_usd: number
+          send_attempts: number
           source_amount_usd: number
           source_chain: string
           source_token: string
@@ -432,6 +434,7 @@ export type Database = {
           deposit_start_block?: number | null
           dest_address: string
           dest_asset?: string
+          dest_broadcast_nonce?: number | null
           dest_fee_sats?: number | null
           dest_from_address?: string | null
           dest_tx_hash?: string | null
@@ -445,6 +448,7 @@ export type Database = {
           public_id?: string
           quoted_dest_out: number
           quoted_dest_per_usd: number
+          send_attempts?: number
           source_amount_usd: number
           source_chain: string
           source_token: string
@@ -465,6 +469,7 @@ export type Database = {
           deposit_start_block?: number | null
           dest_address?: string
           dest_asset?: string
+          dest_broadcast_nonce?: number | null
           dest_fee_sats?: number | null
           dest_from_address?: string | null
           dest_tx_hash?: string | null
@@ -478,6 +483,7 @@ export type Database = {
           public_id?: string
           quoted_dest_out?: number
           quoted_dest_per_usd?: number
+          send_attempts?: number
           source_amount_usd?: number
           source_chain?: string
           source_token?: string

@@ -53,10 +53,16 @@ function serialize<T>(fn: () => Promise<T>): Promise<T> {
 /**
  * Sign + broadcast a wTXC ERC-20 transfer from the operator wallet (index 0).
  * Waits for 1 confirmation before returning.
+ *
+ * `onSubmitted` fires the moment `eth_sendRawTransaction` returns — before
+ * we start waiting on the receipt — so callers can persist the tx hash
+ * immediately and survive a Worker eviction during `tx.wait`.
  */
 export async function sendWtxc(opts: {
   toAddress: string;
   amountWtxc: number;
+  onSubmitted?: (info: { txHash: string; nonce: number }) => Promise<void> | void;
+  timeoutMs?: number;
 }): Promise<WtxcSendResult> {
   return serialize(() => sendWtxcInner({ ...opts, fromIndex: 0 }));
 }
@@ -69,9 +75,12 @@ export async function sendWtxcFrom(opts: {
   fromIndex: number;
   toAddress: string;
   amountWtxc: number;
+  onSubmitted?: (info: { txHash: string; nonce: number }) => Promise<void> | void;
+  timeoutMs?: number;
 }): Promise<WtxcSendResult> {
   return serialize(() => sendWtxcInner(opts));
 }
+
 
 /** Native ETH balance for an address (raw wei + formatted string). */
 export async function getEthBalance(address: string): Promise<{ wei: bigint; eth: number }> {
@@ -79,6 +88,21 @@ export async function getEthBalance(address: string): Promise<{ wei: bigint; eth
   const wei = await provider.getBalance(address);
   return { wei, eth: Number(formatUnits(wei, 18)) };
 }
+
+/**
+ * Current transaction-count for an address. `pending` includes txs sitting
+ * in the mempool; `latest` counts only mined. Comparing a recorded
+ * pre-attempt pending nonce against a later reading tells us whether our
+ * broadcast actually made it out.
+ */
+export async function getEvmNonce(
+  address: string,
+  block: "latest" | "pending" = "pending",
+): Promise<number> {
+  const provider = getProvider();
+  return await provider.getTransactionCount(address, block);
+}
+
 
 /**
  * Send native ETH from any HD-derived index. Used to fund gas on a
@@ -114,6 +138,8 @@ async function sendWtxcInner(opts: {
   fromIndex: number;
   toAddress: string;
   amountWtxc: number;
+  onSubmitted?: (info: { txHash: string; nonce: number }) => Promise<void> | void;
+  timeoutMs?: number;
 }): Promise<WtxcSendResult> {
   if (!/^0x[a-fA-F0-9]{40}$/.test(opts.toAddress)) {
     throw new Error(`Invalid wTXC destination address: ${opts.toAddress}`);
@@ -121,12 +147,36 @@ async function sendWtxcInner(opts: {
   if (!Number.isFinite(opts.amountWtxc) || opts.amountWtxc <= 0) {
     throw new Error(`Invalid wTXC amount: ${opts.amountWtxc}`);
   }
+  const timeoutMs = opts.timeoutMs ?? 22_000;
   const provider = getProvider();
   const wallet = deriveEvmWallet(opts.fromIndex).connect(provider);
   const contract = new Contract(WTXC_CONTRACT, ERC20_ABI, wallet);
   const amountRaw = parseUnits(opts.amountWtxc.toFixed(WTXC_DECIMALS), WTXC_DECIMALS);
 
-  const tx = await contract.transfer(opts.toAddress, amountRaw);
+  // Hard timeout: without this, a stalled Alchemy pre-flight (estimateGas /
+  // getFeeData / getTransactionCount) can silently run past the Cloudflare
+  // Worker wall-clock limit and the isolate dies with no error thrown.
+  const submitted: Promise<{ tx: Awaited<ReturnType<typeof contract.transfer>>; nonce: number }> =
+    (async () => {
+      const tx = await contract.transfer(opts.toAddress, amountRaw);
+      return { tx, nonce: Number(tx.nonce) };
+    })();
+  const timer = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`sendWtxc: broadcast timed out after ${timeoutMs}ms`)), timeoutMs),
+  );
+  const { tx, nonce } = await Promise.race([submitted, timer]);
+
+  // Broadcast succeeded — persist the hash immediately via the callback so
+  // that even if `tx.wait(1)` is killed by a worker eviction, the reconciler
+  // can complete the order by looking up this hash next tick.
+  if (opts.onSubmitted) {
+    try {
+      await opts.onSubmitted({ txHash: tx.hash, nonce });
+    } catch (e) {
+      console.error("[sendWtxc] onSubmitted callback failed", e);
+    }
+  }
+
   const receipt = await tx.wait(1);
   return {
     txid: tx.hash,
@@ -136,4 +186,5 @@ async function sendWtxcInner(opts: {
     feeSats: Number(receipt?.gasUsed ?? 0n),
   };
 }
+
 
