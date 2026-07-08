@@ -53,10 +53,16 @@ function serialize<T>(fn: () => Promise<T>): Promise<T> {
 /**
  * Sign + broadcast a wTXC ERC-20 transfer from the operator wallet (index 0).
  * Waits for 1 confirmation before returning.
+ *
+ * `onSubmitted` fires the moment `eth_sendRawTransaction` returns — before
+ * we start waiting on the receipt — so callers can persist the tx hash
+ * immediately and survive a Worker eviction during `tx.wait`.
  */
 export async function sendWtxc(opts: {
   toAddress: string;
   amountWtxc: number;
+  onSubmitted?: (info: { txHash: string; nonce: number }) => Promise<void> | void;
+  timeoutMs?: number;
 }): Promise<WtxcSendResult> {
   return serialize(() => sendWtxcInner({ ...opts, fromIndex: 0 }));
 }
@@ -69,9 +75,12 @@ export async function sendWtxcFrom(opts: {
   fromIndex: number;
   toAddress: string;
   amountWtxc: number;
+  onSubmitted?: (info: { txHash: string; nonce: number }) => Promise<void> | void;
+  timeoutMs?: number;
 }): Promise<WtxcSendResult> {
   return serialize(() => sendWtxcInner(opts));
 }
+
 
 /** Native ETH balance for an address (raw wei + formatted string). */
 export async function getEthBalance(address: string): Promise<{ wei: bigint; eth: number }> {
