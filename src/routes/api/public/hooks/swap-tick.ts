@@ -555,25 +555,15 @@ async function watchTxcDeposits() {
         const usd = txcAmount * txcSpot;
 
         // BLOCK-HEIGHT GUARD: reject any TXC deposit mined before the order
-        // was created. Blocks stale-deposit replay at recycled addresses.
-        // Skip when blockHeight is 0 (unconfirmed mempool) since TXC pays on
-        // 0-conf and mempool txs have no block yet — those can't be stale.
+        // was created. Same reasoning as EVM path — usually innocent address
+        // reuse, so no admin alert unless it hits 2+ orders (see helper).
         const txBlock = t.blockHeight ?? 0;
         if (
           order.deposit_start_block != null &&
           txBlock > 0 &&
           txBlock < order.deposit_start_block
         ) {
-          await sendAdminAlert(
-            "Stale deposit blocked",
-            `TXC tx ${t.txid} at block ${txBlock} predates order ${order.public_id} (start block ${order.deposit_start_block}). Refusing to credit.`,
-            `stale:txc:${t.txid}`,
-          );
-          await logOrderEvent(order.id, "note", "stale_deposit_blocked", {
-            tx_hash: t.txid,
-            tx_block: txBlock,
-            order_start_block: order.deposit_start_block,
-          });
+          await maybeLogStaleDeposit(order.id, order.public_id, "txc", t.txid, txBlock, order.deposit_start_block);
           continue;
         }
 
