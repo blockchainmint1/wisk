@@ -26,6 +26,7 @@ import { Route as LovableEmailQueueProcessRouteImport } from './routes/lovable/e
 import { Route as LovableEmailAuthWebhookRouteImport } from './routes/lovable/email/auth/webhook'
 import { Route as LovableEmailAuthPreviewRouteImport } from './routes/lovable/email/auth/preview'
 import { Route as ApiPublicHooksSwapTickRouteImport } from './routes/api/public/hooks/swap-tick'
+import { Route as ApiPublicHooksPayoutSendRouteImport } from './routes/api/public/hooks/payout-send'
 
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
@@ -113,6 +114,12 @@ const ApiPublicHooksSwapTickRoute = ApiPublicHooksSwapTickRouteImport.update({
   path: '/api/public/hooks/swap-tick',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksPayoutSendRoute =
+  ApiPublicHooksPayoutSendRouteImport.update({
+    id: '/api/public/hooks/payout-send',
+    path: '/api/public/hooks/payout-send',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -128,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/swap/$orderId': typeof SwapOrderIdRoute
   '/swap/': typeof SwapIndexRoute
+  '/api/public/hooks/payout-send': typeof ApiPublicHooksPayoutSendRoute
   '/api/public/hooks/swap-tick': typeof ApiPublicHooksSwapTickRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
@@ -146,6 +154,7 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/swap/$orderId': typeof SwapOrderIdRoute
   '/swap': typeof SwapIndexRoute
+  '/api/public/hooks/payout-send': typeof ApiPublicHooksPayoutSendRoute
   '/api/public/hooks/swap-tick': typeof ApiPublicHooksSwapTickRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
@@ -166,6 +175,7 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/swap/$orderId': typeof SwapOrderIdRoute
   '/swap/': typeof SwapIndexRoute
+  '/api/public/hooks/payout-send': typeof ApiPublicHooksPayoutSendRoute
   '/api/public/hooks/swap-tick': typeof ApiPublicHooksSwapTickRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
@@ -187,6 +197,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/swap/$orderId'
     | '/swap/'
+    | '/api/public/hooks/payout-send'
     | '/api/public/hooks/swap-tick'
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
@@ -205,6 +216,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/swap/$orderId'
     | '/swap'
+    | '/api/public/hooks/payout-send'
     | '/api/public/hooks/swap-tick'
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
@@ -224,6 +236,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/swap/$orderId'
     | '/swap/'
+    | '/api/public/hooks/payout-send'
     | '/api/public/hooks/swap-tick'
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
@@ -242,6 +255,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SwapRoute: typeof SwapRouteWithChildren
   TermsRoute: typeof TermsRoute
+  ApiPublicHooksPayoutSendRoute: typeof ApiPublicHooksPayoutSendRoute
   ApiPublicHooksSwapTickRoute: typeof ApiPublicHooksSwapTickRoute
   LovableEmailAuthPreviewRoute: typeof LovableEmailAuthPreviewRoute
   LovableEmailAuthWebhookRoute: typeof LovableEmailAuthWebhookRoute
@@ -369,6 +383,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksSwapTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/payout-send': {
+      id: '/api/public/hooks/payout-send'
+      path: '/api/public/hooks/payout-send'
+      fullPath: '/api/public/hooks/payout-send'
+      preLoaderRoute: typeof ApiPublicHooksPayoutSendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -396,6 +417,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SwapRoute: SwapRouteWithChildren,
   TermsRoute: TermsRoute,
+  ApiPublicHooksPayoutSendRoute: ApiPublicHooksPayoutSendRoute,
   ApiPublicHooksSwapTickRoute: ApiPublicHooksSwapTickRoute,
   LovableEmailAuthPreviewRoute: LovableEmailAuthPreviewRoute,
   LovableEmailAuthWebhookRoute: LovableEmailAuthWebhookRoute,
