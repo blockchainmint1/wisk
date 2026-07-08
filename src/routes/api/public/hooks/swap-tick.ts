@@ -11,6 +11,7 @@
 // Auth: route lives under /api/public/* which bypasses Lovable's site auth.
 
 import { createFileRoute } from "@tanstack/react-router";
+import { getRequest } from "@tanstack/react-start/server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   getOrderDetail,
