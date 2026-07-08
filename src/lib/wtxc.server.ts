@@ -90,6 +90,21 @@ export async function getEthBalance(address: string): Promise<{ wei: bigint; eth
 }
 
 /**
+ * Current transaction-count for an address. `pending` includes txs sitting
+ * in the mempool; `latest` counts only mined. Comparing a recorded
+ * pre-attempt pending nonce against a later reading tells us whether our
+ * broadcast actually made it out.
+ */
+export async function getEvmNonce(
+  address: string,
+  block: "latest" | "pending" = "pending",
+): Promise<number> {
+  const provider = getProvider();
+  return await provider.getTransactionCount(address, block);
+}
+
+
+/**
  * Send native ETH from any HD-derived index. Used to fund gas on a
  * derived address before sweeping wTXC out of it.
  */
