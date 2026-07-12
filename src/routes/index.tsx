@@ -1,9 +1,37 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import type { ReactNode } from "react";
 import { LiveTicker } from "@/components/live-ticker";
 import { SiteFooter, SiteHeader } from "@/components/site-shell";
 import { SwapForm } from "@/components/swap-form";
 import { getPublicFees } from "@/lib/public-settings.functions";
+import {
+  getRecentSwaps,
+  getWtxcHolders,
+  type PublicSwapRow,
+  type PublicHolderRow,
+} from "@/lib/homepage-stats.functions";
+
+const UNISWAP_URL =
+  "https://app.uniswap.org/#/swap?outputCurrency=0x9FC65df3997073B8551Ffd617154B5102fACbb88&theme=dark";
+const WTXC_CONTRACT = "0x9FC65df3997073B8551Ffd617154B5102fACbb88";
+
+const fmtAmount = (n: number) =>
+  n >= 1
+    ? n.toLocaleString(undefined, { maximumFractionDigits: 4 })
+    : n.toLocaleString(undefined, { maximumFractionDigits: 8 });
+
+const fmtRelative = (iso: string) => {
+  const diff = Date.now() - new Date(iso).getTime();
+  const s = Math.max(1, Math.floor(diff / 1000));
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+};
 
 const fmtPct = (bps: number) => {
   const pct = bps / 100;
