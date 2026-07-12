@@ -19,7 +19,7 @@ export function SiteHeader({ ticker }: { ticker?: ReactNode }) {
         <div className="flex items-center gap-8">
           <Link to="/" className="flex items-center gap-2">
             <img src={logoAsset.url} alt="honest.money" className="size-6" loading="lazy" width={24} height={24} />
-            <span className="font-mono font-bold tracking-tight text-sm">SWAP</span>
+            <span className="font-mono font-bold tracking-tight text-sm">WRAP</span>
           </Link>
           <div className="hidden md:flex items-center gap-6 text-[11px] font-mono text-muted-foreground uppercase tracking-widest">
             <div className="flex items-center gap-2">
