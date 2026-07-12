@@ -1,9 +1,37 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import type { ReactNode } from "react";
 import { LiveTicker } from "@/components/live-ticker";
 import { SiteFooter, SiteHeader } from "@/components/site-shell";
 import { SwapForm } from "@/components/swap-form";
 import { getPublicFees } from "@/lib/public-settings.functions";
+import {
+  getRecentSwaps,
+  getWtxcHolders,
+  type PublicSwapRow,
+  type PublicHolderRow,
+} from "@/lib/homepage-stats.functions";
+
+const UNISWAP_URL =
+  "https://app.uniswap.org/#/swap?outputCurrency=0x9FC65df3997073B8551Ffd617154B5102fACbb88&theme=dark";
+const WTXC_CONTRACT = "0x9FC65df3997073B8551Ffd617154B5102fACbb88";
+
+const fmtAmount = (n: number) =>
+  n >= 1
+    ? n.toLocaleString(undefined, { maximumFractionDigits: 4 })
+    : n.toLocaleString(undefined, { maximumFractionDigits: 8 });
+
+const fmtRelative = (iso: string) => {
+  const diff = Date.now() - new Date(iso).getTime();
+  const s = Math.max(1, Math.floor(diff / 1000));
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+};
 
 const fmtPct = (bps: number) => {
   const pct = bps / 100;
@@ -126,8 +154,13 @@ function HomePage() {
             />
           </div>
         </section>
+
+        <RecentSwapsSection />
+        <HoldersSection />
+        <UniswapSection />
       </main>
       <SiteFooter />
+
     </div>
   );
 }
@@ -155,3 +188,198 @@ function Principle({ n, title, body }: { n: string; title: string; body: ReactNo
     </div>
   );
 }
+
+function SectionHeader({ eyebrow, title, right }: { eyebrow: string; title: string; right?: ReactNode }) {
+  return (
+    <div className="flex items-end justify-between gap-4 mb-6 flex-wrap">
+      <div>
+        <div className="font-mono text-[10px] text-accent uppercase tracking-[0.3em] mb-2">{eyebrow}</div>
+        <h2 className="font-bold text-2xl tracking-tight">{title}</h2>
+      </div>
+      {right ? <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{right}</div> : null}
+    </div>
+  );
+}
+
+function RecentSwapsSection() {
+  const fetchFn = useServerFn(getRecentSwaps);
+  const { data, isLoading } = useQuery({
+    queryKey: ["homepage", "recent-swaps"],
+    queryFn: () => fetchFn(),
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+  });
+  const rows: PublicSwapRow[] = data ?? [];
+
+  return (
+    <section className="mt-32 border-t border-border pt-16">
+      <SectionHeader eyebrow="Live" title="Recent wraps & unwraps" right={rows.length ? `${rows.length} shown` : ""} />
+      <div className="border border-border overflow-x-auto">
+        <table className="w-full font-mono text-xs">
+          <thead className="bg-muted/40">
+            <tr className="text-left text-muted-foreground uppercase tracking-widest text-[10px]">
+              <th className="px-4 py-3">Type</th>
+              <th className="px-4 py-3">Amount</th>
+              <th className="px-4 py-3 hidden sm:table-cell">Recipient</th>
+              <th className="px-4 py-3 hidden md:table-cell">Order</th>
+              <th className="px-4 py-3 text-right">When</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading && rows.length === 0 ? (
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">Loading…</td></tr>
+            ) : rows.length === 0 ? (
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No swaps yet.</td></tr>
+            ) : (
+              rows.map((r) => (
+                <tr key={r.publicId} className="border-t border-border">
+                  <td className="px-4 py-3">
+                    <span className={`inline-block px-2 py-0.5 border ${r.kind === "wrap" ? "border-accent text-accent" : "border-success text-success"}`}>
+                      {r.kind.toUpperCase()}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">{fmtAmount(r.amount)} <span className="text-muted-foreground">{r.asset}</span></td>
+                  <td className="px-4 py-3 hidden sm:table-cell text-muted-foreground">{r.destShort}</td>
+                  <td className="px-4 py-3 hidden md:table-cell text-muted-foreground">{r.publicId}</td>
+                  <td className="px-4 py-3 text-right text-muted-foreground">{fmtRelative(r.completedAt)}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function HoldersSection() {
+  const fetchFn = useServerFn(getWtxcHolders);
+  const { data, isLoading } = useQuery({
+    queryKey: ["homepage", "wtxc-holders"],
+    queryFn: () => fetchFn(),
+    refetchInterval: 5 * 60_000,
+    staleTime: 60_000,
+  });
+  const rows: PublicHolderRow[] = data?.rows ?? [];
+  const supply = data?.totalSupply ?? 0;
+  const holderCount = data?.holderCount ?? 0;
+
+  return (
+    <section className="mt-24 border-t border-border pt-16">
+      <SectionHeader
+        eyebrow="On-chain"
+        title="wTXC holders"
+        right={supply ? `${fmtAmount(supply)} wTXC · ${holderCount} holders` : ""}
+      />
+      <div className="border border-border overflow-x-auto">
+        <table className="w-full font-mono text-xs">
+          <thead className="bg-muted/40">
+            <tr className="text-left text-muted-foreground uppercase tracking-widest text-[10px]">
+              <th className="px-4 py-3">#</th>
+              <th className="px-4 py-3">Address</th>
+              <th className="px-4 py-3 text-right">Balance</th>
+              <th className="px-4 py-3 text-right hidden sm:table-cell">Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading && rows.length === 0 ? (
+              <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">Loading…</td></tr>
+            ) : rows.length === 0 ? (
+              <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">No holders yet.</td></tr>
+            ) : (
+              rows.map((h, i) => {
+                const share = supply > 0 ? (h.balance / supply) * 100 : 0;
+                return (
+                  <tr key={h.address} className="border-t border-border">
+                    <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
+                    <td className="px-4 py-3">
+                      <a
+                        href={`https://etherscan.io/token/${WTXC_CONTRACT}?a=${h.address}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-accent transition-colors"
+                      >
+                        {h.addressShort}
+                      </a>
+                      {h.isBridge ? (
+                        <span className="ml-2 px-1.5 py-0.5 border border-border text-[9px] uppercase tracking-widest text-muted-foreground">
+                          Bridge
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-3 text-right">{fmtAmount(h.balance)}</td>
+                    <td className="px-4 py-3 text-right text-muted-foreground hidden sm:table-cell">{share.toFixed(2)}%</td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function UniswapSection() {
+  return (
+    <section className="mt-24 border-t border-border pt-16">
+      <SectionHeader eyebrow="DEX" title="Trade wTXC on Uniswap" />
+      <div className="grid md:grid-cols-[1.2fr_1fr] gap-8 border border-border p-6">
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground leading-relaxed max-w-[52ch]">
+            Already holding ETH, USDC, or USDT on Ethereum? Swap straight into wTXC on
+            Uniswap. Verify the contract address before you accept the token — copycats
+            reuse the ticker.
+          </p>
+          <div className="flex gap-3 flex-wrap">
+            <a
+              href={UNISWAP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-6 py-3 border border-border font-mono text-xs uppercase tracking-widest hover:bg-foreground hover:text-background transition-colors"
+            >
+              Open on Uniswap →
+            </a>
+            <a
+              href="https://texitcoin.org/wtxc"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-6 py-3 border border-border font-mono text-xs uppercase tracking-widest hover:bg-foreground hover:text-background transition-colors"
+            >
+              Full details
+            </a>
+          </div>
+        </div>
+        <div className="space-y-3 font-mono text-xs">
+          <DetailRow label="Token" value="wTXC — Wrapped TEXITcoin" />
+          <DetailRow
+            label="Contract"
+            value={
+              <a
+                href={`https://etherscan.io/token/${WTXC_CONTRACT}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-accent transition-colors break-all"
+              >
+                {WTXC_CONTRACT}
+              </a>
+            }
+          />
+          <DetailRow label="Network" value="Ethereum mainnet" />
+          <DetailRow label="Decimals" value="8" />
+          <DetailRow label="Backing" value="1:1 native TXC in custody" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="grid grid-cols-[100px_1fr] gap-3 border-b border-border pb-2 last:border-b-0">
+      <div className="text-muted-foreground uppercase tracking-widest text-[10px]">{label}</div>
+      <div>{value}</div>
+    </div>
+  );
+}
+
