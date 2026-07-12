@@ -154,8 +154,13 @@ function HomePage() {
             />
           </div>
         </section>
+
+        <RecentSwapsSection />
+        <HoldersSection />
+        <UniswapSection />
       </main>
       <SiteFooter />
+
     </div>
   );
 }
