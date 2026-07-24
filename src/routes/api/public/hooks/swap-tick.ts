@@ -932,7 +932,10 @@ async function settleConfirmed() {
         try {
           void fetch(url, {
             method: "POST",
-            headers: { "content-type": "application/json" },
+            headers: {
+              "content-type": "application/json",
+              apikey: process.env.SUPABASE_PUBLISHABLE_KEY ?? "",
+            },
             body: JSON.stringify({ orderId: o.id }),
           }).catch((err) => {
             console.warn("[settle] payout-send kick failed", o.public_id, err);
