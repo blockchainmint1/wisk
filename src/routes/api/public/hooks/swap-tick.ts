@@ -247,14 +247,21 @@ async function reconcileStuckSending() {
       toBlock: currentBlock,
     });
 
-    // Read current pending nonce ONCE — used to decide whether it's safe to
-    // retry orders that show no matching outbound transfer.
+    // Read the operator's pending + latest nonce ONCE. When they are equal,
+    // nothing of ours is sitting unmined in the mempool — so a missing
+    // outbound transfer in the scan above proves this order never went out.
+    // (The old "pending nonce hasn't advanced past our recorded one" test is
+    // unusable: the nonce is shared across every payout, so one successful
+    // send permanently strands every other order attempted at that nonce.)
     let currentPendingNonce: number | null = null;
+    let currentLatestNonce: number | null = null;
     try {
       currentPendingNonce = await getEvmNonce(operator, "pending");
+      currentLatestNonce = await getEvmNonce(operator, "latest");
     } catch (e) {
       console.warn("[reconcile] could not read operator nonce", e);
     }
+
 
     for (const o of stuck) {
       const dest = o.dest_address.toLowerCase();
