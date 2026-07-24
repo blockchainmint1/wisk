@@ -247,14 +247,21 @@ async function reconcileStuckSending() {
       toBlock: currentBlock,
     });
 
-    // Read current pending nonce ONCE — used to decide whether it's safe to
-    // retry orders that show no matching outbound transfer.
+    // Read the operator's pending + latest nonce ONCE. When they are equal,
+    // nothing of ours is sitting unmined in the mempool — so a missing
+    // outbound transfer in the scan above proves this order never went out.
+    // (The old "pending nonce hasn't advanced past our recorded one" test is
+    // unusable: the nonce is shared across every payout, so one successful
+    // send permanently strands every other order attempted at that nonce.)
     let currentPendingNonce: number | null = null;
+    let currentLatestNonce: number | null = null;
     try {
       currentPendingNonce = await getEvmNonce(operator, "pending");
+      currentLatestNonce = await getEvmNonce(operator, "latest");
     } catch (e) {
       console.warn("[reconcile] could not read operator nonce", e);
     }
+
 
     for (const o of stuck) {
       const dest = o.dest_address.toLowerCase();
@@ -309,18 +316,18 @@ async function reconcileStuckSending() {
       }
 
       // 3) No on-chain match. Decide whether to retry.
-      // Safe to retry only when we can PROVE nothing was broadcast:
-      //   - we recorded a pending nonce at attempt time, AND
-      //   - the current pending nonce has NOT advanced past it, AND
-      //   - we have not recorded a submitted tx hash for this order, AND
+      // Safe to retry only when we can PROVE nothing was broadcast for THIS
+      // order:
+      //   - no submitted tx hash recorded, AND
+      //   - the operator has no unmined txs (pending nonce === latest nonce),
+      //     so the scan above saw every broadcast we ever made, AND
       //   - we're under the retry cap.
       const attempts = o.send_attempts ?? 0;
-      const safeToRetry =
-        !o.dest_tx_hash &&
-        o.dest_broadcast_nonce !== null &&
+      const noPendingInFlight =
         currentPendingNonce !== null &&
-        currentPendingNonce <= o.dest_broadcast_nonce &&
-        attempts < MAX_ATTEMPTS;
+        currentLatestNonce !== null &&
+        currentPendingNonce === currentLatestNonce;
+      const safeToRetry = !o.dest_tx_hash && noPendingInFlight && attempts < MAX_ATTEMPTS;
 
       if (safeToRetry) {
         // Roll back to `confirmed` so settleConfirmed picks it up next tick.
@@ -333,7 +340,9 @@ async function reconcileStuckSending() {
           attempts_used: attempts,
           recorded_nonce: o.dest_broadcast_nonce,
           current_pending_nonce: currentPendingNonce,
+          current_latest_nonce: currentLatestNonce,
         });
+
         retried += 1;
         continue;
       }
