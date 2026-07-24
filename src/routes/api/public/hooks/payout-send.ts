@@ -40,6 +40,19 @@ export const Route = createFileRoute("/api/public/hooks/payout-send")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        // Auth: this endpoint signs and broadcasts real on-chain wTXC
+        // transfers. Only internal callers (swap-tick / cron) that present the
+        // project's publishable key may invoke it.
+        const expected = process.env.SUPABASE_PUBLISHABLE_KEY;
+        const provided =
+          request.headers.get("apikey") ??
+          request.headers.get("x-cron-key") ??
+          request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
+          "";
+        if (!expected || provided !== expected) {
+          return new Response("Unauthorized", { status: 401 });
+        }
+
         let parsed: z.infer<typeof Body>;
         try {
           parsed = Body.parse(await request.json());
