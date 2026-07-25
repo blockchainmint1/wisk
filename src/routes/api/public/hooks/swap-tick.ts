@@ -232,7 +232,10 @@ async function reconcileStuckSending() {
     >();
   if (!stuck?.length) return { reconciled: 0, retried: 0 };
 
-  const MAX_ATTEMPTS = 3;
+  // Retries here are provably safe (no recorded tx hash + operator has zero
+  // unmined txs), so a low cap only strands orders that need a human. Keep it
+  // generous — each retry costs one extra Worker invocation, nothing on-chain.
+  const MAX_ATTEMPTS = 12;
   let reconciled = 0;
   let retried = 0;
   try {
