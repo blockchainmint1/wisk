@@ -232,7 +232,10 @@ async function reconcileStuckSending() {
     >();
   if (!stuck?.length) return { reconciled: 0, retried: 0 };
 
-  const MAX_ATTEMPTS = 3;
+  // Retries here are provably safe (no recorded tx hash + operator has zero
+  // unmined txs), so a low cap only strands orders that need a human. Keep it
+  // generous — each retry costs one extra Worker invocation, nothing on-chain.
+  const MAX_ATTEMPTS = 12;
   let reconciled = 0;
   let retried = 0;
   try {
@@ -933,28 +936,31 @@ async function settleConfirmed() {
       if (nextAttempt === 1) await notifyById("sending", o.id);
 
       if (asset === "wTXC" && originForPayout) {
-        // Fire-and-forget: kick a dedicated Worker invocation so the send has
-        // its own fresh CPU / wall-clock budget. We do NOT await; the
-        // reconciler will roll back and retry if this invocation dies or the
-        // broadcast never lands.
+        // Dedicated Worker invocation so the send gets its own fresh CPU /
+        // wall-clock budget. This MUST be awaited: an un-awaited subrequest is
+        // cancelled the moment this handler returns its response, which is why
+        // most `broadcast_attempt`s never produced a `broadcast_submitted`.
+        // payout-send is idempotent and the reconciler retries on failure.
         const url = `${originForPayout}/api/public/hooks/payout-send`;
         try {
-          void fetch(url, {
+          const res = await fetch(url, {
             method: "POST",
             headers: {
               "content-type": "application/json",
               apikey: process.env.SUPABASE_PUBLISHABLE_KEY ?? "",
             },
             body: JSON.stringify({ orderId: o.id }),
-          }).catch((err) => {
-            console.warn("[settle] payout-send kick failed", o.public_id, err);
           });
+          if (!res.ok) {
+            console.warn("[settle] payout-send returned", res.status, o.public_id);
+          }
         } catch (err) {
-          console.warn("[settle] payout-send kick threw sync", o.public_id, err);
+          console.warn("[settle] payout-send kick failed", o.public_id, err);
         }
         sent += 1;
         continue;
       }
+
 
       // TXC (native) payouts stay inline — our own RPC node is fast and
       // doesn't have the multi-round-trip pre-flight ethers does on EVM.
