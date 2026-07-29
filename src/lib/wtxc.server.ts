@@ -192,7 +192,8 @@ async function sendWtxcInner(opts: {
     }
   }
 
-  const receipt = await tx.wait(1);
+  const receipt =
+    opts.waitForReceipt === false ? null : await waitBounded(tx.wait(1), 20_000);
   return {
     txid: tx.hash,
     fromAddress: wallet.address,
