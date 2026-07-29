@@ -238,7 +238,8 @@ export const createOrder = createServerFn({ method: "POST" })
       .insert({
         source_chain: data.sourceChain,
         source_token: data.sourceToken,
-        source_amount_usd: data.usdAmount,
+        source_amount_usd: usdAmount,
+
         deposit_address: isWrap ? depositAddress : depositAddress.toLowerCase(),
         deposit_index: idxData,
         deposit_start_block: depositStartBlock,
