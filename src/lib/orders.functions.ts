@@ -155,27 +155,42 @@ export const createOrder = createServerFn({ method: "POST" })
     //  - Wrap (source = native TXC → dest = wTXC): 1 TXC = (1 - wrap fee) wTXC.
     //  - Bridge unwrap (source = wTXC → dest = TXC): 1 wTXC = (1 - unwrap fee) TXC.
     //  - Everything else (stables/ETH → TXC or wTXC): Bitmart spot + 5%.
-    const spot = await getSpotPrice(dest.bitmartSymbol);
     const isUnwrap =
       !isWrap && isWtxcSource(data.sourceChain as ChainKey, data.sourceToken);
+    const isOneToOne = isWrap || isUnwrap;
+
+    // Spot price is informational for 1:1 wrap/unwrap — never block on it.
+    const spot: number | null = await getSpotPrice(dest.bitmartSymbol).catch((e) => {
+      if (!isOneToOne) throw e;
+      console.warn("[createOrder] spot price unavailable", e);
+      return null;
+    });
 
     let assetPerUsd: number;
     let assetOut: number;
-    if (isWrap) {
-      const feeMul = 1 - settings.wrap_fee_bps / 10_000;
-      // usdAmount was computed on the UI from haveTxc * spot. 1:1 minus fee.
-      assetPerUsd = (1 / spot) * feeMul;
-      assetOut = data.usdAmount * assetPerUsd;
-    } else if (isUnwrap) {
-      const feeMul = 1 - settings.unwrap_fee_bps / 10_000;
-      assetPerUsd = (1 / spot) * feeMul;
-      assetOut = data.usdAmount * assetPerUsd;
+    let sourceAmount: number;
+    if (isOneToOne) {
+      const feeMul =
+        1 - (isWrap ? settings.wrap_fee_bps : settings.unwrap_fee_bps) / 10_000;
+      // Native token in → native token out, 1:1 minus fee.
+      sourceAmount =
+        data.sourceAmount ??
+        (spot && data.usdAmount ? data.usdAmount / spot : 0);
+      if (!(sourceAmount > 0)) {
+        throw new Error("Invalid amount");
+      }
+      assetOut = sourceAmount * feeMul;
+      assetPerUsd = spot ? (1 / spot) * feeMul : feeMul;
     } else {
+      if (spot === null || !data.usdAmount) throw new Error("Quote unavailable");
       const premiumMultiplier = 1 + settings.premium_bps / 10_000;
       const effectivePrice = spot * premiumMultiplier;
       assetOut = data.usdAmount / effectivePrice;
       assetPerUsd = 1 / effectivePrice;
+      sourceAmount = data.usdAmount;
     }
+    const usdAmount = data.usdAmount ?? (spot ? sourceAmount * spot : 0);
+
 
     // Allocate HD address.
     //  - TXC deposits (wrap): NEVER recycle — always a brand-new index, so a
