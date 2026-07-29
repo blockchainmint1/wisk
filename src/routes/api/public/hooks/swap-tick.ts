@@ -562,7 +562,6 @@ async function watchDeposits() {
             order.quoted_dest_out = repricedTxcOut;
             await logOrderEvent(order.id, "state", "payment_detected", {
               tx_hash: t.txHash,
-              usd: totalPaidUsd,
               confirmations,
               original_payout: originalTxcOut,
               repriced_payout: repricedTxcOut,
@@ -581,7 +580,6 @@ async function watchDeposits() {
             if (repriced) {
             await logOrderEvent(order.id, "note", "repriced", {
                 additional_tx: t.txHash,
-                total_usd: totalPaidUsd,
                 original_payout: originalTxcOut,
                 repriced_payout: repricedTxcOut,
               });
@@ -786,7 +784,6 @@ async function watchTxcDeposits() {
           order.underpayment_ack = nextAck;
           await logOrderEvent(order.id, "state", "payment_detected", {
             tx_hash: t.txid,
-            usd: totalPaidUsd,
             confirmations: t.confirmations,
             original_payout: originalOut,
             repriced_payout: repricedOut,
@@ -808,7 +805,6 @@ async function watchTxcDeposits() {
           if (repriced) {
             await logOrderEvent(order.id, "note", "repriced", {
               additional_tx: t.txid,
-              total_usd: totalPaidUsd,
               original_payout: originalOut,
               repriced_payout: repricedOut,
               underpayment: isShort,
