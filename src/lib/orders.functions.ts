@@ -30,7 +30,11 @@ const CreateInput = z
   .object({
     sourceChain: z.enum(ALL_SOURCE_CHAINS),
     sourceToken: z.string().min(1).max(20),
-    usdAmount: z.number().positive().max(1_000_000),
+    usdAmount: z.number().nonnegative().max(1_000_000).optional(),
+    // Native source-token amount (TXC or wTXC). This is the authoritative
+    // input for the 1:1 bridge; usdAmount is legacy/informational.
+    sourceAmount: z.number().positive().max(100_000_000).optional(),
+
     destAsset: z
       .enum(DEST_ASSETS as [DestAsset, ...DestAsset[]])
       .default("TXC"),
