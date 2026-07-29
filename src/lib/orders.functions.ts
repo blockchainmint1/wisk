@@ -168,11 +168,14 @@ export const createOrder = createServerFn({ method: "POST" })
       assetPerUsd = 1 / effectivePrice;
     }
 
-    // Allocate HD address — recycles expired+unpaid indexes (>60min past expiry)
-    // before incrementing the counter.
+    // Allocate HD address.
+    //  - TXC deposits (wrap): NEVER recycle — always a brand-new index, so a
+    //    deposit address is never handed out twice and can't be gamed.
+    //  - EVM deposits (unwrap): keep recycling indexes idle for >1h.
     const { data: idxData, error: idxErr } = await supabaseAdmin.rpc(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       "allocate_hd_index" as any,
+      { _recycle: !isWrap } as any,
     );
     if (idxErr || typeof idxData !== "number") {
       throw new Error("Failed to allocate deposit address: " + (idxErr?.message ?? "no index"));
