@@ -154,6 +154,7 @@ async function sendWtxcInner(opts: {
   amountWtxc: number;
   onSubmitted?: (info: { txHash: string; nonce: number }) => Promise<void> | void;
   timeoutMs?: number;
+  waitForReceipt?: boolean;
 }): Promise<WtxcSendResult> {
   if (!/^0x[a-fA-F0-9]{40}$/.test(opts.toAddress)) {
     throw new Error(`Invalid wTXC destination address: ${opts.toAddress}`);
