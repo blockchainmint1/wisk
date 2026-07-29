@@ -137,7 +137,8 @@ export async function sendEthFrom(opts: {
     const wallet = deriveEvmWallet(opts.fromIndex).connect(provider);
     const value = parseUnits(opts.amountEth.toFixed(18), 18);
     const tx = await wallet.sendTransaction({ to: opts.toAddress, value });
-    await tx.wait(1);
+    // Bounded: broadcast is what matters; a slow receipt must not hang the isolate.
+    await waitBounded(tx.wait(1), 20_000);
     return {
       txid: tx.hash,
       fromAddress: wallet.address,
