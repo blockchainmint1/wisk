@@ -286,9 +286,12 @@ function OrdersTab() {
             label="TXC"
             value={
               hot.data?.txc.ok
-                ? `${hot.data.txc.confirmed.toFixed(4)}${
-                    hot.data.txc.unconfirmed ? ` (+${hot.data.txc.unconfirmed.toFixed(4)})` : ""
+                ? `${hot.data.txc.totalConfirmed.toFixed(4)}${
+                    hot.data.txc.totalUnconfirmed
+                      ? ` (+${hot.data.txc.totalUnconfirmed.toFixed(4)})`
+                      : ""
                   }`
+
                 : null
             }
             error={hot.data?.txc.ok === false ? hot.data.txc.error : null}
