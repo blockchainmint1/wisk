@@ -5,7 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getBalances, getSpotPrice, submitMarketBuy } from "./bitmart.server";
 import { invalidateChainsCache } from "./chains.server";
-import { deriveEvmAddress, getOperatorEvmAddress } from "./bridge-wallet.server";
+import { deriveEvmAddress, deriveTxcAddress, getOperatorEvmAddress } from "./bridge-wallet.server";
 import { getEthBalance, getWtxcBalance, sendEthFrom, sendWtxc, sendWtxcFrom } from "./wtxc.server";
 import { getSettings, invalidateSettingsCache } from "./settings.server";
 import { getTxcHotAddress, getTxcAddressBalanceSats } from "./txc-sign.server";
