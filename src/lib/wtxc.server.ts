@@ -46,9 +46,20 @@ export interface WtxcSendResult {
 let sendChain: Promise<unknown> = Promise.resolve();
 function serialize<T>(fn: () => Promise<T>): Promise<T> {
   const next = sendChain.then(fn, fn);
-  sendChain = next.catch(() => undefined);
+  // Never let a hung send (e.g. a receipt wait that outlives the RPC) block
+  // every subsequent send in this isolate — cap how long the queue waits.
+  sendChain = Promise.race([
+    next.catch(() => undefined),
+    new Promise((r) => setTimeout(r, 45_000)),
+  ]);
   return next;
 }
+
+/** Await a receipt but never hang forever; resolves null on timeout. */
+async function waitBounded<T>(p: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([p, new Promise<null>((r) => setTimeout(() => r(null), ms))]);
+}
+
 
 /**
  * Sign + broadcast a wTXC ERC-20 transfer from the operator wallet (index 0).
@@ -77,6 +88,8 @@ export async function sendWtxcFrom(opts: {
   amountWtxc: number;
   onSubmitted?: (info: { txHash: string; nonce: number }) => Promise<void> | void;
   timeoutMs?: number;
+  /** Return as soon as the tx is broadcast instead of waiting for a receipt. */
+  waitForReceipt?: boolean;
 }): Promise<WtxcSendResult> {
   return serialize(() => sendWtxcInner(opts));
 }
@@ -124,7 +137,8 @@ export async function sendEthFrom(opts: {
     const wallet = deriveEvmWallet(opts.fromIndex).connect(provider);
     const value = parseUnits(opts.amountEth.toFixed(18), 18);
     const tx = await wallet.sendTransaction({ to: opts.toAddress, value });
-    await tx.wait(1);
+    // Bounded: broadcast is what matters; a slow receipt must not hang the isolate.
+    await waitBounded(tx.wait(1), 20_000);
     return {
       txid: tx.hash,
       fromAddress: wallet.address,
@@ -140,6 +154,7 @@ async function sendWtxcInner(opts: {
   amountWtxc: number;
   onSubmitted?: (info: { txHash: string; nonce: number }) => Promise<void> | void;
   timeoutMs?: number;
+  waitForReceipt?: boolean;
 }): Promise<WtxcSendResult> {
   if (!/^0x[a-fA-F0-9]{40}$/.test(opts.toAddress)) {
     throw new Error(`Invalid wTXC destination address: ${opts.toAddress}`);
@@ -177,7 +192,10 @@ async function sendWtxcInner(opts: {
     }
   }
 
-  const receipt = await tx.wait(1);
+  const receipt: { gasUsed?: bigint } | null =
+    opts.waitForReceipt === false
+      ? null
+      : await waitBounded<{ gasUsed?: bigint } | null>(tx.wait(1), 20_000);
   return {
     txid: tx.hash,
     fromAddress: wallet.address,
