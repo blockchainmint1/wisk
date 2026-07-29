@@ -461,7 +461,7 @@ export const adminHotWalletBalances = createServerFn({ method: "POST" })
           if (!recent || recent.length === 0) {
             await supabaseAdmin
               .from("txc_balance_snapshots")
-              .insert({ balance_txc: txc.confirmed });
+              .insert({ balance_txc: txc.totalConfirmed });
           }
         } catch {
           // best-effort; never fail the balance read on snapshot write
