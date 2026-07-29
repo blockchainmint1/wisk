@@ -88,6 +88,8 @@ export async function sendWtxcFrom(opts: {
   amountWtxc: number;
   onSubmitted?: (info: { txHash: string; nonce: number }) => Promise<void> | void;
   timeoutMs?: number;
+  /** Return as soon as the tx is broadcast instead of waiting for a receipt. */
+  waitForReceipt?: boolean;
 }): Promise<WtxcSendResult> {
   return serialize(() => sendWtxcInner(opts));
 }
