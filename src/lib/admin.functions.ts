@@ -1198,6 +1198,9 @@ export const adminSweepWtxc = createServerFn({ method: "POST" })
       fromIndex: data.fromIndex,
       toAddress,
       amountWtxc: amount,
+      // Return as soon as it's broadcast — waiting on a receipt routinely
+      // outran the serverless wall-clock and left the sweep "stuck".
+      waitForReceipt: false,
     });
     await audit(context.userId, "wtxc_sweep", {
       fromIndex: data.fromIndex,
