@@ -225,13 +225,10 @@ export function SwapForm({ compact = false }: { compact?: boolean }) {
           ? "Creating Order…"
           : haveAmount <= 0
             ? "Enter an amount"
-            : usdAmount > 0 && usdAmount < 10
-              ? "Minimum $10 equivalent"
-              : !addressValid
-                ? `Enter ${destConfig.label} address`
-                : !quote?.ok
-                  ? "Waiting for quote…"
-                  : "Get started"}
+            : !addressValid
+              ? `Enter ${destConfig.label} address`
+              : "Get started"}
+
       </button>
 
       <p className="mt-4 text-center text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
