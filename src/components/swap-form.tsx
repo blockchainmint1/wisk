@@ -43,7 +43,6 @@ export function SwapForm({ compact = false }: { compact?: boolean }) {
     refetchInterval: 15_000,
   });
 
-  const txcPriceUsd = quote?.ok ? quote.spotPriceUsd : null;
   const unwrapFeeBps = quote?.ok ? (quote.unwrapFeeBps ?? 0) : 0;
   const wrapFeeBps = quote?.ok ? (quote.wrapFeeBps ?? 500) : 500;
   const unwrapFeePct = unwrapFeeBps / 100;
@@ -55,10 +54,6 @@ export function SwapForm({ compact = false }: { compact?: boolean }) {
     return haveAmount * (1 - wrapFeeBps / 10_000);
   }, [haveAmount, isUnwrap, unwrapFeeBps, wrapFeeBps]);
 
-  const usdAmount = useMemo(() => {
-    if (!txcPriceUsd || haveAmount <= 0) return 0;
-    return haveAmount * txcPriceUsd;
-  }, [haveAmount, txcPriceUsd]);
 
   const addressValid = destConfig.addressRegex.test(dest.trim());
 
