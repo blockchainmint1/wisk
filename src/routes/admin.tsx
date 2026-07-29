@@ -828,17 +828,22 @@ function TxcWalletTab() {
             </div>
             <div className="text-right">
               <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                Balance
+                HD wallet total
               </div>
               <div className="font-mono text-2xl mt-1">
-                {txc.confirmed.toFixed(4)} <span className="text-sm">TXC</span>
+                {txc.totalConfirmed.toFixed(4)} <span className="text-sm">TXC</span>
               </div>
-              {txc.unconfirmed ? (
+              {txc.totalUnconfirmed ? (
                 <div className="text-[10px] font-mono text-muted-foreground">
-                  +{txc.unconfirmed.toFixed(4)} pending
+                  +{txc.totalUnconfirmed.toFixed(4)} pending
                 </div>
               ) : null}
+              <div className="text-[10px] font-mono text-muted-foreground mt-2">
+                hot {txc.confirmed.toFixed(4)} · deposits {txc.derivedConfirmed.toFixed(4)} (
+                {txc.derivedScanned} addrs)
+              </div>
             </div>
+
           </div>
         </div>
       )}
