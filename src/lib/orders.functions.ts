@@ -261,12 +261,13 @@ export const createOrder = createServerFn({ method: "POST" })
     if (error || !order) throw new Error("Failed to create order: " + (error?.message ?? ""));
 
     // Fire-and-forget Telegram notification (respect notify threshold)
-    if (data.usdAmount >= settings.notify_min_usd_created) {
+    if (usdAmount >= settings.notify_min_usd_created || isOneToOne) {
       void notifyOrderEvent("created", {
         public_id: order.public_id,
         source_chain: data.sourceChain,
         source_token: data.sourceToken,
-        source_amount_usd: data.usdAmount,
+        source_amount_usd: usdAmount,
+
         quoted_dest_out: assetOut,
         dest_address: data.destAddress,
         dest_asset: dest.key,
