@@ -69,7 +69,7 @@ export function SwapForm({ compact = false }: { compact?: boolean }) {
         data: {
           sourceChain: isWrap ? "txc" : "ethereum",
           sourceToken: isWrap ? "TXC" : "wTXC",
-          usdAmount,
+          sourceAmount: haveAmount,
           destAsset,
           destAddress: dest.trim(),
         },
@@ -86,8 +86,9 @@ export function SwapForm({ compact = false }: { compact?: boolean }) {
     onError: (e: Error) => setError(e?.message || "Order creation failed."),
   });
 
-  const formValid =
-    haveAmount > 0 && addressValid && quote?.ok === true && usdAmount >= 10;
+  // 1:1 bridge — no price needed to place an order.
+  const formValid = haveAmount > 0 && addressValid;
+
 
   function flip() {
     setHave((h) => (h === "wTXC" ? "TXC" : "wTXC"));
