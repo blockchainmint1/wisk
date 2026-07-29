@@ -222,7 +222,8 @@ function OrderPage() {
                 value={
                   order.sourceNativeAmount
                     ? `≈ ${order.sourceNativeAmount.toFixed(6)} ${order.source_token}`
-                    : `$${Number(order.source_amount_usd).toFixed(2)}`
+                    : `— ${order.source_token}`
+
                 }
               />
               <KV
