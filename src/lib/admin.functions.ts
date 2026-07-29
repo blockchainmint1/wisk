@@ -379,8 +379,48 @@ export const adminHotWalletBalances = createServerFn({ method: "POST" })
       (async () => {
         const address = getTxcHotAddress();
         const { confirmed, unconfirmed } = await getTxcAddressBalanceSats(address);
-        return { address, confirmed: confirmed / 1e8, unconfirmed: unconfirmed / 1e8 };
+        // Per-order TXC deposit addresses are never recycled, so unswept
+        // deposits sit at derived indices 1..N. Sum them so the console
+        // reports the whole HD wallet, not just the hot address.
+        let derivedConfirmed = 0;
+        let derivedUnconfirmed = 0;
+        let derivedScanned = 0;
+        try {
+          const { data: counter } = await supabaseAdmin
+            .from("hd_address_counter")
+            .select("next_index")
+            .eq("id", 1)
+            .maybeSingle();
+          const next = Number(counter?.next_index ?? 1);
+          const indices: number[] = [];
+          for (let i = 1; i < next && indices.length < 400; i++) indices.push(i);
+          for (let i = 0; i < indices.length; i += 10) {
+            const batch = indices.slice(i, i + 10);
+            const results = await Promise.allSettled(
+              batch.map(async (idx) => getTxcAddressBalanceSats(deriveDepositAddress(idx, "txc"))),
+            );
+            for (const r of results) {
+              if (r.status !== "fulfilled") continue;
+              derivedScanned++;
+              derivedConfirmed += r.value.confirmed;
+              derivedUnconfirmed += r.value.unconfirmed;
+            }
+          }
+        } catch {
+          // best-effort: fall back to hot-only totals
+        }
+        return {
+          address,
+          confirmed: confirmed / 1e8,
+          unconfirmed: unconfirmed / 1e8,
+          derivedConfirmed: derivedConfirmed / 1e8,
+          derivedUnconfirmed: derivedUnconfirmed / 1e8,
+          derivedScanned,
+          totalConfirmed: (confirmed + derivedConfirmed) / 1e8,
+          totalUnconfirmed: (unconfirmed + derivedUnconfirmed) / 1e8,
+        };
       })(),
+
       (async () => {
         const address = getOperatorEvmAddress();
         const balance = await getWtxcBalance(address);
