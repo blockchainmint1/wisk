@@ -397,7 +397,7 @@ export const adminHotWalletBalances = createServerFn({ method: "POST" })
           for (let i = 0; i < indices.length; i += 10) {
             const batch = indices.slice(i, i + 10);
             const results = await Promise.allSettled(
-              batch.map(async (idx) => getTxcAddressBalanceSats(deriveDepositAddress(idx, "txc"))),
+              batch.map(async (idx) => getTxcAddressBalanceSats(deriveTxcAddress(idx))),
             );
             for (const r of results) {
               if (r.status !== "fulfilled") continue;
