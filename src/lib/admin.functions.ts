@@ -392,12 +392,29 @@ export const adminHotWalletBalances = createServerFn({ method: "POST" })
             .eq("id", 1)
             .maybeSingle();
           const next = Number(counter?.next_index ?? 1);
-          const indices: number[] = [];
-          for (let i = 1; i < next && indices.length < 400; i++) indices.push(i);
-          for (let i = 0; i < indices.length; i += 10) {
-            const batch = indices.slice(i, i + 10);
+
+          // The counter has been reset before, so it is NOT a high-water mark.
+          // Scan every TXC address we have ever handed out (from orders) plus
+          // the current counter range, de-duplicated.
+          const addresses = new Set<string>();
+          for (let i = 1; i < next; i++) addresses.add(deriveTxcAddress(i));
+
+          const { data: rows } = await supabaseAdmin
+            .from("orders")
+            .select("deposit_address")
+            .like("deposit_address", "T%")
+            .limit(5000);
+          for (const r of rows ?? []) {
+            const a = (r as { deposit_address: string | null }).deposit_address;
+            if (a && a !== address) addresses.add(a);
+          }
+          addresses.delete(address);
+
+          const list = [...addresses].slice(0, 600);
+          for (let i = 0; i < list.length; i += 10) {
+            const batch = list.slice(i, i + 10);
             const results = await Promise.allSettled(
-              batch.map(async (idx) => getTxcAddressBalanceSats(deriveTxcAddress(idx))),
+              batch.map(async (addr) => getTxcAddressBalanceSats(addr)),
             );
             for (const r of results) {
               if (r.status !== "fulfilled") continue;
@@ -407,6 +424,7 @@ export const adminHotWalletBalances = createServerFn({ method: "POST" })
             }
           }
         } catch {
+
           // best-effort: fall back to hot-only totals
         }
         return {
