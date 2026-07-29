@@ -563,7 +563,9 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      allocate_hd_index: { Args: never; Returns: number }
+      allocate_hd_index:
+        | { Args: never; Returns: number }
+        | { Args: { _recycle?: boolean }; Returns: number }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
