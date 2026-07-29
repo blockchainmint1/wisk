@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.allocate_hd_index();
