@@ -43,7 +43,6 @@ export function SwapForm({ compact = false }: { compact?: boolean }) {
     refetchInterval: 15_000,
   });
 
-  const txcPriceUsd = quote?.ok ? quote.spotPriceUsd : null;
   const unwrapFeeBps = quote?.ok ? (quote.unwrapFeeBps ?? 0) : 0;
   const wrapFeeBps = quote?.ok ? (quote.wrapFeeBps ?? 500) : 500;
   const unwrapFeePct = unwrapFeeBps / 100;
@@ -55,10 +54,6 @@ export function SwapForm({ compact = false }: { compact?: boolean }) {
     return haveAmount * (1 - wrapFeeBps / 10_000);
   }, [haveAmount, isUnwrap, unwrapFeeBps, wrapFeeBps]);
 
-  const usdAmount = useMemo(() => {
-    if (!txcPriceUsd || haveAmount <= 0) return 0;
-    return haveAmount * txcPriceUsd;
-  }, [haveAmount, txcPriceUsd]);
 
   const addressValid = destConfig.addressRegex.test(dest.trim());
 
@@ -69,7 +64,7 @@ export function SwapForm({ compact = false }: { compact?: boolean }) {
         data: {
           sourceChain: isWrap ? "txc" : "ethereum",
           sourceToken: isWrap ? "TXC" : "wTXC",
-          usdAmount,
+          sourceAmount: haveAmount,
           destAsset,
           destAddress: dest.trim(),
         },
@@ -86,8 +81,9 @@ export function SwapForm({ compact = false }: { compact?: boolean }) {
     onError: (e: Error) => setError(e?.message || "Order creation failed."),
   });
 
-  const formValid =
-    haveAmount > 0 && addressValid && quote?.ok === true && usdAmount >= 10;
+  // 1:1 bridge — no price needed to place an order.
+  const formValid = haveAmount > 0 && addressValid;
+
 
   function flip() {
     setHave((h) => (h === "wTXC" ? "TXC" : "wTXC"));
@@ -224,13 +220,10 @@ export function SwapForm({ compact = false }: { compact?: boolean }) {
           ? "Creating Order…"
           : haveAmount <= 0
             ? "Enter an amount"
-            : usdAmount > 0 && usdAmount < 10
-              ? "Minimum $10 equivalent"
-              : !addressValid
-                ? `Enter ${destConfig.label} address`
-                : !quote?.ok
-                  ? "Waiting for quote…"
-                  : "Get started"}
+            : !addressValid
+              ? `Enter ${destConfig.label} address`
+              : "Get started"}
+
       </button>
 
       <p className="mt-4 text-center text-[10px] font-mono text-muted-foreground uppercase tracking-widest">

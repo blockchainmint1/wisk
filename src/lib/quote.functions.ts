@@ -20,23 +20,25 @@ export const getQuote = createServerFn({ method: "POST" })
     try {
       const dest = getDestination(data.destAsset);
       const [spot, settings] = await Promise.all([
-        getSpotPrice(dest.bitmartSymbol),
+        // Price is informational only — this is a 1:1 bridge. Never let a
+        // broken exchange ticker block quoting.
+        getSpotPrice(dest.bitmartSymbol).catch((e) => {
+          console.warn("getQuote: spot price unavailable", e);
+          return null as number | null;
+        }),
         getSettings(),
       ]);
       const premiumMultiplier = 1 + settings.premium_bps / 10_000;
-      const effectivePrice = spot * premiumMultiplier;
-      const assetOut = data.usdAmount / effectivePrice;
+      const effectivePrice = spot !== null ? spot * premiumMultiplier : null;
+      const assetOut = effectivePrice ? data.usdAmount / effectivePrice : null;
       return {
         ok: true as const,
         destAsset: dest.key,
         spotPriceUsd: spot,
         premiumBps: settings.premium_bps,
         effectivePriceUsd: effectivePrice,
-        assetPerUsd: 1 / effectivePrice,
+        assetPerUsd: effectivePrice ? 1 / effectivePrice : null,
         assetOut,
-        // Back-compat fields for any old caller still reading `txc*`.
-        txcPerUsd: 1 / effectivePrice,
-        txcOut: assetOut,
         minUsd: settings.min_usd,
         maxUsd: settings.max_usd,
         paused: settings.paused,
@@ -53,3 +55,4 @@ export const getQuote = createServerFn({ method: "POST" })
       };
     }
   });
+

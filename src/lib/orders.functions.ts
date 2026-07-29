@@ -30,7 +30,11 @@ const CreateInput = z
   .object({
     sourceChain: z.enum(ALL_SOURCE_CHAINS),
     sourceToken: z.string().min(1).max(20),
-    usdAmount: z.number().positive().max(1_000_000),
+    usdAmount: z.number().nonnegative().max(1_000_000).optional(),
+    // Native source-token amount (TXC or wTXC). This is the authoritative
+    // input for the 1:1 bridge; usdAmount is legacy/informational.
+    sourceAmount: z.number().positive().max(100_000_000).optional(),
+
     destAsset: z
       .enum(DEST_ASSETS as [DestAsset, ...DestAsset[]])
       .default("TXC"),
@@ -94,12 +98,17 @@ export const createOrder = createServerFn({ method: "POST" })
           "New orders are temporarily paused. Please try again shortly.",
       );
     }
-    if (data.usdAmount < settings.min_usd) {
-      throw new Error(`Minimum order is $${settings.min_usd}`);
+    // USD limits only apply to legacy USD-denominated orders. The 1:1 bridge
+    // sends a native token amount and has no dollar notion at all.
+    if (typeof data.usdAmount === "number" && data.usdAmount > 0) {
+      if (data.usdAmount < settings.min_usd) {
+        throw new Error(`Minimum order is $${settings.min_usd}`);
+      }
+      if (data.usdAmount > settings.max_usd) {
+        throw new Error(`Maximum order is $${settings.max_usd.toLocaleString()}`);
+      }
     }
-    if (data.usdAmount > settings.max_usd) {
-      throw new Error(`Maximum order is $${settings.max_usd.toLocaleString()}`);
-    }
+
 
     // Blocked-address check — reject if destination wallet is on the blacklist.
     // Compared case-insensitively (EVM addresses stored lowercased).
@@ -146,27 +155,42 @@ export const createOrder = createServerFn({ method: "POST" })
     //  - Wrap (source = native TXC → dest = wTXC): 1 TXC = (1 - wrap fee) wTXC.
     //  - Bridge unwrap (source = wTXC → dest = TXC): 1 wTXC = (1 - unwrap fee) TXC.
     //  - Everything else (stables/ETH → TXC or wTXC): Bitmart spot + 5%.
-    const spot = await getSpotPrice(dest.bitmartSymbol);
     const isUnwrap =
       !isWrap && isWtxcSource(data.sourceChain as ChainKey, data.sourceToken);
+    const isOneToOne = isWrap || isUnwrap;
+
+    // Spot price is informational for 1:1 wrap/unwrap — never block on it.
+    const spot: number | null = await getSpotPrice(dest.bitmartSymbol).catch((e) => {
+      if (!isOneToOne) throw e;
+      console.warn("[createOrder] spot price unavailable", e);
+      return null;
+    });
 
     let assetPerUsd: number;
     let assetOut: number;
-    if (isWrap) {
-      const feeMul = 1 - settings.wrap_fee_bps / 10_000;
-      // usdAmount was computed on the UI from haveTxc * spot. 1:1 minus fee.
-      assetPerUsd = (1 / spot) * feeMul;
-      assetOut = data.usdAmount * assetPerUsd;
-    } else if (isUnwrap) {
-      const feeMul = 1 - settings.unwrap_fee_bps / 10_000;
-      assetPerUsd = (1 / spot) * feeMul;
-      assetOut = data.usdAmount * assetPerUsd;
+    let sourceAmount: number;
+    if (isOneToOne) {
+      const feeMul =
+        1 - (isWrap ? settings.wrap_fee_bps : settings.unwrap_fee_bps) / 10_000;
+      // Native token in → native token out, 1:1 minus fee.
+      sourceAmount =
+        data.sourceAmount ??
+        (spot && data.usdAmount ? data.usdAmount / spot : 0);
+      if (!(sourceAmount > 0)) {
+        throw new Error("Invalid amount");
+      }
+      assetOut = sourceAmount * feeMul;
+      assetPerUsd = spot ? (1 / spot) * feeMul : feeMul;
     } else {
+      if (spot === null || !data.usdAmount) throw new Error("Quote unavailable");
       const premiumMultiplier = 1 + settings.premium_bps / 10_000;
       const effectivePrice = spot * premiumMultiplier;
       assetOut = data.usdAmount / effectivePrice;
       assetPerUsd = 1 / effectivePrice;
+      sourceAmount = data.usdAmount;
     }
+    const usdAmount = data.usdAmount ?? (spot ? sourceAmount * spot : 0);
+
 
     // Allocate HD address.
     //  - TXC deposits (wrap): NEVER recycle — always a brand-new index, so a
@@ -214,7 +238,8 @@ export const createOrder = createServerFn({ method: "POST" })
       .insert({
         source_chain: data.sourceChain,
         source_token: data.sourceToken,
-        source_amount_usd: data.usdAmount,
+        source_amount_usd: usdAmount,
+
         deposit_address: isWrap ? depositAddress : depositAddress.toLowerCase(),
         deposit_index: idxData,
         deposit_start_block: depositStartBlock,
@@ -227,7 +252,7 @@ export const createOrder = createServerFn({ method: "POST" })
           : isUnwrap
             ? -settings.unwrap_fee_bps
             : settings.premium_bps,
-        bitmart_spot_price: spot,
+        bitmart_spot_price: spot ?? 0,
         expires_at: expiresAt,
       })
       .select("public_id")
@@ -236,12 +261,13 @@ export const createOrder = createServerFn({ method: "POST" })
     if (error || !order) throw new Error("Failed to create order: " + (error?.message ?? ""));
 
     // Fire-and-forget Telegram notification (respect notify threshold)
-    if (data.usdAmount >= settings.notify_min_usd_created) {
+    if (usdAmount >= settings.notify_min_usd_created || isOneToOne) {
       void notifyOrderEvent("created", {
         public_id: order.public_id,
         source_chain: data.sourceChain,
         source_token: data.sourceToken,
-        source_amount_usd: data.usdAmount,
+        source_amount_usd: usdAmount,
+
         quoted_dest_out: assetOut,
         dest_address: data.destAddress,
         dest_asset: dest.key,
