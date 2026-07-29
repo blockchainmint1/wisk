@@ -98,12 +98,17 @@ export const createOrder = createServerFn({ method: "POST" })
           "New orders are temporarily paused. Please try again shortly.",
       );
     }
-    if (data.usdAmount < settings.min_usd) {
-      throw new Error(`Minimum order is $${settings.min_usd}`);
+    // USD limits only apply to legacy USD-denominated orders. The 1:1 bridge
+    // sends a native token amount and has no dollar notion at all.
+    if (typeof data.usdAmount === "number" && data.usdAmount > 0) {
+      if (data.usdAmount < settings.min_usd) {
+        throw new Error(`Minimum order is $${settings.min_usd}`);
+      }
+      if (data.usdAmount > settings.max_usd) {
+        throw new Error(`Maximum order is $${settings.max_usd.toLocaleString()}`);
+      }
     }
-    if (data.usdAmount > settings.max_usd) {
-      throw new Error(`Maximum order is $${settings.max_usd.toLocaleString()}`);
-    }
+
 
     // Blocked-address check — reject if destination wallet is on the blacklist.
     // Compared case-insensitively (EVM addresses stored lowercased).
