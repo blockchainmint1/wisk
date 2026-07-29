@@ -192,8 +192,10 @@ async function sendWtxcInner(opts: {
     }
   }
 
-  const receipt =
-    opts.waitForReceipt === false ? null : await waitBounded(tx.wait(1), 20_000);
+  const receipt: { gasUsed?: bigint } | null =
+    opts.waitForReceipt === false
+      ? null
+      : await waitBounded<{ gasUsed?: bigint } | null>(tx.wait(1), 20_000);
   return {
     txid: tx.hash,
     fromAddress: wallet.address,
