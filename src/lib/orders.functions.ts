@@ -252,7 +252,7 @@ export const createOrder = createServerFn({ method: "POST" })
           : isUnwrap
             ? -settings.unwrap_fee_bps
             : settings.premium_bps,
-        bitmart_spot_price: spot,
+        bitmart_spot_price: spot ?? 0,
         expires_at: expiresAt,
       })
       .select("public_id")
