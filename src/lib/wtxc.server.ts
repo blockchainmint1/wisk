@@ -46,9 +46,20 @@ export interface WtxcSendResult {
 let sendChain: Promise<unknown> = Promise.resolve();
 function serialize<T>(fn: () => Promise<T>): Promise<T> {
   const next = sendChain.then(fn, fn);
-  sendChain = next.catch(() => undefined);
+  // Never let a hung send (e.g. a receipt wait that outlives the RPC) block
+  // every subsequent send in this isolate — cap how long the queue waits.
+  sendChain = Promise.race([
+    next.catch(() => undefined),
+    new Promise((r) => setTimeout(r, 45_000)),
+  ]);
   return next;
 }
+
+/** Await a receipt but never hang forever; resolves null on timeout. */
+async function waitBounded<T>(p: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([p, new Promise<null>((r) => setTimeout(() => r(null), ms))]);
+}
+
 
 /**
  * Sign + broadcast a wTXC ERC-20 transfer from the operator wallet (index 0).
