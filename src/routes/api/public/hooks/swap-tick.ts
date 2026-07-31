@@ -1106,12 +1106,20 @@ async function pollBitmartFillsDecoupled() {
 }
 
 
+// Identifies which deployment produced an alert, so a shared Telegram chat
+// makes it obvious where to look.
+const SITE_LABEL = "wTXC Wrap — wtxc.texitcoin.org";
+
 /**
  * Read hot-wallet balances (TXC + wTXC) each tick; fire a deduped admin
  * Telegram alert when either drops below the admin-configured floor
  * (app_settings.low_txc_threshold / low_wtxc_threshold). sendAdminAlert
  * has a 15-min cooldown per (title, dedupeKey), so a sustained low
  * balance produces at most 4 pings/hr per asset.
+ *
+ * TXC lives in an HD wallet: unswept customer deposits sit at derived
+ * indices, so the hot address alone under-reports. Only alert when the
+ * WHOLE HD wallet is below the floor.
  */
 async function checkHotBalances(): Promise<{ txc: number | null; wtxc: number | null }> {
   const settings = await getSettings();
@@ -1129,13 +1137,28 @@ async function checkHotBalances(): Promise<{ txc: number | null; wtxc: number | 
     const pendingTxc = unconfirmed / 1e8;
     out.txc = confirmedTxc;
     if (confirmedTxc < txcFloor) {
-      void sendAdminAlert(
-        "⚠️ TXC hot wallet low",
-        `Balance: ${confirmedTxc.toFixed(4)} TXC` +
-          (pendingTxc ? ` (+${pendingTxc.toFixed(4)} pending)` : "") +
-          `\nFloor: ${txcFloor} TXC\nAddress: ${address}\nRecharge to keep payouts flowing.`,
-        "low-txc",
-      );
+      // Hot address looks low — check the full HD wallet before paging.
+      const { getTxcHdTotal } = await import("@/lib/txc-hd-balance.server");
+      const hd = await getTxcHdTotal(address).catch(() => null);
+      const hdTotal = hd?.totalConfirmed ?? confirmedTxc;
+      out.txc = hdTotal;
+      if (hdTotal < txcFloor) {
+        void sendAdminAlert(
+          `⚠️ TXC hot wallet low — ${SITE_LABEL}`,
+          `Site: ${SITE_LABEL}\n` +
+            `HD wallet total: ${hdTotal.toFixed(4)} TXC` +
+            (hd ? ` (across ${hd.derivedScanned + 1} addresses)` : "") +
+            `\nHot address: ${confirmedTxc.toFixed(4)} TXC` +
+            (pendingTxc ? ` (+${pendingTxc.toFixed(4)} pending)` : "") +
+            (hd ? `\nDeposit addresses: ${hd.derivedConfirmed.toFixed(4)} TXC` : "") +
+            `\nFloor: ${txcFloor} TXC\nAddress: ${address}\nRecharge to keep payouts flowing.`,
+          "low-txc",
+        );
+      } else if (hd) {
+        console.info(
+          `[check-hot-balances] hot address low (${confirmedTxc.toFixed(4)}) but HD total ${hdTotal.toFixed(4)} ≥ floor — no alert; sweep deposits to the hot address`,
+        );
+      }
     }
   } catch (e) {
     console.warn("[check-hot-balances] TXC read failed", e);
@@ -1149,8 +1172,8 @@ async function checkHotBalances(): Promise<{ txc: number | null; wtxc: number | 
     out.wtxc = balance;
     if (balance < wtxcFloor) {
       void sendAdminAlert(
-        "⚠️ wTXC operator wallet low",
-        `Balance: ${balance.toFixed(4)} wTXC\nFloor: ${wtxcFloor} wTXC\nAddress: ${address}\nWrap more TXC to keep payouts flowing.`,
+        `⚠️ wTXC operator wallet low — ${SITE_LABEL}`,
+        `Site: ${SITE_LABEL}\nBalance: ${balance.toFixed(4)} wTXC\nFloor: ${wtxcFloor} wTXC\nAddress: ${address}\nWrap more TXC to keep payouts flowing.`,
         "low-wtxc",
       );
     }
