@@ -116,6 +116,103 @@ async function getUtxos(address: string): Promise<EsploraUtxo[]> {
   );
 }
 
+// ===== HD-wide UTXO collection =====
+// A UTXO tagged with the HD index whose key can sign it.
+type HdUtxo = EsploraUtxo & { hdIndex: number };
+
+const MAX_HD_SCAN_INDEX = 400;
+
+/** address → hd index for every index we could ever have handed out. */
+function buildHdAddressMap(): Map<string, number> {
+  const map = new Map<string, number>();
+  for (let i = 0; i <= MAX_HD_SCAN_INDEX; i++) {
+    try {
+      map.set(deriveTxcAddress(i), i);
+    } catch {
+      break;
+    }
+  }
+  return map;
+}
+
+/**
+ * Pull UTXOs from derived (non-hot) HD addresses until we've gathered at
+ * least `needSats`. Candidate addresses come from every TXC deposit address
+ * ever recorded on an order, plus the current counter range.
+ */
+async function getDerivedUtxos(needSats: number): Promise<HdUtxo[]> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const addrToIndex = buildHdAddressMap();
+  const hotAddress = deriveTxcAddress(0);
+
+  const candidates = new Set<string>();
+  try {
+    const { data: rows } = await supabaseAdmin
+      .from("orders")
+      .select("deposit_address")
+      .like("deposit_address", "T%")
+      .limit(5000);
+    for (const r of rows ?? []) {
+      const a = (r as { deposit_address: string | null }).deposit_address;
+      if (a && addrToIndex.has(a)) candidates.add(a);
+    }
+  } catch {
+    /* best effort */
+  }
+  try {
+    const { data: counter } = await supabaseAdmin
+      .from("hd_address_counter")
+      .select("next_index")
+      .eq("id", 1)
+      .maybeSingle();
+    const next = Number(counter?.next_index ?? 1);
+    for (let i = 1; i < Math.min(next, MAX_HD_SCAN_INDEX); i++) {
+      candidates.add(deriveTxcAddress(i));
+    }
+  } catch {
+    /* best effort */
+  }
+  candidates.delete(hotAddress);
+
+  // Balance-check in batches so we only fetch UTXOs where there's money.
+  const list = [...candidates];
+  const funded: { address: string; confirmed: number }[] = [];
+  for (let i = 0; i < list.length; i += 12) {
+    const batch = list.slice(i, i + 12);
+    const res = await Promise.allSettled(
+      batch.map(async (addr) => ({
+        address: addr,
+        ...(await getTxcAddressBalanceSats(addr)),
+      })),
+    );
+    for (const r of res) {
+      if (r.status === "fulfilled" && r.value.confirmed > 0) {
+        funded.push({ address: r.value.address, confirmed: r.value.confirmed });
+      }
+    }
+  }
+  funded.sort((a, b) => b.confirmed - a.confirmed);
+
+  const out: HdUtxo[] = [];
+  let sum = 0;
+  for (const f of funded) {
+    if (sum >= needSats) break;
+    const idx = addrToIndex.get(f.address);
+    if (idx == null) continue;
+    try {
+      const utxos = await getUtxos(f.address);
+      for (const u of utxos) {
+        if (!u.status?.confirmed) continue; // only confirmed at deposit addrs
+        out.push({ ...u, hdIndex: idx });
+        sum += u.value;
+      }
+    } catch {
+      /* skip unreachable address */
+    }
+  }
+  return out.sort((a, b) => b.value - a.value);
+}
+
 async function getRawTxHex(txid: string): Promise<string> {
   return esplora<string>(`/tx/${txid}/hex`);
 }
