@@ -95,7 +95,7 @@ function buildMessage(
 ): string {
   const asset = o.dest_asset || "TXC";
   const lines: string[] = [];
-  lines.push(`<b>wTXC Swap</b>`);
+  lines.push(`<b>wTXC Wrap</b>`);
   lines.push(`${header(event)}`);
   lines.push(`<code>${escapeHtml(o.public_id)}</code> · ${escapeHtml(asset)}`);
   if (o.source_chain || o.source_token) {
