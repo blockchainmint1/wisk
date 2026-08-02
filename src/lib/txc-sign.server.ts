@@ -373,7 +373,7 @@ async function sendTxcInner(opts: {
     10 + numIn * 148 + numOut * 34;
 
   // Coin selection
-  let selected: EsploraUtxo[] = [];
+  let selected: HdUtxo[] = [];
   let inputSum = 0;
   let fee = 0;
   let needsChange = true;
