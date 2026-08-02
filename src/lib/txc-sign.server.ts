@@ -430,13 +430,23 @@ async function sendTxcInner(opts: {
     psbt.addOutput({ script: fromScript, value: BigInt(change) });
   }
 
-  // Sign all inputs
-  const signer = {
-    publicKey: Buffer.from(kp.publicKey),
-    sign: (hash: Buffer) => Buffer.from(kp.sign(hash)),
+  // Sign each input with the key for the HD index that owns it.
+  const keyCache = new Map<number, ReturnType<typeof deriveTxcKeypair>>();
+  const keyFor = (index: number) => {
+    if (index === 0) return kp;
+    let k = keyCache.get(index);
+    if (!k) {
+      k = deriveTxcKeypair(index);
+      keyCache.set(index, k);
+    }
+    return k;
   };
   for (let i = 0; i < selected.length; i++) {
-    psbt.signInput(i, signer);
+    const k = keyFor(selected[i].hdIndex);
+    psbt.signInput(i, {
+      publicKey: Buffer.from(k.publicKey),
+      sign: (hash: Buffer) => Buffer.from(k.sign(hash)),
+    });
   }
   psbt.finalizeAllInputs();
 
