@@ -8,7 +8,11 @@
 import * as bitcoin from "bitcoinjs-lib";
 import { ECPairFactory } from "ecpair";
 import * as ecc from "@bitcoinerlab/secp256k1";
-import { getTxcHotKeypair } from "./bridge-wallet.server";
+import {
+  deriveTxcAddress,
+  deriveTxcKeypair,
+  getTxcHotKeypair,
+} from "./bridge-wallet.server";
 
 bitcoin.initEccLib(ecc);
 const ECPair = ECPairFactory(ecc);
@@ -114,6 +118,103 @@ async function getUtxos(address: string): Promise<EsploraUtxo[]> {
       typeof last === "string" ? last.slice(0, 200) : JSON.stringify(last).slice(0, 200)
     }`,
   );
+}
+
+// ===== HD-wide UTXO collection =====
+// A UTXO tagged with the HD index whose key can sign it.
+type HdUtxo = EsploraUtxo & { hdIndex: number };
+
+const MAX_HD_SCAN_INDEX = 400;
+
+/** address → hd index for every index we could ever have handed out. */
+function buildHdAddressMap(): Map<string, number> {
+  const map = new Map<string, number>();
+  for (let i = 0; i <= MAX_HD_SCAN_INDEX; i++) {
+    try {
+      map.set(deriveTxcAddress(i), i);
+    } catch {
+      break;
+    }
+  }
+  return map;
+}
+
+/**
+ * Pull UTXOs from derived (non-hot) HD addresses until we've gathered at
+ * least `needSats`. Candidate addresses come from every TXC deposit address
+ * ever recorded on an order, plus the current counter range.
+ */
+async function getDerivedUtxos(needSats: number): Promise<HdUtxo[]> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const addrToIndex = buildHdAddressMap();
+  const hotAddress = deriveTxcAddress(0);
+
+  const candidates = new Set<string>();
+  try {
+    const { data: rows } = await supabaseAdmin
+      .from("orders")
+      .select("deposit_address")
+      .like("deposit_address", "T%")
+      .limit(5000);
+    for (const r of rows ?? []) {
+      const a = (r as { deposit_address: string | null }).deposit_address;
+      if (a && addrToIndex.has(a)) candidates.add(a);
+    }
+  } catch {
+    /* best effort */
+  }
+  try {
+    const { data: counter } = await supabaseAdmin
+      .from("hd_address_counter")
+      .select("next_index")
+      .eq("id", 1)
+      .maybeSingle();
+    const next = Number(counter?.next_index ?? 1);
+    for (let i = 1; i < Math.min(next, MAX_HD_SCAN_INDEX); i++) {
+      candidates.add(deriveTxcAddress(i));
+    }
+  } catch {
+    /* best effort */
+  }
+  candidates.delete(hotAddress);
+
+  // Balance-check in batches so we only fetch UTXOs where there's money.
+  const list = [...candidates];
+  const funded: { address: string; confirmed: number }[] = [];
+  for (let i = 0; i < list.length; i += 12) {
+    const batch = list.slice(i, i + 12);
+    const res = await Promise.allSettled(
+      batch.map(async (addr) => ({
+        address: addr,
+        ...(await getTxcAddressBalanceSats(addr)),
+      })),
+    );
+    for (const r of res) {
+      if (r.status === "fulfilled" && r.value.confirmed > 0) {
+        funded.push({ address: r.value.address, confirmed: r.value.confirmed });
+      }
+    }
+  }
+  funded.sort((a, b) => b.confirmed - a.confirmed);
+
+  const out: HdUtxo[] = [];
+  let sum = 0;
+  for (const f of funded) {
+    if (sum >= needSats) break;
+    const idx = addrToIndex.get(f.address);
+    if (idx == null) continue;
+    try {
+      const utxos = await getUtxos(f.address);
+      for (const u of utxos) {
+        if (!u.status?.confirmed) continue; // only confirmed at deposit addrs
+        out.push({ ...u, hdIndex: idx });
+        sum += u.value;
+      }
+    } catch {
+      /* skip unreachable address */
+    }
+  }
+  return out.sort((a, b) => b.value - a.value);
 }
 
 async function getRawTxHex(txid: string): Promise<string> {
@@ -246,12 +347,23 @@ async function sendTxcInner(opts: {
   // almost always our own change from a recent payout — safe to spend
   // (we're the only signer on this address) and required for back-to-back
   // sends. Largest first for fewer inputs.
-  const allUtxos = await getUtxos(fromAddress);
-  const utxos = allUtxos.slice().sort((a, b) => b.value - a.value);
+  //
+  // TXC deposit addresses are never recycled, so most of the wallet's funds
+  // sit at derived indices, not at index 0. Spend the whole HD wallet:
+  // start with the hot address, then pull in derived deposit UTXOs (which
+  // also sweeps them, since change always returns to the hot address).
+  const hotUtxos = (await getUtxos(fromAddress)).map((u) => ({ ...u, hdIndex: 0 }));
+  const utxos: HdUtxo[] = hotUtxos.slice().sort((a, b) => b.value - a.value);
+  const hotSum = utxos.reduce((s, u) => s + u.value, 0);
+  // Fee headroom: assume up to ~20 inputs of overhead.
+  if (hotSum < amountSats + 20_000) {
+    utxos.push(...(await getDerivedUtxos(amountSats + 20_000 - hotSum)));
+  }
 
   if (!utxos.length) {
     throw new Error(`No UTXOs at hot wallet ${fromAddress}`);
   }
+
 
 
   const feeRate = await getFeeRateSatsPerVb();
@@ -261,7 +373,7 @@ async function sendTxcInner(opts: {
     10 + numIn * 148 + numOut * 34;
 
   // Coin selection
-  let selected: EsploraUtxo[] = [];
+  let selected: HdUtxo[] = [];
   let inputSum = 0;
   let fee = 0;
   let needsChange = true;
@@ -318,13 +430,23 @@ async function sendTxcInner(opts: {
     psbt.addOutput({ script: fromScript, value: BigInt(change) });
   }
 
-  // Sign all inputs
-  const signer = {
-    publicKey: Buffer.from(kp.publicKey),
-    sign: (hash: Buffer) => Buffer.from(kp.sign(hash)),
+  // Sign each input with the key for the HD index that owns it.
+  const keyCache = new Map<number, ReturnType<typeof deriveTxcKeypair>>();
+  const keyFor = (index: number) => {
+    if (index === 0) return kp;
+    let k = keyCache.get(index);
+    if (!k) {
+      k = deriveTxcKeypair(index);
+      keyCache.set(index, k);
+    }
+    return k;
   };
   for (let i = 0; i < selected.length; i++) {
-    psbt.signInput(i, signer);
+    const k = keyFor(selected[i].hdIndex);
+    psbt.signInput(i, {
+      publicKey: Buffer.from(k.publicKey),
+      sign: (hash: Buffer) => Buffer.from(k.sign(hash)),
+    });
   }
   psbt.finalizeAllInputs();
 
