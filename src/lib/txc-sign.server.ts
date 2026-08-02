@@ -246,12 +246,23 @@ async function sendTxcInner(opts: {
   // almost always our own change from a recent payout — safe to spend
   // (we're the only signer on this address) and required for back-to-back
   // sends. Largest first for fewer inputs.
-  const allUtxos = await getUtxos(fromAddress);
-  const utxos = allUtxos.slice().sort((a, b) => b.value - a.value);
+  //
+  // TXC deposit addresses are never recycled, so most of the wallet's funds
+  // sit at derived indices, not at index 0. Spend the whole HD wallet:
+  // start with the hot address, then pull in derived deposit UTXOs (which
+  // also sweeps them, since change always returns to the hot address).
+  const hotUtxos = (await getUtxos(fromAddress)).map((u) => ({ ...u, hdIndex: 0 }));
+  const utxos: HdUtxo[] = hotUtxos.slice().sort((a, b) => b.value - a.value);
+  const hotSum = utxos.reduce((s, u) => s + u.value, 0);
+  // Fee headroom: assume up to ~20 inputs of overhead.
+  if (hotSum < amountSats + 20_000) {
+    utxos.push(...(await getDerivedUtxos(amountSats + 20_000 - hotSum)));
+  }
 
   if (!utxos.length) {
     throw new Error(`No UTXOs at hot wallet ${fromAddress}`);
   }
+
 
 
   const feeRate = await getFeeRateSatsPerVb();
