@@ -134,6 +134,52 @@ async function failOrder(orderId: string, message: string) {
   await notifyById("failed", orderId);
 }
 
+// Errors from the TXC payout path that provably happen BEFORE any raw tx is
+// accepted by the network, so re-broadcasting cannot double-pay:
+//  • txn-mempool-conflict / missingorspent — our tx was REJECTED because an
+//    input was already spent by another of our txs; nothing of ours landed.
+//  • insufficient balance / no UTXOs — coin selection never built a tx.
+//  • hot-wallet lock timeout — we never got as far as signing.
+//  • Esplora read failures during UTXO/fee/prevtx fetch.
+const TXC_RETRYABLE = [
+  "txn-mempool-conflict",
+  "missingorspent",
+  "insufficient txc balance",
+  "no utxos at hot wallet",
+  "did not return an array",
+  "timed out waiting for txc hot-wallet lock",
+  "wallet lock acquire failed",
+  "bad-txns-inputs-missingorspent",
+];
+const MAX_TXC_SEND_ATTEMPTS = 12;
+
+function isRetryableTxcSendError(message: string) {
+  const m = message.toLowerCase();
+  return TXC_RETRYABLE.some((s) => m.includes(s));
+}
+
+/**
+ * A TXC payout blew up before broadcast. Roll the order back to `confirmed`
+ * so the next tick tries again, instead of parking it in terminal `failed`
+ * (which no reconciler ever picks up — the reconciler only handles wTXC).
+ */
+async function requeueTxcPayout(
+  orderId: string,
+  attempts: number,
+  message: string,
+) {
+  await supabaseAdmin
+    .from("orders")
+    .update({ status: "confirmed", error_message: message })
+    .eq("id", orderId);
+  await logOrderEvent(orderId, "note", "retry_scheduled", {
+    reason: "txc_send_pre_broadcast_error",
+    attempts_used: attempts,
+    message,
+  });
+}
+
+
 async function expireStale() {
   // Auto-accept any pending underpayment whose quote window has closed —
   // the customer chose not to top up in time, so pay out what they sent.
@@ -978,8 +1024,19 @@ async function settleConfirmed() {
       await notifyById("completed", o.id);
       sent += 1;
     } catch (e) {
-      await failOrder(o.id, e instanceof Error ? e.message : "Settlement failed");
+      const msg = e instanceof Error ? e.message : "Settlement failed";
+      const attempts = (o.send_attempts ?? 0) + 1;
+      if (
+        asset !== "wTXC" &&
+        isRetryableTxcSendError(msg) &&
+        attempts < MAX_TXC_SEND_ATTEMPTS
+      ) {
+        await requeueTxcPayout(o.id, attempts, msg);
+      } else {
+        await failOrder(o.id, msg);
+      }
     }
+
   }
   return { sent, queuedForBitmart };
 }
