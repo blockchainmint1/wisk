@@ -1024,8 +1024,19 @@ async function settleConfirmed() {
       await notifyById("completed", o.id);
       sent += 1;
     } catch (e) {
-      await failOrder(o.id, e instanceof Error ? e.message : "Settlement failed");
+      const msg = e instanceof Error ? e.message : "Settlement failed";
+      const attempts = (o.send_attempts ?? 0) + 1;
+      if (
+        asset !== "wTXC" &&
+        isRetryableTxcSendError(msg) &&
+        attempts < MAX_TXC_SEND_ATTEMPTS
+      ) {
+        await requeueTxcPayout(o.id, attempts, msg);
+      } else {
+        await failOrder(o.id, msg);
+      }
     }
+
   }
   return { sent, queuedForBitmart };
 }
