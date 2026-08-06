@@ -1,0 +1,1 @@
+UPDATE public.orders SET status='confirmed', send_attempts=0, error_message=NULL, dest_tx_hash=NULL WHERE public_id='TX-0439BEE2' AND status='failed';
