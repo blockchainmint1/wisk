@@ -36,6 +36,8 @@ export async function getWtxcBalance(address: string): Promise<number> {
 
 export interface WtxcSendResult {
   txid: string;
+  /** True only when a receipt was observed (tx is mined). */
+  mined?: boolean;
   fromAddress: string;
   toAddress: string;
   amountWtxc: number;
@@ -108,6 +110,21 @@ export async function getEthBalance(address: string): Promise<{ wei: bigint; eth
  * pre-attempt pending nonce against a later reading tells us whether our
  * broadcast actually made it out.
  */
+/**
+ * Does this tx hash exist in the node's view (mempool or mined)? A same-nonce
+ * loser gets dropped and returns null here — the only reliable way to tell a
+ * successful broadcast from a silently-replaced one.
+ */
+export async function evmTxExists(txHash: string): Promise<boolean> {
+  const provider = getProvider();
+  try {
+    const tx = await provider.getTransaction(txHash);
+    return tx !== null;
+  } catch {
+    return false;
+  }
+}
+
 export async function getEvmNonce(
   address: string,
   block: "latest" | "pending" = "pending",
@@ -201,6 +218,7 @@ async function sendWtxcInner(opts: {
     fromAddress: wallet.address,
     toAddress: opts.toAddress,
     amountWtxc: opts.amountWtxc,
+    mined: receipt !== null,
     feeSats: Number(receipt?.gasUsed ?? 0n),
   };
 }
