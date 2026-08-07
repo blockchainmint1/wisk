@@ -16,7 +16,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { sendWtxc } from "@/lib/wtxc.server";
+import { sendWtxc, evmTxExists } from "@/lib/wtxc.server";
 import { logOrderEvent, notifyOrderEvent, sendAdminAlert } from "@/lib/telegram.server";
 
 const Body = z.object({ orderId: z.string().uuid() });
@@ -90,6 +90,24 @@ export const Route = createFileRoute("/api/public/hooks/payout-send")({
           );
         }
 
+        // Cross-isolate nonce lease. `sendWtxc`'s in-process serializer only
+        // orders payouts inside ONE Worker isolate; each payout-send request
+        // gets its own isolate, so two concurrent payouts used to read the same
+        // pending nonce and race — the loser silently vanished from the mempool
+        // (see TX-D1239CDA). This DB lock makes the whole broadcast exclusive.
+        const holder = `payout:${o.id}`;
+        const { data: gotLock } = await supabaseAdmin.rpc("try_acquire_wallet_lock", {
+          _wallet_key: "evm_operator",
+          _ttl_seconds: 90,
+          _holder: holder,
+        });
+        if (!gotLock) {
+          return new Response(
+            JSON.stringify({ ok: true, skipped: "operator_locked" }),
+            { headers: { "content-type": "application/json" } },
+          );
+        }
+
         try {
           const r = await sendWtxc({
             toAddress: o.dest_address,
@@ -105,6 +123,31 @@ export const Route = createFileRoute("/api/public/hooks/payout-send")({
               });
             },
           });
+
+          // A returned hash is NOT proof of delivery: a same-nonce collision
+          // drops our tx and `eth_getTransactionByHash` returns null. Only
+          // flip to `completed` once the tx is mined or at least still known
+          // to the node; otherwise clear the hash and let the reconciler retry.
+          const landed = r.mined === true || (await evmTxExists(r.txid));
+          if (!landed) {
+            await supabaseAdmin
+              .from("orders")
+              .update({ status: "confirmed", dest_tx_hash: null })
+              .eq("id", o.id);
+            await logOrderEvent(o.id, "error", "broadcast_dropped", {
+              tx_hash: r.txid,
+              reason: "tx not found on chain after broadcast (likely nonce collision)",
+            });
+            void sendAdminAlert(
+              `Payout broadcast dropped ${o.public_id}`,
+              `Broadcast returned ${r.txid} but the node does not know that tx. Rolled back to confirmed for retry.`,
+              `payout-dropped:${o.public_id}`,
+            );
+            return new Response(
+              JSON.stringify({ ok: false, error: "broadcast_dropped", tx_hash: r.txid }),
+              { status: 202, headers: { "content-type": "application/json" } },
+            );
+          }
 
           await supabaseAdmin
             .from("orders")
@@ -143,6 +186,11 @@ export const Route = createFileRoute("/api/public/hooks/payout-send")({
             JSON.stringify({ ok: false, error: msg }),
             { status: 500, headers: { "content-type": "application/json" } },
           );
+        } finally {
+          await supabaseAdmin.rpc("release_wallet_lock", {
+            _wallet_key: "evm_operator",
+            _holder: holder,
+          });
         }
       },
     },
