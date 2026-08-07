@@ -22,6 +22,7 @@ import { Route as SwapRouteImport } from './routes/swap'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SwapIndexRouteImport } from './routes/swap.index'
 import { Route as SwapOrderIdRouteImport } from './routes/swap.$orderId'
+import { Route as ApiPublicHooksManualWtxcSendRouteImport } from './routes/api/public/hooks/manual-wtxc-send'
 import { Route as ApiPublicHooksPayoutSendRouteImport } from './routes/api/public/hooks/payout-send'
 import { Route as ApiPublicHooksSwapTickRouteImport } from './routes/api/public/hooks/swap-tick'
 import { Route as LovableEmailAuthPreviewRouteImport } from './routes/lovable/email/auth/preview'
@@ -93,6 +94,12 @@ const SwapOrderIdRoute = SwapOrderIdRouteImport.update({
   path: '/$orderId',
   getParentRoute: () => SwapRoute,
 } as any)
+const ApiPublicHooksManualWtxcSendRoute =
+  ApiPublicHooksManualWtxcSendRouteImport.update({
+    id: '/api/public/hooks/manual-wtxc-send',
+    path: '/api/public/hooks/manual-wtxc-send',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksPayoutSendRoute =
   ApiPublicHooksPayoutSendRouteImport.update({
     id: '/api/public/hooks/payout-send',
@@ -135,6 +142,7 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/swap/$orderId': typeof SwapOrderIdRoute
   '/swap/': typeof SwapIndexRoute
+  '/api/public/hooks/manual-wtxc-send': typeof ApiPublicHooksManualWtxcSendRoute
   '/api/public/hooks/payout-send': typeof ApiPublicHooksPayoutSendRoute
   '/api/public/hooks/swap-tick': typeof ApiPublicHooksSwapTickRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
@@ -154,6 +162,7 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/swap/$orderId': typeof SwapOrderIdRoute
   '/swap': typeof SwapIndexRoute
+  '/api/public/hooks/manual-wtxc-send': typeof ApiPublicHooksManualWtxcSendRoute
   '/api/public/hooks/payout-send': typeof ApiPublicHooksPayoutSendRoute
   '/api/public/hooks/swap-tick': typeof ApiPublicHooksSwapTickRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
@@ -175,6 +184,7 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/swap/$orderId': typeof SwapOrderIdRoute
   '/swap/': typeof SwapIndexRoute
+  '/api/public/hooks/manual-wtxc-send': typeof ApiPublicHooksManualWtxcSendRoute
   '/api/public/hooks/payout-send': typeof ApiPublicHooksPayoutSendRoute
   '/api/public/hooks/swap-tick': typeof ApiPublicHooksSwapTickRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
@@ -197,6 +207,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/swap/$orderId'
     | '/swap/'
+    | '/api/public/hooks/manual-wtxc-send'
     | '/api/public/hooks/payout-send'
     | '/api/public/hooks/swap-tick'
     | '/lovable/email/auth/preview'
@@ -216,6 +227,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/swap/$orderId'
     | '/swap'
+    | '/api/public/hooks/manual-wtxc-send'
     | '/api/public/hooks/payout-send'
     | '/api/public/hooks/swap-tick'
     | '/lovable/email/auth/preview'
@@ -236,6 +248,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/swap/$orderId'
     | '/swap/'
+    | '/api/public/hooks/manual-wtxc-send'
     | '/api/public/hooks/payout-send'
     | '/api/public/hooks/swap-tick'
     | '/lovable/email/auth/preview'
@@ -255,6 +268,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SwapRoute: typeof SwapRouteWithChildren
   TermsRoute: typeof TermsRoute
+  ApiPublicHooksManualWtxcSendRoute: typeof ApiPublicHooksManualWtxcSendRoute
   ApiPublicHooksPayoutSendRoute: typeof ApiPublicHooksPayoutSendRoute
   ApiPublicHooksSwapTickRoute: typeof ApiPublicHooksSwapTickRoute
   LovableEmailAuthPreviewRoute: typeof LovableEmailAuthPreviewRoute
@@ -355,6 +369,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SwapOrderIdRouteImport
       parentRoute: typeof SwapRoute
     }
+    '/api/public/hooks/manual-wtxc-send': {
+      id: '/api/public/hooks/manual-wtxc-send'
+      path: '/api/public/hooks/manual-wtxc-send'
+      fullPath: '/api/public/hooks/manual-wtxc-send'
+      preLoaderRoute: typeof ApiPublicHooksManualWtxcSendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/payout-send': {
       id: '/api/public/hooks/payout-send'
       path: '/api/public/hooks/payout-send'
@@ -417,6 +438,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SwapRoute: SwapRouteWithChildren,
   TermsRoute: TermsRoute,
+  ApiPublicHooksManualWtxcSendRoute: ApiPublicHooksManualWtxcSendRoute,
   ApiPublicHooksPayoutSendRoute: ApiPublicHooksPayoutSendRoute,
   ApiPublicHooksSwapTickRoute: ApiPublicHooksSwapTickRoute,
   LovableEmailAuthPreviewRoute: LovableEmailAuthPreviewRoute,
