@@ -16,7 +16,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { sendWtxc, evmTxExists } from "@/lib/wtxc.server";
+import { sendWtxc, evmTxExists, getEvmNonce } from "@/lib/wtxc.server";
+import { getOperatorEvmAddress } from "@/lib/bridge-wallet.server";
 import { logOrderEvent, notifyOrderEvent, sendAdminAlert } from "@/lib/telegram.server";
 
 const Body = z.object({ orderId: z.string().uuid() });
@@ -109,13 +110,37 @@ export const Route = createFileRoute("/api/public/hooks/payout-send")({
         }
 
         try {
+          // Nonce selection must NOT trust the node's pending count alone.
+          // Alchemy's `pending` nonce can lag a just-broadcast tx (observed on
+          // TX-67A8DFC4 / TX-95FC1AC4: both read pending 77 43s apart, and the
+          // second silently replaced the first). Take the max of the node's
+          // pending nonce and (highest nonce we've ever recorded + 1).
+          const nodeNonce = await getEvmNonce(getOperatorEvmAddress(), "pending");
+          const { data: lastNonceRow } = await supabaseAdmin
+            .from("orders")
+            .select("dest_broadcast_nonce")
+            .eq("dest_asset", "wTXC")
+            .not("dest_tx_hash", "is", null)
+            .not("dest_broadcast_nonce", "is", null)
+            .order("dest_broadcast_nonce", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          const dbNext = (lastNonceRow?.dest_broadcast_nonce ?? -1) + 1;
+          const useNonce = Math.max(nodeNonce, dbNext);
+          await logOrderEvent(o.id, "note", "nonce_selected", {
+            node_pending: nodeNonce,
+            db_next: dbNext,
+            use: useNonce,
+          });
+
           const r = await sendWtxc({
             toAddress: o.dest_address,
             amountWtxc: Number(o.quoted_dest_out),
+            nonce: useNonce,
             onSubmitted: async ({ txHash, nonce }) => {
               await supabaseAdmin
                 .from("orders")
-                .update({ dest_tx_hash: txHash })
+                .update({ dest_tx_hash: txHash, dest_broadcast_nonce: nonce })
                 .eq("id", o.id);
               await logOrderEvent(o.id, "note", "broadcast_submitted", {
                 tx_hash: txHash,
