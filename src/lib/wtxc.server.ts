@@ -76,6 +76,8 @@ export async function sendWtxc(opts: {
   amountWtxc: number;
   onSubmitted?: (info: { txHash: string; nonce: number }) => Promise<void> | void;
   timeoutMs?: number;
+  /** Explicit nonce. Pass this when the caller tracks nonces itself (see payout-send). */
+  nonce?: number;
 }): Promise<WtxcSendResult> {
   return serialize(() => sendWtxcInner({ ...opts, fromIndex: 0 }));
 }
