@@ -16,7 +16,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { sendWtxc, evmTxExists } from "@/lib/wtxc.server";
+import { sendWtxc, evmTxExists, getEvmNonce } from "@/lib/wtxc.server";
+import { getOperatorEvmAddress } from "@/lib/bridge-wallet.server";
 import { logOrderEvent, notifyOrderEvent, sendAdminAlert } from "@/lib/telegram.server";
 
 const Body = z.object({ orderId: z.string().uuid() });
