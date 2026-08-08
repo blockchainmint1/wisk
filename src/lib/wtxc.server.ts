@@ -174,6 +174,7 @@ async function sendWtxcInner(opts: {
   onSubmitted?: (info: { txHash: string; nonce: number }) => Promise<void> | void;
   timeoutMs?: number;
   waitForReceipt?: boolean;
+  nonce?: number;
 }): Promise<WtxcSendResult> {
   if (!/^0x[a-fA-F0-9]{40}$/.test(opts.toAddress)) {
     throw new Error(`Invalid wTXC destination address: ${opts.toAddress}`);
@@ -190,9 +191,10 @@ async function sendWtxcInner(opts: {
   // Hard timeout: without this, a stalled Alchemy pre-flight (estimateGas /
   // getFeeData / getTransactionCount) can silently run past the Cloudflare
   // Worker wall-clock limit and the isolate dies with no error thrown.
+  const overrides = opts.nonce !== undefined ? { nonce: opts.nonce } : {};
   const submitted: Promise<{ tx: Awaited<ReturnType<typeof contract.transfer>>; nonce: number }> =
     (async () => {
-      const tx = await contract.transfer(opts.toAddress, amountRaw);
+      const tx = await contract.transfer(opts.toAddress, amountRaw, overrides);
       return { tx, nonce: Number(tx.nonce) };
     })();
   const timer = new Promise<never>((_, reject) =>
