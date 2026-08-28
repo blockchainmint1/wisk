@@ -395,9 +395,9 @@ function UniswapSection() {
       <div className="grid md:grid-cols-[1.2fr_1fr] gap-8 border border-border p-6">
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground leading-relaxed max-w-[52ch]">
-            Already holding ETH, USDC, or USDT on Ethereum? Swap straight into wISK on
-            Uniswap. Verify the contract address before you accept the token — copycats
-            reuse the ticker.
+            The wISK/USDC pool is live on Uniswap v3 (Ethereum mainnet, 0.3% fee tier),
+            seeded at $0.10 with full-range liquidity. Verify the contract address before
+            you accept the token — copycats reuse the ticker.
           </p>
           <div className="flex gap-3 flex-wrap">
             <a
@@ -406,20 +406,42 @@ function UniswapSection() {
               rel="noopener noreferrer"
               className="px-6 py-3 border border-border font-mono text-xs uppercase tracking-widest hover:bg-foreground hover:text-background transition-colors"
             >
-              Open on Uniswap →
+              Swap USDC → wISK →
             </a>
             <a
-              href="https://iskandercoin.com/wisk"
+              href={UNISWAP_POOL_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="px-6 py-3 border border-border font-mono text-xs uppercase tracking-widest hover:bg-foreground hover:text-background transition-colors"
             >
-              Full details
+              Pool stats
+            </a>
+            <a
+              href={UNISWAP_ADD_LIQUIDITY_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-6 py-3 border border-border font-mono text-xs uppercase tracking-widest hover:bg-foreground hover:text-background transition-colors"
+            >
+              Add liquidity
             </a>
           </div>
         </div>
         <div className="space-y-3 font-mono text-xs">
-          <DetailRow label="Token" value="wISK — Wrapped Iskander Coin" />
+          <DetailRow label="Pair" value="wISK / USDC — Uniswap v3" />
+          <DetailRow label="Fee tier" value="0.30%" />
+          <DetailRow
+            label="Pool"
+            value={
+              <a
+                href={`https://etherscan.io/address/${POOL_ADDRESS}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-accent transition-colors break-all"
+              >
+                {POOL_ADDRESS}
+              </a>
+            }
+          />
           <DetailRow
             label="Contract"
             value={
@@ -441,6 +463,7 @@ function UniswapSection() {
     </section>
   );
 }
+
 
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   return (
