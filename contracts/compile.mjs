@@ -72,13 +72,11 @@ while (queue.length) {
   const f = queue.shift();
   const content = sources[f].content;
   for (const m of content.matchAll(/import\s+(?:\{[^}]*\}\s+from\s+)?["']([^"']+)["']/g)) {
-    const dep = m[1];
-    if (seen.has(dep)) continue;
-    const r = readImport(dep);
-    if (r.error) throw new Error(r.error);
-    seen.add(dep);
-    sources[dep] = { content: r.contents };
-    queue.push(dep);
+    const { key, file } = resolveImport(m[1], f);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    sources[key] = { content: fs.readFileSync(file, "utf8") };
+    queue.push(key);
   }
 }
 fs.writeFileSync(
