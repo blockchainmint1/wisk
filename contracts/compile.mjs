@@ -10,16 +10,22 @@ const root = path.resolve(here, "..");
 
 const SOURCE = "WrappedISK.sol";
 
-function readImport(importPath) {
-  let file;
-  if (importPath.startsWith("@openzeppelin/")) {
-    file = path.join(root, "node_modules", importPath);
-  } else {
-    file = path.join(here, importPath);
+// Resolve an import to a canonical key (node_modules-relative for packages,
+// contracts-relative otherwise) plus its absolute path on disk.
+function resolveImport(importPath, fromKey = SOURCE) {
+  let key = importPath;
+  if (importPath.startsWith(".")) {
+    key = path.posix.normalize(path.posix.join(path.posix.dirname(fromKey), importPath));
   }
+  const file = key.startsWith("@") ? path.join(root, "node_modules", key) : path.join(here, key);
+  return { key, file };
+}
+
+function readImport(importPath) {
+  const { file } = resolveImport(importPath);
   try {
     return { contents: fs.readFileSync(file, "utf8") };
-  } catch (e) {
+  } catch {
     return { error: `Not found: ${importPath} (${file})` };
   }
 }
