@@ -194,6 +194,8 @@ async function sendWiskInner(opts: {
   timeoutMs?: number;
   waitForReceipt?: boolean;
   nonce?: number;
+  mint?: boolean;
+  iskTxid?: string | null;
 }): Promise<WiskSendResult> {
   if (!/^0x[a-fA-F0-9]{40}$/.test(opts.toAddress)) {
     throw new Error(`Invalid wISK destination address: ${opts.toAddress}`);
