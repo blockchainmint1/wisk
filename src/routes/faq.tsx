@@ -70,16 +70,16 @@ const FAQS: Array<{ q: string; a: ReactNode }> = [
 ];
 
 const SCHEMA_TEXTS = [
-  `A custodial bridge between native Iskander Coin (ISK) and its ERC-20 twin on Ethereum, wISK (${CONTRACT}). One operator wallet holds real ISK 1:1 against every wISK in circulation.`,
+  `A custodial bridge between native Iskander Coin (ISK) and its ERC-20 twin on Ethereum, wISK (${CONTRACT}). wISK is minted when you wrap and burned when you unwrap, so total supply always equals the ISK held in the bridge reserve — 1:1, verifiable on both chains.`,
   "Wrap (ISK → wISK) is 5%. Unwrap (wISK → ISK) is free. Fees are set by the operator and shown live on the swap form before you confirm.",
-  "By choice. A one-operator hot wallet with a public reconciliation dashboard is simpler, cheaper to run, and easier to audit than a contract we'd have to trust ourselves to secure. ISK held by the bridge matches wISK in circulation — publicly checkable at any time.",
+  "The ISK side has no smart contracts — it's a Bitcoin-derived chain — so somebody has to custody the native coin. We keep that side deliberately simple: one operator wallet, and a wISK contract that only mints against a confirmed ISK deposit and only burns on unwrap. There is no pre-mined float sitting around, so wISK total supply is a live proof-of-reserves number anyone can check.",
   "Native ISK on the Iskander Coin network, or wISK on Ethereum. We do not offer stablecoin or ETH on-ramp swaps.",
   "Native ISK (paid to any ISK address — legacy K… or SegWit isk1q…) or wISK (paid to any Ethereum 0x… address).",
   "Around 5 minutes end-to-end. We wait for chain-specific confirmations on your deposit, then sign and broadcast the payout from the hot wallet. Slower chains (Ethereum mainnet) take longer than the Iskander Coin network.",
   "Funds sent on an unsupported chain or with an unsupported token aren't picked up automatically. Contact the Help Center with your order ID and deposit tx hash — manual recovery may be possible.",
   "We can only send to the address you provided at order creation. Double-check before confirming — payouts can't be reversed.",
   "Each quote is valid for the expiry window shown on the order page (15 minutes by default). Late deposits are held for manual reconciliation — contact support with your order ID.",
-  "Yes — that's the model. The bridge is custodial by design. ISK backing wISK lives in the operator wallet full-time while the wISK is in circulation.",
+  "Yes — that's the model. The bridge is custodial by design. The ISK backing wISK stays in the operator wallet for as long as that wISK is in circulation, and is released the moment it's burned on unwrap.",
   "After creating an order you're redirected to a live status page that auto-refreshes through every stage. Your browser also keeps a local history of recent swaps on /swap.",
   "Minimums and maximums are shown live on the swap form and enforced at order creation. They can change based on hot-wallet liquidity and operator limits.",
 ];
@@ -87,13 +87,13 @@ const SCHEMA_TEXTS = [
 export const Route = createFileRoute("/faq")({
   head: () => ({
     meta: [
-      { title: "FAQ — SWAP" },
+      { title: "wISK Bridge FAQ — Fees, Timing & Supported Networks" },
       {
         name: "description",
         content:
-          "Common questions about the ISK ↔ wISK bridge — fees, timing, supported networks, and recovery.",
+          "Common questions about the ISK ↔ wISK bridge — wrap and unwrap fees, how long a swap takes, supported networks, and what to do if something goes wrong.",
       },
-      { property: "og:title", content: "FAQ — SWAP" },
+      { property: "og:title", content: "wISK Bridge FAQ — Fees, Timing & Supported Networks" },
       {
         property: "og:description",
         content:
