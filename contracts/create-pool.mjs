@@ -4,6 +4,7 @@
 //   bun contracts/create-pool.mjs mint-lp         — mint 100,000 wISK to operator (backed by ISK reserve)
 //   bun contracts/create-pool.mjs create          — create + initialize the pool at $0.10
 //   bun contracts/create-pool.mjs add-liquidity   — approve + mint the full-range position
+//   bun contracts/create-pool.mjs cardinality [n] — grow the TWAP oracle buffer (default 200 slots)
 //
 // Requires BRIDGE_MNEMONIC and ALCHEMY_API(_KEY) in the environment.
 
@@ -49,6 +50,7 @@ const FACTORY_ABI = ["function getPool(address,address,uint24) view returns (add
 const POOL_ABI = [
   "function slot0() view returns (uint160 sqrtPriceX96,int24 tick,uint16,uint16,uint16,uint8,bool)",
   "function liquidity() view returns (uint128)",
+  "function increaseObservationCardinalityNext(uint16 observationCardinalityNext)",
 ];
 const NPM_ABI = [
   "function createAndInitializePoolIfNecessary(address token0,address token1,uint24 fee,uint160 sqrtPriceX96) payable returns (address pool)",
@@ -168,10 +170,30 @@ async function addLiquidity(signer) {
   console.log("mined in block", rc.blockNumber);
 }
 
+async function cardinality(signer) {
+  const target = Number(process.argv[3] || 200);
+  const factory = new Contract(FACTORY, FACTORY_ABI, signer.provider);
+  const poolAddr = await factory.getPool(TOKEN0, TOKEN1, FEE);
+  const pool = new Contract(poolAddr, POOL_ABI, signer);
+  const s0 = await pool.slot0();
+  console.log("pool", poolAddr, "cardinality", s0[3].toString(), "next", s0[4].toString());
+  if (Number(s0[4]) >= target) {
+    console.log("already >= target", target);
+    return;
+  }
+  const tx = await pool.increaseObservationCardinalityNext(target);
+  console.log("tx", tx.hash);
+  const rc = await tx.wait();
+  console.log("mined block", rc.blockNumber, "gas used", rc.gasUsed.toString());
+  const after = await pool.slot0();
+  console.log("cardinalityNext now", after[4].toString());
+}
+
 const cmd = process.argv[2] || "status";
 const signer = wallet();
 if (cmd === "status") await status(signer);
 else if (cmd === "mint-lp") await mintLp(signer);
 else if (cmd === "create") await create(signer);
 else if (cmd === "add-liquidity") await addLiquidity(signer);
+else if (cmd === "cardinality") await cardinality(signer);
 else throw new Error(`unknown command: ${cmd}`);

@@ -75,6 +75,7 @@ export function SiteFooter() {
             <p className="font-bold text-foreground">Resources</p>
             <Link to="/faq" className="block hover:text-accent">FAQ</Link>
             <Link to="/embed-builder" className="block hover:text-accent">Embed Widget</Link>
+            <Link to="/api" className="block hover:text-accent">Price API</Link>
             <a href="https://iskandercoin.com" className="block hover:text-accent">iskandercoin.com</a>
             <a href="https://iskandercoin.com/build" className="block hover:text-accent">Developers</a>
             <a href="https://help.honest.money" className="block hover:text-accent">Help Center</a>

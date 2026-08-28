@@ -21,6 +21,7 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SwapRouteImport } from './routes/swap'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as ApiIndexRouteImport } from './routes/api.index'
 import { Route as SwapIndexRouteImport } from './routes/swap.index'
 import { Route as SwapOrderIdRouteImport } from './routes/swap.$orderId'
 import { Route as ApiPublicPriceRouteImport } from './routes/api/public/price'
@@ -91,6 +92,11 @@ const TermsRoute = TermsRouteImport.update({
   path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiIndexRoute = ApiIndexRouteImport.update({
+  id: '/api/',
+  path: '/api/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SwapIndexRoute = SwapIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -154,6 +160,7 @@ export interface FileRoutesByFullPath {
   '/swap': typeof SwapRouteWithChildren
   '/terms': typeof TermsRoute
   '/swap/$orderId': typeof SwapOrderIdRoute
+  '/api/': typeof ApiIndexRoute
   '/swap/': typeof SwapIndexRoute
   '/api/public/price': typeof ApiPublicPriceRoute
   '/api/public/hooks/burn-unwrapped': typeof ApiPublicHooksBurnUnwrappedRoute
@@ -176,6 +183,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/swap/$orderId': typeof SwapOrderIdRoute
+  '/api': typeof ApiIndexRoute
   '/swap': typeof SwapIndexRoute
   '/api/public/price': typeof ApiPublicPriceRoute
   '/api/public/hooks/burn-unwrapped': typeof ApiPublicHooksBurnUnwrappedRoute
@@ -200,6 +208,7 @@ export interface FileRoutesById {
   '/swap': typeof SwapRouteWithChildren
   '/terms': typeof TermsRoute
   '/swap/$orderId': typeof SwapOrderIdRoute
+  '/api/': typeof ApiIndexRoute
   '/swap/': typeof SwapIndexRoute
   '/api/public/price': typeof ApiPublicPriceRoute
   '/api/public/hooks/burn-unwrapped': typeof ApiPublicHooksBurnUnwrappedRoute
@@ -225,6 +234,7 @@ export interface FileRouteTypes {
     | '/swap'
     | '/terms'
     | '/swap/$orderId'
+    | '/api/'
     | '/swap/'
     | '/api/public/price'
     | '/api/public/hooks/burn-unwrapped'
@@ -247,6 +257,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/terms'
     | '/swap/$orderId'
+    | '/api'
     | '/swap'
     | '/api/public/price'
     | '/api/public/hooks/burn-unwrapped'
@@ -270,6 +281,7 @@ export interface FileRouteTypes {
     | '/swap'
     | '/terms'
     | '/swap/$orderId'
+    | '/api/'
     | '/swap/'
     | '/api/public/price'
     | '/api/public/hooks/burn-unwrapped'
@@ -293,6 +305,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SwapRoute: typeof SwapRouteWithChildren
   TermsRoute: typeof TermsRoute
+  ApiIndexRoute: typeof ApiIndexRoute
   ApiPublicPriceRoute: typeof ApiPublicPriceRoute
   ApiPublicHooksBurnUnwrappedRoute: typeof ApiPublicHooksBurnUnwrappedRoute
   ApiPublicHooksPayoutSendRoute: typeof ApiPublicHooksPayoutSendRoute
@@ -388,6 +401,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/': {
+      id: '/api/'
+      path: '/api'
+      fullPath: '/api/'
+      preLoaderRoute: typeof ApiIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/swap/': {
       id: '/swap/'
       path: '/'
@@ -479,6 +499,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SwapRoute: SwapRouteWithChildren,
   TermsRoute: TermsRoute,
+  ApiIndexRoute: ApiIndexRoute,
   ApiPublicPriceRoute: ApiPublicPriceRoute,
   ApiPublicHooksBurnUnwrappedRoute: ApiPublicHooksBurnUnwrappedRoute,
   ApiPublicHooksPayoutSendRoute: ApiPublicHooksPayoutSendRoute,
