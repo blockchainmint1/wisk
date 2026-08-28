@@ -18,7 +18,8 @@ const FAQS: Array<{ q: string; a: ReactNode }> = [
         >
           wISK ({CONTRACT})
         </a>
-        . One operator wallet holds real ISK 1:1 against every wISK in circulation.
+        . wISK is minted when you wrap and burned when you unwrap, so total supply always equals
+        the ISK held in the bridge reserve — 1:1, verifiable on both chains.
       </>
     ),
   },
@@ -28,7 +29,7 @@ const FAQS: Array<{ q: string; a: ReactNode }> = [
   },
   {
     q: "Why custodial and not a smart contract?",
-    a: "By choice. A one-operator hot wallet with a public reconciliation dashboard is simpler, cheaper to run, and easier to audit than a contract we'd have to trust ourselves to secure. ISK held by the bridge matches wISK in circulation — publicly checkable at any time.",
+    a: "The ISK side has no smart contracts — it's a Bitcoin-derived chain — so somebody has to custody the native coin. We keep that side deliberately simple: one operator wallet, and a wISK contract that only mints against a confirmed ISK deposit and only burns on unwrap. There is no pre-mined float sitting around, so wISK total supply is a live proof-of-reserves number anyone can check.",
   },
   {
     q: "Which networks and tokens can I send from?",
@@ -56,7 +57,7 @@ const FAQS: Array<{ q: string; a: ReactNode }> = [
   },
   {
     q: "Do you take custody of my funds?",
-    a: "Yes — that's the model. The bridge is custodial by design. ISK backing wISK lives in the operator wallet full-time while the wISK is in circulation.",
+    a: "Yes — that's the model. The bridge is custodial by design. The ISK backing wISK stays in the operator wallet for as long as that wISK is in circulation, and is released the moment it's burned on unwrap.",
   },
   {
     q: "Where can I track my swap?",
