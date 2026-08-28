@@ -14,8 +14,8 @@ import {
 } from "@/lib/homepage-stats.functions";
 
 const UNISWAP_URL =
-  "https://app.uniswap.org/#/swap?outputCurrency=0x9FC65df3997073B8551Ffd617154B5102fACbb88&theme=dark";
-const WISK_CONTRACT = "0x9FC65df3997073B8551Ffd617154B5102fACbb88";
+  "https://app.uniswap.org/#/swap?outputCurrency=0xFB38867D064Df981F159b886007F1273a346b0BB&theme=dark";
+const WISK_CONTRACT = "0xFB38867D064Df981F159b886007F1273a346b0BB";
 
 const fmtAmount = (n: number) =>
   n >= 1

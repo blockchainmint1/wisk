@@ -43,7 +43,7 @@ function TermsPage() {
 
           <Section title="2. Service Description">
             <p>
-              SWAP operates a custodial bridge between native Iskander Coin (ISK) and its ERC-20 representation on Ethereum, wISK (contract 0x9FC65df3997073B8551Ffd617154B5102fACbb88), plus a stablecoin and ETH on-ramp into either asset. ISK held by the operator wallet backs wISK in circulation 1:1. The on-ramp sources liquidity from Bitmart and applies a fixed 5% protocol premium above the live spot price.
+              SWAP operates a custodial bridge between native Iskander Coin (ISK) and its ERC-20 representation on Ethereum, wISK (contract 0xFB38867D064Df981F159b886007F1273a346b0BB), plus a stablecoin and ETH on-ramp into either asset. ISK held by the operator wallet backs wISK in circulation 1:1. The on-ramp sources liquidity from Bitmart and applies a fixed 5% protocol premium above the live spot price.
             </p>
           </Section>
 

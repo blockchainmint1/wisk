@@ -61,9 +61,9 @@ const ISK_NETWORK = {
   messagePrefix: "\x19Iskander Signed Message:\n",
   bech32: "isk",
   bip32: { public: 0x0488b21e, private: 0x0488ade4 },
-  pubKeyHash: 0x42,
-  scriptHash: 0x32,
-  wif: 0xc1,
+  pubKeyHash: 0x2d, // base58 'K' prefix
+  scriptHash: 0x2c,
+  wif: 0xad,
 } as const;
 
 let cachedIskRoot: HDKey | null = null;

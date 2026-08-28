@@ -5,7 +5,7 @@
 import { Contract, JsonRpcProvider, formatUnits, parseUnits } from "ethers";
 import { deriveEvmWallet } from "./bridge-wallet.server";
 
-export const WISK_CONTRACT = "0x9FC65df3997073B8551Ffd617154B5102fACbb88";
+export const WISK_CONTRACT = "0xFB38867D064Df981F159b886007F1273a346b0BB";
 export const WISK_DECIMALS = 8;
 export const WISK_CHAIN_ID = 1; // Ethereum mainnet
 

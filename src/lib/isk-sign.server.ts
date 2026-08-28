@@ -24,9 +24,9 @@ export const ISK_NETWORK: bitcoin.networks.Network = {
   messagePrefix: "\x19Iskander Signed Message:\n",
   bech32: "isk",
   bip32: { public: 0x0488b21e, private: 0x0488ade4 },
-  pubKeyHash: 0x42, // base58 'T' prefix
-  scriptHash: 0x32,
-  wif: 0xc1,
+  pubKeyHash: 0x2d, // base58 'K' prefix
+  scriptHash: 0x2c,
+  wif: 0xad,
 };
 
 // API host is api.mempool.iskandercoin.com — the bare mempool.iskandercoin.com

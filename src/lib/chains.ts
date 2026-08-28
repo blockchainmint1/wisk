@@ -52,7 +52,7 @@ const native = (symbol: string, bitmartSymbol: string): TokenConfig => ({
   bitmartSymbol,
 });
 
-export const WISK_ADDRESS_ETHEREUM = "0x9FC65df3997073B8551Ffd617154B5102fACbb88";
+export const WISK_ADDRESS_ETHEREUM = "0xFB38867D064Df981F159b886007F1273a346b0BB";
 
 export const CHAINS: Record<ChainKey, ChainConfig> = {
   ethereum: {

@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { SiteFooter, SiteHeader } from "@/components/site-shell";
 
-const CONTRACT = "0x9FC65df3997073B8551Ffd617154B5102fACbb88";
+const CONTRACT = "0xFB38867D064Df981F159b886007F1273a346b0BB";
 
 const FAQS: Array<{ q: string; a: ReactNode }> = [
   {
