@@ -7,6 +7,7 @@ import { SiteFooter, SiteHeader } from "@/components/site-shell";
 import { SwapForm } from "@/components/swap-form";
 import { getPublicFees } from "@/lib/public-settings.functions";
 import {
+  getProofOfReserves,
   getRecentSwaps,
   getWiskHolders,
   type PublicSwapRow,
