@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
-import { Route as ApiRouteImport } from './routes/api'
 import { Route as ChangeLogRouteImport } from './routes/change-log'
 import { Route as EmbedRouteImport } from './routes/embed'
 import { Route as EmbedBuilderRouteImport } from './routes/embed-builder'
@@ -22,6 +21,7 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SwapRouteImport } from './routes/swap'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as ApiIndexRouteImport } from './routes/api.index'
 import { Route as SwapIndexRouteImport } from './routes/swap.index'
 import { Route as SwapOrderIdRouteImport } from './routes/swap.$orderId'
 import { Route as ApiPublicPriceRouteImport } from './routes/api/public/price'
@@ -40,11 +40,6 @@ const IndexRoute = IndexRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiRoute = ApiRouteImport.update({
-  id: '/api',
-  path: '/api',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChangeLogRoute = ChangeLogRouteImport.update({
@@ -97,6 +92,11 @@ const TermsRoute = TermsRouteImport.update({
   path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiIndexRoute = ApiIndexRouteImport.update({
+  id: '/api/',
+  path: '/api/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SwapIndexRoute = SwapIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -108,26 +108,26 @@ const SwapOrderIdRoute = SwapOrderIdRouteImport.update({
   getParentRoute: () => SwapRoute,
 } as any)
 const ApiPublicPriceRoute = ApiPublicPriceRouteImport.update({
-  id: '/public/price',
-  path: '/public/price',
-  getParentRoute: () => ApiRoute,
+  id: '/api/public/price',
+  path: '/api/public/price',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicHooksBurnUnwrappedRoute =
   ApiPublicHooksBurnUnwrappedRouteImport.update({
-    id: '/public/hooks/burn-unwrapped',
-    path: '/public/hooks/burn-unwrapped',
-    getParentRoute: () => ApiRoute,
+    id: '/api/public/hooks/burn-unwrapped',
+    path: '/api/public/hooks/burn-unwrapped',
+    getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicHooksPayoutSendRoute =
   ApiPublicHooksPayoutSendRouteImport.update({
-    id: '/public/hooks/payout-send',
-    path: '/public/hooks/payout-send',
-    getParentRoute: () => ApiRoute,
+    id: '/api/public/hooks/payout-send',
+    path: '/api/public/hooks/payout-send',
+    getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicHooksSwapTickRoute = ApiPublicHooksSwapTickRouteImport.update({
-  id: '/public/hooks/swap-tick',
-  path: '/public/hooks/swap-tick',
-  getParentRoute: () => ApiRoute,
+  id: '/api/public/hooks/swap-tick',
+  path: '/api/public/hooks/swap-tick',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const LovableEmailAuthPreviewRoute = LovableEmailAuthPreviewRouteImport.update({
   id: '/lovable/email/auth/preview',
@@ -149,7 +149,6 @@ const LovableEmailQueueProcessRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/api': typeof ApiRouteWithChildren
   '/change-log': typeof ChangeLogRoute
   '/embed': typeof EmbedRoute
   '/embed-builder': typeof EmbedBuilderRoute
@@ -161,6 +160,7 @@ export interface FileRoutesByFullPath {
   '/swap': typeof SwapRouteWithChildren
   '/terms': typeof TermsRoute
   '/swap/$orderId': typeof SwapOrderIdRoute
+  '/api/': typeof ApiIndexRoute
   '/swap/': typeof SwapIndexRoute
   '/api/public/price': typeof ApiPublicPriceRoute
   '/api/public/hooks/burn-unwrapped': typeof ApiPublicHooksBurnUnwrappedRoute
@@ -173,7 +173,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/api': typeof ApiRouteWithChildren
   '/change-log': typeof ChangeLogRoute
   '/embed': typeof EmbedRoute
   '/embed-builder': typeof EmbedBuilderRoute
@@ -184,6 +183,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/swap/$orderId': typeof SwapOrderIdRoute
+  '/api': typeof ApiIndexRoute
   '/swap': typeof SwapIndexRoute
   '/api/public/price': typeof ApiPublicPriceRoute
   '/api/public/hooks/burn-unwrapped': typeof ApiPublicHooksBurnUnwrappedRoute
@@ -197,7 +197,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/api': typeof ApiRouteWithChildren
   '/change-log': typeof ChangeLogRoute
   '/embed': typeof EmbedRoute
   '/embed-builder': typeof EmbedBuilderRoute
@@ -209,6 +208,7 @@ export interface FileRoutesById {
   '/swap': typeof SwapRouteWithChildren
   '/terms': typeof TermsRoute
   '/swap/$orderId': typeof SwapOrderIdRoute
+  '/api/': typeof ApiIndexRoute
   '/swap/': typeof SwapIndexRoute
   '/api/public/price': typeof ApiPublicPriceRoute
   '/api/public/hooks/burn-unwrapped': typeof ApiPublicHooksBurnUnwrappedRoute
@@ -223,7 +223,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
-    | '/api'
     | '/change-log'
     | '/embed'
     | '/embed-builder'
@@ -235,6 +234,7 @@ export interface FileRouteTypes {
     | '/swap'
     | '/terms'
     | '/swap/$orderId'
+    | '/api/'
     | '/swap/'
     | '/api/public/price'
     | '/api/public/hooks/burn-unwrapped'
@@ -247,7 +247,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
-    | '/api'
     | '/change-log'
     | '/embed'
     | '/embed-builder'
@@ -258,6 +257,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/terms'
     | '/swap/$orderId'
+    | '/api'
     | '/swap'
     | '/api/public/price'
     | '/api/public/hooks/burn-unwrapped'
@@ -270,7 +270,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
-    | '/api'
     | '/change-log'
     | '/embed'
     | '/embed-builder'
@@ -282,6 +281,7 @@ export interface FileRouteTypes {
     | '/swap'
     | '/terms'
     | '/swap/$orderId'
+    | '/api/'
     | '/swap/'
     | '/api/public/price'
     | '/api/public/hooks/burn-unwrapped'
@@ -295,7 +295,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
-  ApiRoute: typeof ApiRouteWithChildren
   ChangeLogRoute: typeof ChangeLogRoute
   EmbedRoute: typeof EmbedRoute
   EmbedBuilderRoute: typeof EmbedBuilderRoute
@@ -306,6 +305,11 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SwapRoute: typeof SwapRouteWithChildren
   TermsRoute: typeof TermsRoute
+  ApiIndexRoute: typeof ApiIndexRoute
+  ApiPublicPriceRoute: typeof ApiPublicPriceRoute
+  ApiPublicHooksBurnUnwrappedRoute: typeof ApiPublicHooksBurnUnwrappedRoute
+  ApiPublicHooksPayoutSendRoute: typeof ApiPublicHooksPayoutSendRoute
+  ApiPublicHooksSwapTickRoute: typeof ApiPublicHooksSwapTickRoute
   LovableEmailAuthPreviewRoute: typeof LovableEmailAuthPreviewRoute
   LovableEmailAuthWebhookRoute: typeof LovableEmailAuthWebhookRoute
   LovableEmailQueueProcessRoute: typeof LovableEmailQueueProcessRoute
@@ -325,13 +329,6 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api': {
-      id: '/api'
-      path: '/api'
-      fullPath: '/api'
-      preLoaderRoute: typeof ApiRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/change-log': {
@@ -404,6 +401,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/': {
+      id: '/api/'
+      path: '/api'
+      fullPath: '/api/'
+      preLoaderRoute: typeof ApiIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/swap/': {
       id: '/swap/'
       path: '/'
@@ -420,31 +424,31 @@ declare module '@tanstack/react-router' {
     }
     '/api/public/price': {
       id: '/api/public/price'
-      path: '/public/price'
+      path: '/api/public/price'
       fullPath: '/api/public/price'
       preLoaderRoute: typeof ApiPublicPriceRouteImport
-      parentRoute: typeof ApiRoute
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/burn-unwrapped': {
       id: '/api/public/hooks/burn-unwrapped'
-      path: '/public/hooks/burn-unwrapped'
+      path: '/api/public/hooks/burn-unwrapped'
       fullPath: '/api/public/hooks/burn-unwrapped'
       preLoaderRoute: typeof ApiPublicHooksBurnUnwrappedRouteImport
-      parentRoute: typeof ApiRoute
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/payout-send': {
       id: '/api/public/hooks/payout-send'
-      path: '/public/hooks/payout-send'
+      path: '/api/public/hooks/payout-send'
       fullPath: '/api/public/hooks/payout-send'
       preLoaderRoute: typeof ApiPublicHooksPayoutSendRouteImport
-      parentRoute: typeof ApiRoute
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/swap-tick': {
       id: '/api/public/hooks/swap-tick'
-      path: '/public/hooks/swap-tick'
+      path: '/api/public/hooks/swap-tick'
       fullPath: '/api/public/hooks/swap-tick'
       preLoaderRoute: typeof ApiPublicHooksSwapTickRouteImport
-      parentRoute: typeof ApiRoute
+      parentRoute: typeof rootRouteImport
     }
     '/lovable/email/auth/preview': {
       id: '/lovable/email/auth/preview'
@@ -470,22 +474,6 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface ApiRouteChildren {
-  ApiPublicPriceRoute: typeof ApiPublicPriceRoute
-  ApiPublicHooksBurnUnwrappedRoute: typeof ApiPublicHooksBurnUnwrappedRoute
-  ApiPublicHooksPayoutSendRoute: typeof ApiPublicHooksPayoutSendRoute
-  ApiPublicHooksSwapTickRoute: typeof ApiPublicHooksSwapTickRoute
-}
-
-const ApiRouteChildren: ApiRouteChildren = {
-  ApiPublicPriceRoute: ApiPublicPriceRoute,
-  ApiPublicHooksBurnUnwrappedRoute: ApiPublicHooksBurnUnwrappedRoute,
-  ApiPublicHooksPayoutSendRoute: ApiPublicHooksPayoutSendRoute,
-  ApiPublicHooksSwapTickRoute: ApiPublicHooksSwapTickRoute,
-}
-
-const ApiRouteWithChildren = ApiRoute._addFileChildren(ApiRouteChildren)
-
 interface SwapRouteChildren {
   SwapOrderIdRoute: typeof SwapOrderIdRoute
   SwapIndexRoute: typeof SwapIndexRoute
@@ -501,7 +489,6 @@ const SwapRouteWithChildren = SwapRoute._addFileChildren(SwapRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
-  ApiRoute: ApiRouteWithChildren,
   ChangeLogRoute: ChangeLogRoute,
   EmbedRoute: EmbedRoute,
   EmbedBuilderRoute: EmbedBuilderRoute,
@@ -512,6 +499,11 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SwapRoute: SwapRouteWithChildren,
   TermsRoute: TermsRoute,
+  ApiIndexRoute: ApiIndexRoute,
+  ApiPublicPriceRoute: ApiPublicPriceRoute,
+  ApiPublicHooksBurnUnwrappedRoute: ApiPublicHooksBurnUnwrappedRoute,
+  ApiPublicHooksPayoutSendRoute: ApiPublicHooksPayoutSendRoute,
+  ApiPublicHooksSwapTickRoute: ApiPublicHooksSwapTickRoute,
   LovableEmailAuthPreviewRoute: LovableEmailAuthPreviewRoute,
   LovableEmailAuthWebhookRoute: LovableEmailAuthWebhookRoute,
   LovableEmailQueueProcessRoute: LovableEmailQueueProcessRoute,
