@@ -208,7 +208,7 @@ export const getProofOfReserves = createServerFn({ method: "GET" }).handler(
         getWiskTotalSupply(),
         hdMod.getIskHdTotal(signMod.getIskHotAddress()),
       ]);
-      const reserve = Number(totals.totalIsk ?? 0);
+      const reserve = Number(totals.totalConfirmed ?? 0);
       const delta = reserve - supply;
       const value: ProofOfReserves = {
         supply,
