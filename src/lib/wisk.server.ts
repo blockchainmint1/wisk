@@ -11,6 +11,7 @@ export const WISK_CHAIN_ID = 1; // Ethereum mainnet
 
 const ERC20_ABI = [
   "function balanceOf(address) view returns (uint256)",
+  "function totalSupply() view returns (uint256)",
   "function transfer(address to, uint256 amount) returns (bool)",
   "function decimals() view returns (uint8)",
   "function mintWrapped(address to, uint256 amount, string iskTxid)",
