@@ -41,13 +41,13 @@ function TermsPage() {
         <div className="space-y-12 text-sm leading-relaxed text-muted-foreground">
           <Section title="1. Acceptance of Terms">
             <p>
-              By accessing or using swapISK ("the Protocol"), you agree to be bound by these Terms of Use. If you do not agree, do not use the Protocol. These terms constitute a legally binding agreement between you and the Protocol operators.
+              By accessing or using the wISK bridge ("the Protocol"), you agree to be bound by these Terms of Use. If you do not agree, do not use the Protocol. These terms constitute a legally binding agreement between you and the Protocol operators.
             </p>
           </Section>
 
           <Section title="2. Service Description">
             <p>
-              SWAP operates a custodial bridge between native Iskander Coin (ISK) and its ERC-20 representation on Ethereum, wISK (contract 0xFB38867D064Df981F159b886007F1273a346b0BB), plus a stablecoin and ETH on-ramp into either asset. ISK held by the operator wallet backs wISK in circulation 1:1. The on-ramp sources liquidity from Bitmart and applies a fixed 5% protocol premium above the live spot price.
+              The Protocol operates a custodial bridge between native Iskander Coin (ISK) and its ERC-20 representation on Ethereum, wISK (contract 0xFB38867D064Df981F159b886007F1273a346b0BB). Wrapping mints new wISK against a confirmed ISK deposit held in the operator wallet; unwrapping burns wISK and releases the corresponding ISK. wISK total supply therefore equals the ISK reserve at all times. Swaps are one-for-one on quantity, less the applicable protocol fee. The Protocol does not operate a stablecoin or fiat on-ramp and does not price swaps against any currency.
             </p>
           </Section>
 
