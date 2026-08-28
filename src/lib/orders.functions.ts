@@ -214,7 +214,6 @@ export const createOrder = createServerFn({ method: "POST" })
           : isUnwrap
             ? -settings.unwrap_fee_bps
             : settings.premium_bps,
-        bitmart_spot_price: 0,
         expires_at: expiresAt,
       })
       .select("public_id")
@@ -247,7 +246,7 @@ export const getOrder = createServerFn({ method: "POST" })
     const { data: order, error } = await supabaseAdmin
       .from("orders")
       .select(
-        "id,public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_asset,dest_address,quoted_dest_out,quoted_dest_per_usd,premium_bps,bitmart_spot_price,created_at,expires_at,paid_tx_hash,paid_amount_usd,bitmart_avg_price,bitmart_filled_dest,dest_tx_hash,error_message,original_quoted_dest_out,underpayment_ack",
+        "id,public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_asset,dest_address,quoted_dest_out,quoted_dest_per_usd,premium_bps,created_at,expires_at,paid_tx_hash,paid_amount_usd,dest_tx_hash,error_message,original_quoted_dest_out,underpayment_ack",
       )
       .eq("public_id", data.publicId)
       .maybeSingle();

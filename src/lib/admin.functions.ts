@@ -45,7 +45,7 @@ export const adminListOrders = createServerFn({ method: "POST" })
     const { data: rows, error } = await supabaseAdmin
       .from("orders")
       .select(
-        "public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_address,quoted_dest_out,created_at,paid_amount_usd,bitmart_filled_dest,dest_tx_hash,dest_asset,error_message",
+        "public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_address,quoted_dest_out,created_at,paid_amount_usd,dest_tx_hash,dest_asset,error_message",
       )
       .order("created_at", { ascending: false })
       .limit(data.limit);
@@ -70,7 +70,7 @@ export const adminSearchOrders = createServerFn({ method: "POST" })
     const q = data.query.trim();
     const like = `%${q.replace(/[%_]/g, (m) => `\\${m}`)}%`;
     const cols =
-      "public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_address,quoted_dest_out,created_at,paid_amount_usd,bitmart_filled_dest,dest_tx_hash,dest_asset,error_message";
+      "public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_address,quoted_dest_out,created_at,paid_amount_usd,dest_tx_hash,dest_asset,error_message";
 
     // 1) Search columns directly on orders.
     const orFilter = [
@@ -80,7 +80,6 @@ export const adminSearchOrders = createServerFn({ method: "POST" })
       `dest_from_address.ilike.${like}`,
       `dest_tx_hash.ilike.${like}`,
       `paid_tx_hash.ilike.${like}`,
-      `bitmart_order_id.ilike.${like}`,
       `withdrawal_id.ilike.${like}`,
       `error_message.ilike.${like}`,
       `source_chain.ilike.${like}`,
@@ -753,7 +752,7 @@ export const adminListCustomTokens = createServerFn({ method: "POST" })
     await assertAdmin(context.userId);
     const { data, error } = await supabaseAdmin
       .from("custom_tokens")
-      .select("id,chain,symbol,address,decimals,is_native,bitmart_symbol,enabled,created_at,updated_at")
+      .select("id,chain,symbol,address,decimals,is_native,enabled,created_at,updated_at")
       .order("chain", { ascending: true })
       .order("symbol", { ascending: true });
     if (error) throw new Error(error.message);
