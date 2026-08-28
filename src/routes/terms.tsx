@@ -4,16 +4,20 @@ import { SiteFooter, SiteHeader } from "@/components/site-shell";
 export const Route = createFileRoute("/terms")({
   head: () => ({
     meta: [
-      { title: "Terms of Use — swapISK" },
+      { title: "Terms of Use — wISK Bridge" },
       {
         name: "description",
-        content: "Terms of use for swapISK stablecoin-to-native swap protocol.",
+        content:
+          "Terms of use for the wISK bridge: eligibility, custodial model, fees, risks, and liability for wrapping ISK into wISK and back.",
       },
-      { property: "og:title", content: "Terms of Use — swapISK" },
+      { property: "og:title", content: "Terms of Use — wISK Bridge" },
       {
         property: "og:description",
-        content: "Terms of use for swapISK stablecoin-to-native swap protocol.",
+        content:
+          "Terms of use for the ISK ↔ wISK custodial bridge — eligibility, fees, risks, and liability.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: TermsPage,
