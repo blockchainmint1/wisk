@@ -133,9 +133,12 @@ export const Route = createFileRoute("/api/public/hooks/payout-send")({
             use: useNonce,
           });
 
-          const r = await sendWisk({
+          // Mint-on-demand: the operator never holds wISK inventory; each
+          // wrap payout creates fresh supply backed 1:1 by the ISK deposit.
+          const r = await mintWisk({
             toAddress: o.dest_address,
             amountWisk: Number(o.quoted_dest_out),
+            iskTxid: o.paid_tx_hash,
             nonce: useNonce,
             onSubmitted: async ({ txHash, nonce }) => {
               await supabaseAdmin
