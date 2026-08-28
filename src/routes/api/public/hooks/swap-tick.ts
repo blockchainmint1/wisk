@@ -1,13 +1,13 @@
 // Fulfillment cron tick — called by pg_cron every minute.
-// Customer flow (TXC and wTXC):
+// Customer flow (ISK and wISK):
 //   awaiting_payment → payment_detected → confirmed → sending → completed
 //   Payout is signed + broadcast locally from our hot/operator wallet using
 //   the quoted amount. Bitmart is NEVER on the critical path.
 // Treasury replenishment (background, decoupled):
-//   For completed on-ramp orders (stables/ETH → TXC or wTXC), submit a
-//   market buy on Bitmart to refill the TXC hot wallet. For unwrap orders
-//   (wTXC → TXC) we skip Bitmart entirely — the user gave us wTXC which
-//   we already hold; re-wrapping TXC back to wTXC is a manual admin op.
+//   For completed on-ramp orders (stables/ETH → ISK or wISK), submit a
+//   market buy on Bitmart to refill the ISK hot wallet. For unwrap orders
+//   (wISK → ISK) we skip Bitmart entirely — the user gave us wISK which
+//   we already hold; re-wrapping ISK back to wISK is a manual admin op.
 // Auth: route lives under /api/public/* which bypasses Lovable's site auth.
 
 import { createFileRoute } from "@tanstack/react-router";
@@ -24,16 +24,16 @@ import {
   scanOutgoingTransfers,
   weiToUsd,
 } from "@/lib/evm-scan.server";
-import { isNativeToken, isWtxcSource, type ChainKey } from "@/lib/chains";
+import { isNativeToken, isWiskSource, type ChainKey } from "@/lib/chains";
 import { getMergedChain, getMergedToken } from "@/lib/chains.server";
 import { getDestination } from "@/lib/destinations";
 import { notifyOrderEvent, logOrderEvent, sendAdminAlert } from "@/lib/telegram.server";
 import { getSettings } from "@/lib/settings.server";
-import { sendTxc } from "@/lib/txc-sign.server";
-import { WTXC_CONTRACT, WTXC_DECIMALS, getEvmNonce } from "@/lib/wtxc.server";
+import { sendIsk } from "@/lib/isk-sign.server";
+import { WISK_CONTRACT, WISK_DECIMALS, getEvmNonce } from "@/lib/wisk.server";
 import { getOperatorEvmAddress } from "@/lib/bridge-wallet.server";
 import { getSpotPrice } from "@/lib/bitmart.server";
-import { scanTxcIncoming, getTxcTipHeight } from "@/lib/txc-scan.server";
+import { scanIskIncoming, getIskTipHeight } from "@/lib/isk-scan.server";
 
 
 async function notifyById(
@@ -49,7 +49,7 @@ async function notifyById(
     .maybeSingle();
   if (!data) return;
   // Sum on-chain source amount from deposits so Telegram can display the
-  // real received amount in the source token (wTXC, ETH, USDC, …) rather
+  // real received amount in the source token (wISK, ETH, USDC, …) rather
   // than a USD-derived approximation.
   const { data: deps } = await supabaseAdmin
     .from("deposits")
@@ -89,7 +89,7 @@ interface OrderRow {
 /**
  * A deposit tx mined before the order's start block cannot possibly belong
  * to this order — deposit addresses are recycled no sooner than 1h after
- * their last order, and TXC blocks are ~3min, so any legit deposit lands at
+ * their last order, and ISK blocks are ~3min, so any legit deposit lands at
  * or after `order.deposit_start_block`. Anything older is just an old
  * on-chain tx sitting at a recycled address; we silently ignore it.
  *
@@ -134,36 +134,36 @@ async function failOrder(orderId: string, message: string) {
   await notifyById("failed", orderId);
 }
 
-// Errors from the TXC payout path that provably happen BEFORE any raw tx is
+// Errors from the ISK payout path that provably happen BEFORE any raw tx is
 // accepted by the network, so re-broadcasting cannot double-pay:
 //  • txn-mempool-conflict / missingorspent — our tx was REJECTED because an
 //    input was already spent by another of our txs; nothing of ours landed.
 //  • insufficient balance / no UTXOs — coin selection never built a tx.
 //  • hot-wallet lock timeout — we never got as far as signing.
 //  • Esplora read failures during UTXO/fee/prevtx fetch.
-const TXC_RETRYABLE = [
+const ISK_RETRYABLE = [
   "txn-mempool-conflict",
   "missingorspent",
-  "insufficient txc balance",
+  "insufficient isk balance",
   "no utxos at hot wallet",
   "did not return an array",
-  "timed out waiting for txc hot-wallet lock",
+  "timed out waiting for isk hot-wallet lock",
   "wallet lock acquire failed",
   "bad-txns-inputs-missingorspent",
 ];
-const MAX_TXC_SEND_ATTEMPTS = 12;
+const MAX_ISK_SEND_ATTEMPTS = 12;
 
-function isRetryableTxcSendError(message: string) {
+function isRetryableIskSendError(message: string) {
   const m = message.toLowerCase();
-  return TXC_RETRYABLE.some((s) => m.includes(s));
+  return ISK_RETRYABLE.some((s) => m.includes(s));
 }
 
 /**
- * A TXC payout blew up before broadcast. Roll the order back to `confirmed`
+ * A ISK payout blew up before broadcast. Roll the order back to `confirmed`
  * so the next tick tries again, instead of parking it in terminal `failed`
- * (which no reconciler ever picks up — the reconciler only handles wTXC).
+ * (which no reconciler ever picks up — the reconciler only handles wISK).
  */
-async function requeueTxcPayout(
+async function requeueIskPayout(
   orderId: string,
   attempts: number,
   message: string,
@@ -173,7 +173,7 @@ async function requeueTxcPayout(
     .update({ status: "confirmed", error_message: message })
     .eq("id", orderId);
   await logOrderEvent(orderId, "note", "retry_scheduled", {
-    reason: "txc_send_pre_broadcast_error",
+    reason: "isk_send_pre_broadcast_error",
     attempts_used: attempts,
     message,
   });
@@ -244,7 +244,7 @@ async function detectStuck() {
  * Recover orders stranded in `sending` because the sender broadcast the
  * on-chain transfer but the DB write flipping the order to `completed` was
  * lost (worker eviction, RPC timeout mid-flight). We scan the operator
- * wallet's recent outbound wTXC transfers and, if we find a unique match on
+ * wallet's recent outbound wISK transfers and, if we find a unique match on
  * (dest_address, amount), record the tx hash and mark completed.
  *
  * SAFETY: this only reconciles state — it never re-broadcasts. If no match
@@ -253,7 +253,7 @@ async function detectStuck() {
  * `Number` → `parseUnits`).
  */
 async function reconcileStuckSending() {
-  // Look for wTXC payouts that have been in `sending` for >3 min. Cap to 10 per tick.
+  // Look for wISK payouts that have been in `sending` for >3 min. Cap to 10 per tick.
   const cutoff = new Date(Date.now() - 3 * 60_000).toISOString();
   const { data: stuck } = await supabaseAdmin
     .from("orders")
@@ -261,7 +261,7 @@ async function reconcileStuckSending() {
       "id,public_id,dest_address,quoted_dest_out,dest_tx_hash,dest_broadcast_nonce,send_attempts,updated_at",
     )
     .eq("status", "sending")
-    .eq("dest_asset", "wTXC")
+    .eq("dest_asset", "wISK")
     .lt("updated_at", cutoff)
     .limit(10)
     .returns<
@@ -291,7 +291,7 @@ async function reconcileStuckSending() {
     const transfers = await scanOutgoingTransfers({
       chain: "ethereum",
       fromAddress: operator,
-      tokenAddresses: [WTXC_CONTRACT],
+      tokenAddresses: [WISK_CONTRACT],
       fromBlock,
       toBlock: currentBlock,
     });
@@ -314,7 +314,7 @@ async function reconcileStuckSending() {
 
     for (const o of stuck) {
       const dest = o.dest_address.toLowerCase();
-      const expectedRaw = BigInt(Math.round(Number(o.quoted_dest_out) * 10 ** WTXC_DECIMALS));
+      const expectedRaw = BigInt(Math.round(Number(o.quoted_dest_out) * 10 ** WISK_DECIMALS));
 
       // 1) Prefer matching by the tx hash we recorded at broadcast_submitted.
       let match = o.dest_tx_hash
@@ -336,7 +336,7 @@ async function reconcileStuckSending() {
           });
           void sendAdminAlert(
             `Ambiguous reconcile for ${o.public_id}`,
-            `Found ${candidates.length} outbound wTXC txs from operator to ${dest} matching ${o.quoted_dest_out}. Resolve manually.`,
+            `Found ${candidates.length} outbound wISK txs from operator to ${dest} matching ${o.quoted_dest_out}. Resolve manually.`,
             `reconcile-ambiguous-${o.public_id}`,
           );
           continue;
@@ -423,7 +423,7 @@ async function watchDeposits() {
       "id,public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_address,dest_asset,premium_bps,quoted_dest_out,quoted_dest_per_usd,expires_at,paid_amount_usd,bitmart_order_id,bitmart_filled_dest,withdrawal_id,deposit_start_block",
     )
     .in("status", ["awaiting_payment", "payment_detected"])
-    .neq("source_chain", "txc")
+    .neq("source_chain", "isk")
     .returns<OrderRow[]>();
   if (!orders?.length) return { detected: 0 };
 
@@ -570,28 +570,28 @@ async function watchDeposits() {
           );
 
           // Payout math:
-          //  - Unwrap (wTXC → TXC): 1:1 minus the locked unwrap fee. USD is
-          //    NOT in the formula — the wTXC deposited on-chain IS the source
+          //  - Unwrap (wISK → ISK): 1:1 minus the locked unwrap fee. USD is
+          //    NOT in the formula — the wISK deposited on-chain IS the source
           //    of truth. This is a swap, not a trade.
-          //  - Everything else (stables / ETH → TXC/wTXC): still price-based;
+          //  - Everything else (stables / ETH → ISK/wISK): still price-based;
           //    reprice at the locked USD → dest rate the customer accepted.
-          const isUnwrap = isWtxcSource(
+          const isUnwrap = isWiskSource(
             order.source_chain as ChainKey,
             order.source_token,
           );
-          let repricedTxcOut: number;
+          let repricedIskOut: number;
           if (isUnwrap) {
             // premium_bps was stored as -unwrap_fee_bps at creation time.
             const feeBps = Math.abs(Number(order.premium_bps ?? 0));
             const feeMul = 1 - feeBps / 10_000;
-            repricedTxcOut = +(totalPaidSource * feeMul).toFixed(8);
+            repricedIskOut = +(totalPaidSource * feeMul).toFixed(8);
           } else {
-            repricedTxcOut = +(
+            repricedIskOut = +(
               totalPaidUsd * Number(order.quoted_dest_per_usd)
             ).toFixed(8);
           }
-          const originalTxcOut = Number(order.quoted_dest_out);
-          const repriced = Math.abs(repricedTxcOut - originalTxcOut) > 0.00000001;
+          const originalIskOut = Number(order.quoted_dest_out);
+          const repriced = Math.abs(repricedIskOut - originalIskOut) > 0.00000001;
 
           if (order.status === "awaiting_payment") {
             await supabaseAdmin
@@ -600,17 +600,17 @@ async function watchDeposits() {
                 status: "payment_detected",
                 paid_tx_hash: t.txHash,
                 paid_amount_usd: totalPaidUsd,
-                quoted_dest_out: repricedTxcOut,
+                quoted_dest_out: repricedIskOut,
               })
               .eq("id", order.id);
             order.status = "payment_detected";
             order.paid_amount_usd = totalPaidUsd;
-            order.quoted_dest_out = repricedTxcOut;
+            order.quoted_dest_out = repricedIskOut;
             await logOrderEvent(order.id, "state", "payment_detected", {
               tx_hash: t.txHash,
               confirmations,
-              original_payout: originalTxcOut,
-              repriced_payout: repricedTxcOut,
+              original_payout: originalIskOut,
+              repriced_payout: repricedIskOut,
             });
             await notifyById("payment_detected", order.id);
           } else {
@@ -618,16 +618,16 @@ async function watchDeposits() {
               .from("orders")
               .update({
                 paid_amount_usd: totalPaidUsd,
-                quoted_dest_out: repricedTxcOut,
+                quoted_dest_out: repricedIskOut,
               })
               .eq("id", order.id);
             order.paid_amount_usd = totalPaidUsd;
-            order.quoted_dest_out = repricedTxcOut;
+            order.quoted_dest_out = repricedIskOut;
             if (repriced) {
             await logOrderEvent(order.id, "note", "repriced", {
                 additional_tx: t.txHash,
-                original_payout: originalTxcOut,
-                repriced_payout: repricedTxcOut,
+                original_payout: originalIskOut,
+                repriced_payout: repricedIskOut,
               });
             }
           }
@@ -654,19 +654,19 @@ async function watchDeposits() {
 }
 
 /**
- * Wrap direction (source = native TXC → dest = wTXC).
- * Scan each awaiting/detected TXC-source order's deposit address on the
- * TEXITcoin chain, price the sats at the live spot, and advance the order
+ * Wrap direction (source = native ISK → dest = wISK).
+ * Scan each awaiting/detected ISK-source order's deposit address on the
+ * Iskander Coin chain, price the sats at the live spot, and advance the order
  * state exactly like watchDeposits() does for EVM.
  */
-async function watchTxcDeposits() {
+async function watchIskDeposits() {
   const { data: orders } = await supabaseAdmin
     .from("orders")
     .select(
       "id,public_id,status,source_amount_usd,deposit_address,premium_bps,quoted_dest_out,quoted_dest_per_usd,original_quoted_dest_out,underpayment_ack,deposit_start_block",
     )
     .in("status", ["awaiting_payment", "payment_detected"])
-    .eq("source_chain", "txc")
+    .eq("source_chain", "isk")
     .returns<
       Array<{
         id: string;
@@ -684,37 +684,37 @@ async function watchTxcDeposits() {
     >();
   if (!orders?.length) return { detected: 0 };
 
-  // TXC deposits: pay out on mempool sighting (0-conf). The bridge hot
+  // ISK deposits: pay out on mempool sighting (0-conf). The bridge hot
   // wallet is the only signer on the deposit address, so we can safely
   // spend the incoming UTXO before it confirms.
   const REQUIRED_CONFIRMATIONS = 0;
   let detected = 0;
   let tip = 0;
   try {
-    tip = await getTxcTipHeight();
+    tip = await getIskTipHeight();
   } catch (e) {
-    console.error("[watch-txc] tip failed", e);
+    console.error("[watch-isk] tip failed", e);
     return { detected: 0 };
   }
   // Spot price is only used for display USD accounting on the deposits row.
   // Wrap payout math is pure 1:1 minus locked wrap fee — no spot involved.
-  let txcSpot = 0;
+  let iskSpot = 0;
   try {
-    txcSpot = await getSpotPrice("TXC_USDT");
+    iskSpot = await getSpotPrice("ISK_USDT");
   } catch (e) {
-    console.warn("[watch-txc] spot lookup failed; USD display will be 0", e);
+    console.warn("[watch-isk] spot lookup failed; USD display will be 0", e);
   }
 
   for (const order of orders) {
     try {
-      const transfers = await scanTxcIncoming(order.deposit_address, tip);
+      const transfers = await scanIskIncoming(order.deposit_address, tip);
       if (!transfers.length) continue;
 
       for (const t of transfers) {
-        const txcAmount = t.amountSats / 1e8;
-        const usd = txcAmount * txcSpot;
+        const iskAmount = t.amountSats / 1e8;
+        const usd = iskAmount * iskSpot;
 
-        // BLOCK-HEIGHT GUARD: reject any TXC deposit mined before the order
+        // BLOCK-HEIGHT GUARD: reject any ISK deposit mined before the order
         // was created. Same reasoning as EVM path — usually innocent address
         // reuse, so no admin alert unless it hits 2+ orders (see helper).
         const txBlock = t.blockHeight ?? 0;
@@ -723,26 +723,26 @@ async function watchTxcDeposits() {
           txBlock > 0 &&
           txBlock < order.deposit_start_block
         ) {
-          await maybeLogStaleDeposit(order.id, order.public_id, "txc", t.txid, txBlock, order.deposit_start_block);
+          await maybeLogStaleDeposit(order.id, order.public_id, "isk", t.txid, txBlock, order.deposit_start_block);
           continue;
         }
 
 
-        // REPLAY GUARD: reject any TXC tx that was already credited to a
+        // REPLAY GUARD: reject any ISK tx that was already credited to a
         // different order (address recycling means the same on-chain deposit
         // must never be counted twice).
         const { data: existingDep } = await supabaseAdmin
           .from("deposits")
           .select("order_id")
-          .eq("chain", "txc")
+          .eq("chain", "isk")
           .eq("tx_hash", t.txid)
           .eq("log_index", 0)
           .maybeSingle();
         if (existingDep && existingDep.order_id !== order.id) {
           await sendAdminAlert(
             "Replay blocked",
-            `TXC tx ${t.txid} at ${order.deposit_address} was already credited to order ${existingDep.order_id}; refusing to credit ${order.public_id}.`,
-            `replay:txc:${t.txid}`,
+            `ISK tx ${t.txid} at ${order.deposit_address} was already credited to order ${existingDep.order_id}; refusing to credit ${order.public_id}.`,
+            `replay:isk:${t.txid}`,
           );
           await logOrderEvent(order.id, "note", "replay_blocked", {
             tx_hash: t.txid,
@@ -755,14 +755,14 @@ async function watchTxcDeposits() {
         await supabaseAdmin.from("deposits").upsert(
           {
             order_id: order.id,
-            chain: "txc",
+            chain: "isk",
             tx_hash: t.txid,
             log_index: 0,
-            token: "TXC",
+            token: "ISK",
             from_address: t.fromAddress ?? "",
             to_address: order.deposit_address,
             amount_usd: usd,
-            amount_source: txcAmount,
+            amount_source: iskAmount,
             block_number: t.blockHeight ?? 0,
             confirmations: t.confirmations,
           },
@@ -777,16 +777,16 @@ async function watchTxcDeposits() {
           (sum, d) => sum + Number(d.amount_usd ?? 0),
           0,
         );
-        const totalPaidTxc = (allDeposits ?? []).reduce(
+        const totalPaidIsk = (allDeposits ?? []).reduce(
           (sum, d) => sum + Number(d.amount_source ?? 0),
           0,
         );
 
         // Wrap payout: 1:1 minus the locked wrap fee. USD is not in the
-        // formula — the TXC deposited on-chain IS the source of truth.
+        // formula — the ISK deposited on-chain IS the source of truth.
         const feeBps = Math.abs(Number(order.premium_bps ?? 0));
         const feeMul = 1 - feeBps / 10_000;
-        const repricedOut = +(totalPaidTxc * feeMul).toFixed(8);
+        const repricedOut = +(totalPaidIsk * feeMul).toFixed(8);
         const originalOut = Number(order.quoted_dest_out);
         const repriced = Math.abs(repricedOut - originalOut) > 0.00000001;
 
@@ -880,7 +880,7 @@ async function watchTxcDeposits() {
         }
       }
     } catch (e) {
-      console.error(`[watch-txc] order ${order.public_id} failed`, e);
+      console.error(`[watch-isk] order ${order.public_id} failed`, e);
     }
   }
   return { detected };
@@ -889,7 +889,7 @@ async function watchTxcDeposits() {
 
 /**
  * For confirmed orders, pay the customer IMMEDIATELY using local signing.
- * Both TXC and wTXC now sign + broadcast directly from our hot wallet.
+ * Both ISK and wISK now sign + broadcast directly from our hot wallet.
  * Bitmart is NEVER on the critical path — treasury replenishment runs
  * in the background after the customer is paid.
  */
@@ -934,19 +934,19 @@ async function settleConfirmed() {
     const req = getRequest();
     originForPayout = new URL(req.url).origin;
   } catch {
-    // If we somehow lost request context, wTXC payouts fall back to inline
+    // If we somehow lost request context, wISK payouts fall back to inline
     // (which is what caused the original problem, but at least the order
     // doesn't just sit forever — the reconciler still runs).
   }
 
   for (const o of orders) {
-    const asset = o.dest_asset || "TXC";
+    const asset = o.dest_asset || "ISK";
     try {
       // Capture the operator's pending nonce BEFORE marking `sending`. If the
       // send never lands on-chain, the reconciler compares this against the
       // current pending nonce to prove nothing was broadcast, and safely retries.
       let attemptNonce: number | null = null;
-      if (asset === "wTXC") {
+      if (asset === "wISK") {
         try {
           attemptNonce = await getEvmNonce(getOperatorEvmAddress(), "pending");
         } catch (e) {
@@ -977,7 +977,7 @@ async function settleConfirmed() {
       // Only fire the customer-facing "sending" telegram on the first attempt.
       if (nextAttempt === 1) await notifyById("sending", o.id);
 
-      if (asset === "wTXC" && originForPayout) {
+      if (asset === "wISK" && originForPayout) {
         // Dedicated Worker invocation so the send gets its own fresh CPU /
         // wall-clock budget. This MUST be awaited: an un-awaited subrequest is
         // cancelled the moment this handler returns its response, which is why
@@ -1004,11 +1004,11 @@ async function settleConfirmed() {
       }
 
 
-      // TXC (native) payouts stay inline — our own RPC node is fast and
+      // ISK (native) payouts stay inline — our own RPC node is fast and
       // doesn't have the multi-round-trip pre-flight ethers does on EVM.
-      const result = await sendTxc({
+      const result = await sendIsk({
         toAddress: o.dest_address,
-        amountTxc: Number(o.quoted_dest_out),
+        amountIsk: Number(o.quoted_dest_out),
       });
 
       await supabaseAdmin
@@ -1027,11 +1027,11 @@ async function settleConfirmed() {
       const msg = e instanceof Error ? e.message : "Settlement failed";
       const attempts = (o.send_attempts ?? 0) + 1;
       if (
-        asset !== "wTXC" &&
-        isRetryableTxcSendError(msg) &&
-        attempts < MAX_TXC_SEND_ATTEMPTS
+        asset !== "wISK" &&
+        isRetryableIskSendError(msg) &&
+        attempts < MAX_ISK_SEND_ATTEMPTS
       ) {
-        await requeueTxcPayout(o.id, attempts, msg);
+        await requeueIskPayout(o.id, attempts, msg);
       } else {
         await failOrder(o.id, msg);
       }
@@ -1044,7 +1044,7 @@ async function settleConfirmed() {
 
 /**
  * Treasury replenishment — runs AFTER the customer is paid.
- * For each completed TXC or wTXC order that has not yet had a Bitmart buy
+ * For each completed ISK or wISK order that has not yet had a Bitmart buy
  * submitted, submit a market buy to refill our hot wallet. This is
  * best-effort: failures here do NOT affect the customer order, they just
  * log and retry next tick.
@@ -1073,13 +1073,13 @@ async function replenishTreasury() {
   for (const o of orders) {
     try {
       // Skip both bridge directions (they never touch stables):
-      //   • unwrap (wTXC → TXC): user gave us wTXC, we paid TXC out.
-      //   • wrap   (TXC  → wTXC): user gave us native TXC, we paid wTXC.
-      if (o.source_chain === "txc") continue;
-      if (isWtxcSource(o.source_chain as ChainKey, o.source_token)) continue;
+      //   • unwrap (wISK → ISK): user gave us wISK, we paid ISK out.
+      //   • wrap   (ISK  → wISK): user gave us native ISK, we paid wISK.
+      if (o.source_chain === "isk") continue;
+      if (isWiskSource(o.source_chain as ChainKey, o.source_token)) continue;
       const dest = getDestination(o.dest_asset);
-      // For wTXC on-ramp, buy TXC on Bitmart (we'll re-wrap manually).
-      const buySymbol = dest.key === "wTXC" ? "TXC_USDT" : dest.bitmartSymbol;
+      // For wISK on-ramp, buy ISK on Bitmart (we'll re-wrap manually).
+      const buySymbol = dest.key === "wISK" ? "ISK_USDT" : dest.bitmartSymbol;
       const buyNotional = +(Number(o.paid_amount_usd) / 1.05).toFixed(2);
       if (buyNotional <= 0) continue;
       const { order_id } = await submitMarketBuy({
@@ -1109,8 +1109,8 @@ async function replenishTreasury() {
 /**
  * Poll Bitmart fills for ANY order with a bitmart_order_id and no recorded
  * fill yet. Updates bookkeeping (bitmart_filled_dest, bitmart_avg_price) but
- * does NOT change customer-facing status for TXC orders (already completed).
- * For wTXC orders still in buying_on_bitmart, advances to `bought` so the
+ * does NOT change customer-facing status for ISK orders (already completed).
+ * For wISK orders still in buying_on_bitmart, advances to `bought` so the
  * withdrawal step picks them up.
  */
 async function pollBitmartFillsDecoupled() {
@@ -1136,18 +1136,18 @@ async function pollBitmartFillsDecoupled() {
     try {
       const detail = await getOrderDetail(o.bitmart_order_id);
       if (detail.state === "filled") {
-        const txcAmount = Number.parseFloat(detail.filled_size);
+        const iskAmount = Number.parseFloat(detail.filled_size);
         const avgPrice = Number.parseFloat(detail.price_avg);
         const update: {
           bitmart_filled_dest: number;
           bitmart_avg_price: number;
         } = {
-          bitmart_filled_dest: txcAmount,
+          bitmart_filled_dest: iskAmount,
           bitmart_avg_price: avgPrice,
         };
         await supabaseAdmin.from("orders").update(update).eq("id", o.id);
         await logOrderEvent(o.id, "bitmart", "filled", {
-          filled: txcAmount,
+          filled: iskAmount,
           avg_price: avgPrice,
         });
         filled += 1;
@@ -1165,77 +1165,77 @@ async function pollBitmartFillsDecoupled() {
 
 // Identifies which deployment produced an alert, so a shared Telegram chat
 // makes it obvious where to look.
-const SITE_LABEL = "wTXC Wrap — wtxc.texitcoin.org";
+const SITE_LABEL = "wISK Wrap — wisk.iskandercoin.com";
 
 /**
- * Read hot-wallet balances (TXC + wTXC) each tick; fire a deduped admin
+ * Read hot-wallet balances (ISK + wISK) each tick; fire a deduped admin
  * Telegram alert when either drops below the admin-configured floor
- * (app_settings.low_txc_threshold / low_wtxc_threshold). sendAdminAlert
+ * (app_settings.low_isk_threshold / low_wisk_threshold). sendAdminAlert
  * has a 15-min cooldown per (title, dedupeKey), so a sustained low
  * balance produces at most 4 pings/hr per asset.
  *
- * TXC lives in an HD wallet: unswept customer deposits sit at derived
+ * ISK lives in an HD wallet: unswept customer deposits sit at derived
  * indices, so the hot address alone under-reports. Only alert when the
  * WHOLE HD wallet is below the floor.
  */
-async function checkHotBalances(): Promise<{ txc: number | null; wtxc: number | null }> {
+async function checkHotBalances(): Promise<{ isk: number | null; wisk: number | null }> {
   const settings = await getSettings();
-  const txcFloor = Number(settings.low_txc_threshold ?? 10_000);
-  const wtxcFloor = Number(settings.low_wtxc_threshold ?? 10_000);
-  const out: { txc: number | null; wtxc: number | null } = { txc: null, wtxc: null };
+  const iskFloor = Number(settings.low_isk_threshold ?? 10_000);
+  const wiskFloor = Number(settings.low_wisk_threshold ?? 10_000);
+  const out: { isk: number | null; wisk: number | null } = { isk: null, wisk: null };
 
   try {
-    const { getTxcHotAddress, getTxcAddressBalanceSats } = await import(
-      "@/lib/txc-sign.server"
+    const { getIskHotAddress, getIskAddressBalanceSats } = await import(
+      "@/lib/isk-sign.server"
     );
-    const address = getTxcHotAddress();
-    const { confirmed, unconfirmed } = await getTxcAddressBalanceSats(address);
-    const confirmedTxc = confirmed / 1e8;
-    const pendingTxc = unconfirmed / 1e8;
-    out.txc = confirmedTxc;
-    if (confirmedTxc < txcFloor) {
+    const address = getIskHotAddress();
+    const { confirmed, unconfirmed } = await getIskAddressBalanceSats(address);
+    const confirmedIsk = confirmed / 1e8;
+    const pendingIsk = unconfirmed / 1e8;
+    out.isk = confirmedIsk;
+    if (confirmedIsk < iskFloor) {
       // Hot address looks low — check the full HD wallet before paging.
-      const { getTxcHdTotal } = await import("@/lib/txc-hd-balance.server");
-      const hd = await getTxcHdTotal(address).catch(() => null);
-      const hdTotal = hd?.totalConfirmed ?? confirmedTxc;
-      out.txc = hdTotal;
-      if (hdTotal < txcFloor) {
+      const { getIskHdTotal } = await import("@/lib/isk-hd-balance.server");
+      const hd = await getIskHdTotal(address).catch(() => null);
+      const hdTotal = hd?.totalConfirmed ?? confirmedIsk;
+      out.isk = hdTotal;
+      if (hdTotal < iskFloor) {
         void sendAdminAlert(
-          `⚠️ TXC hot wallet low — ${SITE_LABEL}`,
+          `⚠️ ISK hot wallet low — ${SITE_LABEL}`,
           `Site: ${SITE_LABEL}\n` +
-            `HD wallet total: ${hdTotal.toFixed(4)} TXC` +
+            `HD wallet total: ${hdTotal.toFixed(4)} ISK` +
             (hd ? ` (across ${hd.derivedScanned + 1} addresses)` : "") +
-            `\nHot address: ${confirmedTxc.toFixed(4)} TXC` +
-            (pendingTxc ? ` (+${pendingTxc.toFixed(4)} pending)` : "") +
-            (hd ? `\nDeposit addresses: ${hd.derivedConfirmed.toFixed(4)} TXC` : "") +
-            `\nFloor: ${txcFloor} TXC\nAddress: ${address}\nRecharge to keep payouts flowing.`,
-          "low-txc",
+            `\nHot address: ${confirmedIsk.toFixed(4)} ISK` +
+            (pendingIsk ? ` (+${pendingIsk.toFixed(4)} pending)` : "") +
+            (hd ? `\nDeposit addresses: ${hd.derivedConfirmed.toFixed(4)} ISK` : "") +
+            `\nFloor: ${iskFloor} ISK\nAddress: ${address}\nRecharge to keep payouts flowing.`,
+          "low-isk",
         );
       } else if (hd) {
         console.info(
-          `[check-hot-balances] hot address low (${confirmedTxc.toFixed(4)}) but HD total ${hdTotal.toFixed(4)} ≥ floor — no alert; sweep deposits to the hot address`,
+          `[check-hot-balances] hot address low (${confirmedIsk.toFixed(4)}) but HD total ${hdTotal.toFixed(4)} ≥ floor — no alert; sweep deposits to the hot address`,
         );
       }
     }
   } catch (e) {
-    console.warn("[check-hot-balances] TXC read failed", e);
+    console.warn("[check-hot-balances] ISK read failed", e);
   }
 
   try {
     const { getOperatorEvmAddress } = await import("@/lib/bridge-wallet.server");
-    const { getWtxcBalance } = await import("@/lib/wtxc.server");
+    const { getWiskBalance } = await import("@/lib/wisk.server");
     const address = getOperatorEvmAddress();
-    const balance = await getWtxcBalance(address);
-    out.wtxc = balance;
-    if (balance < wtxcFloor) {
+    const balance = await getWiskBalance(address);
+    out.wisk = balance;
+    if (balance < wiskFloor) {
       void sendAdminAlert(
-        `⚠️ wTXC operator wallet low — ${SITE_LABEL}`,
-        `Site: ${SITE_LABEL}\nBalance: ${balance.toFixed(4)} wTXC\nFloor: ${wtxcFloor} wTXC\nAddress: ${address}\nWrap more TXC to keep payouts flowing.`,
-        "low-wtxc",
+        `⚠️ wISK operator wallet low — ${SITE_LABEL}`,
+        `Site: ${SITE_LABEL}\nBalance: ${balance.toFixed(4)} wISK\nFloor: ${wiskFloor} wISK\nAddress: ${address}\nWrap more ISK to keep payouts flowing.`,
+        "low-wisk",
       );
     }
   } catch (e) {
-    console.warn("[check-hot-balances] wTXC read failed", e);
+    console.warn("[check-hot-balances] wISK read failed", e);
   }
 
   return out;
@@ -1263,11 +1263,11 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           expired: 0,
           stuck: { stuck: 0 },
           watch: { detected: 0 },
-          watchTxc: { detected: 0 },
+          watchIsk: { detected: 0 },
           fills: { filled: 0 },
           settle: { sent: 0, queuedForBitmart: 0 },
           replenish: { submitted: 0 },
-          balances: { txc: null as number | null, wtxc: null as number | null },
+          balances: { isk: null as number | null, wisk: null as number | null },
           reconcile: { reconciled: 0, retried: 0 },
           ms: 0,
         };
@@ -1290,16 +1290,16 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           result.reconcile =
             (await runPhase("reconcileStuckSending", reconcileStuckSending)) ?? result.reconcile;
           result.watch = (await runPhase("watchDeposits", watchDeposits)) ?? result.watch;
-          result.watchTxc = (await runPhase("watchTxcDeposits", watchTxcDeposits)) ?? result.watchTxc;
+          result.watchIsk = (await runPhase("watchIskDeposits", watchIskDeposits)) ?? result.watchIsk;
           result.settle = (await runPhase("settleConfirmed", settleConfirmed)) ?? result.settle;
 
           result.replenish = (await runPhase("replenishTreasury", replenishTreasury)) ?? result.replenish;
           result.fills = (await runPhase("pollBitmartFillsDecoupled", pollBitmartFillsDecoupled)) ?? result.fills;
           result.balances = (await runPhase("checkHotBalances", checkHotBalances)) ?? result.balances;
 
-          // Fast mempool loop: pg_cron's minimum cadence is 1 minute, but TXC
+          // Fast mempool loop: pg_cron's minimum cadence is 1 minute, but ISK
           // wrap payouts fire on 0-conf mempool sighting. Do 3 extra light
-          // passes (TXC mempool watch + settle) spaced 15s apart so worst-case
+          // passes (ISK mempool watch + settle) spaced 15s apart so worst-case
           // detection → payout latency is ~15s instead of ~60s. Bail early if
           // the initial pass already burned most of the minute.
           const FAST_INTERVAL_MS = 15_000;
@@ -1307,8 +1307,8 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           for (let i = 0; i < 3; i++) {
             if (Date.now() - started > MAX_TOTAL_MS - FAST_INTERVAL_MS) break;
             await new Promise((r) => setTimeout(r, FAST_INTERVAL_MS));
-            const w = await runPhase("watchTxcDeposits", watchTxcDeposits);
-            if (w) result.watchTxc.detected += w.detected;
+            const w = await runPhase("watchIskDeposits", watchIskDeposits);
+            if (w) result.watchIsk.detected += w.detected;
             const s = await runPhase("settleConfirmed", settleConfirmed);
             if (s) {
               result.settle.sent += s.sent;

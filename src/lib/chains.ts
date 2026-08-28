@@ -1,4 +1,4 @@
-// Supported source chains and tokens (ERC-20 stables + native ETH + wTXC).
+// Supported source chains and tokens (ERC-20 stables + native ETH + wISK).
 // Safe to import from client (no secrets).
 
 export type ChainKey = "ethereum" | "base" | "arbitrum" | "polygon" | "bsc";
@@ -7,12 +7,12 @@ export type ChainKey = "ethereum" | "base" | "arbitrum" | "polygon" | "bsc";
 export const NATIVE_TOKEN_ADDRESS = "native";
 
 export interface TokenConfig {
-  symbol: string; // e.g. "USDC", "PYUSD", "ETH", "wTXC"
+  symbol: string; // e.g. "USDC", "PYUSD", "ETH", "wISK"
   address: string; // ERC-20 contract address (lowercase) OR "native" for native coin
   decimals: number;
   isNative?: boolean;
   // Bitmart spot symbol used to price this token in USD when it isn't a $1
-  // stable (e.g. ETH, wTXC). Stables omit this — they're treated as $1.
+  // stable (e.g. ETH, wISK). Stables omit this — they're treated as $1.
   bitmartSymbol?: string;
 }
 
@@ -52,7 +52,7 @@ const native = (symbol: string, bitmartSymbol: string): TokenConfig => ({
   bitmartSymbol,
 });
 
-export const WTXC_ADDRESS_ETHEREUM = "0x9FC65df3997073B8551Ffd617154B5102fACbb88";
+export const WISK_ADDRESS_ETHEREUM = "0x9FC65df3997073B8551Ffd617154B5102fACbb88";
 
 export const CHAINS: Record<ChainKey, ChainConfig> = {
   ethereum: {
@@ -72,8 +72,8 @@ export const CHAINS: Record<ChainKey, ChainConfig> = {
       stable("USDP",  "0x8E870D67F660D95d5be530380D0eC0bd388289E1", 18),
       stable("USDe",  "0x4c9EDD5852cd905f086C759E8383e09bff1E68B3", 18),
       native("ETH", "ETH_USDT"),
-      // wTXC as a source token → unwrap direction (user sends wTXC → we pay TXC).
-      priced("wTXC", WTXC_ADDRESS_ETHEREUM, 8, "TXC_USDT"),
+      // wISK as a source token → unwrap direction (user sends wISK → we pay ISK).
+      priced("wISK", WISK_ADDRESS_ETHEREUM, 8, "ISK_USDT"),
     ],
   },
   base: {
@@ -151,9 +151,9 @@ export function isNativeToken(t: TokenConfig): boolean {
   return t.isNative === true || t.address === NATIVE_TOKEN_ADDRESS;
 }
 
-/** True when the source token is wTXC on Ethereum (unwrap direction). */
-export function isWtxcSource(chain: ChainKey, symbol: string): boolean {
-  return chain === "ethereum" && symbol === "wTXC";
+/** True when the source token is wISK on Ethereum (unwrap direction). */
+export function isWiskSource(chain: ChainKey, symbol: string): boolean {
+  return chain === "ethereum" && symbol === "wISK";
 }
 
 export const PREMIUM_BPS = 500; // 5%

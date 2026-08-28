@@ -17,7 +17,7 @@ export const Route = createFileRoute("/swap/$orderId")({
   head: ({ params }) => ({
     meta: [
       { title: `Order ${params.orderId} — TEXIT Runner` },
-      { name: "description", content: "Track your TXC swap order in real time." },
+      { name: "description", content: "Track your ISK swap order in real time." },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -88,7 +88,7 @@ function OrderPage() {
     if (!order?.public_id) return;
     recordSwap({
       publicId: order.public_id,
-      destAsset: order.dest_asset ?? "TXC",
+      destAsset: order.dest_asset ?? "ISK",
       sourceAmountUsd: Number(order.source_amount_usd ?? 0),
       createdAt: order.created_at ?? new Date().toISOString(),
     });
@@ -123,9 +123,9 @@ function OrderPage() {
     );
   }
 
-  const destAsset = order.dest_asset || "TXC";
+  const destAsset = order.dest_asset || "ISK";
   const steps = makeSteps(destAsset);
-  // Backend uses "sending" for the wrap flow (TXC→wTXC) where the operator
+  // Backend uses "sending" for the wrap flow (ISK→wISK) where the operator
   // wallet is broadcasting the payout — map it to the "Issuing" step so the
   // UI advances instead of appearing stuck on "Awaiting Payment".
   const normalizedStatus = order.status === "sending" ? "buying_on_bitmart" : order.status;
@@ -138,16 +138,16 @@ function OrderPage() {
   // Underpayment prompt: backend flags `underpayment_ack='pending'` when
   // the paid amount is >0.5% short of the original quote. Ask the user
   // to top up OR continue with the repriced (smaller) payout.
-  const isTxcSource = order.source_chain === "txc";
+  const isIskSource = order.source_chain === "isk";
   const feeMul = 1 - Math.abs(Number(order.premium_bps ?? 0)) / 10_000;
-  const paidTxc = feeMul > 0 ? Number(order.quoted_dest_out) / feeMul : 0;
-  const requiredTxc =
+  const paidIsk = feeMul > 0 ? Number(order.quoted_dest_out) / feeMul : 0;
+  const requiredIsk =
     feeMul > 0 && order.original_quoted_dest_out
       ? Number(order.original_quoted_dest_out) / feeMul
       : 0;
-  const shortfallTxc = Math.max(0, requiredTxc - paidTxc);
+  const shortfallIsk = Math.max(0, requiredIsk - paidIsk);
   const isUnderpayment =
-    isTxcSource && order.underpayment_ack === "pending" && shortfallTxc > 0;
+    isIskSource && order.underpayment_ack === "pending" && shortfallIsk > 0;
 
   const [dismissed, setDismissed] = useState(false);
   const showUnderpayment = isUnderpayment && !dismissed;
@@ -251,7 +251,7 @@ function OrderPage() {
                   value={
                     <a
                       className="text-success hover:underline break-all"
-                      href={`${destAsset === "wTXC" ? "https://etherscan.io" : "https://mempool.texitcoin.org"}/tx/${order.dest_tx_hash}`}
+                      href={`${destAsset === "wISK" ? "https://etherscan.io" : "https://mempool.iskandercoin.com"}/tx/${order.dest_tx_hash}`}
                       target="_blank"
                       rel="noreferrer"
                     >
@@ -312,21 +312,21 @@ function OrderPage() {
             <div className="bg-secondary/50 border border-border rounded-lg p-4 font-mono text-xs space-y-2">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Received</span>
-                <span>{paidTxc.toFixed(6)} TXC</span>
+                <span>{paidIsk.toFixed(6)} ISK</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Quote called for</span>
-                <span>{requiredTxc.toFixed(6)} TXC</span>
+                <span>{requiredIsk.toFixed(6)} ISK</span>
               </div>
               <div className="flex justify-between border-t border-border pt-2">
                 <span className="text-muted-foreground">Short by</span>
                 <span className="text-accent">
-                  {shortfallTxc.toFixed(6)} TXC
+                  {shortfallIsk.toFixed(6)} ISK
                 </span>
               </div>
             </div>
             <p className="text-xs text-muted-foreground font-mono leading-relaxed">
-              Send the missing {shortfallTxc.toFixed(6)} TXC to the same
+              Send the missing {shortfallIsk.toFixed(6)} ISK to the same
               deposit address and we'll pay the full quote — or continue now
               and receive{" "}
               <span className="text-foreground">
@@ -348,7 +348,7 @@ function OrderPage() {
               >
                 {accept.isPending
                   ? "Continuing…"
-                  : `Continue with ${paidTxc.toFixed(6)} TXC`}
+                  : `Continue with ${paidIsk.toFixed(6)} ISK`}
               </button>
             </div>
             <div className="text-[10px] font-mono text-muted-foreground text-center">

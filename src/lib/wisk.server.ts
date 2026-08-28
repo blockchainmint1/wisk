@@ -1,13 +1,13 @@
-// SERVER-ONLY: wTXC ERC-20 helpers on Ethereum mainnet.
+// SERVER-ONLY: wISK ERC-20 helpers on Ethereum mainnet.
 // Uses the BRIDGE_MNEMONIC operator wallet (m/44'/60'/0'/0/0) for payouts,
 // and Alchemy for reads/broadcasts (same key that powers the EVM scanner).
 
 import { Contract, JsonRpcProvider, formatUnits, parseUnits } from "ethers";
 import { deriveEvmWallet } from "./bridge-wallet.server";
 
-export const WTXC_CONTRACT = "0x9FC65df3997073B8551Ffd617154B5102fACbb88";
-export const WTXC_DECIMALS = 8;
-export const WTXC_CHAIN_ID = 1; // Ethereum mainnet
+export const WISK_CONTRACT = "0x9FC65df3997073B8551Ffd617154B5102fACbb88";
+export const WISK_DECIMALS = 8;
+export const WISK_CHAIN_ID = 1; // Ethereum mainnet
 
 const ERC20_ABI = [
   "function balanceOf(address) view returns (uint256)",
@@ -22,25 +22,25 @@ function getProvider(): JsonRpcProvider {
   if (!key) throw new Error("ALCHEMY_API_KEY / ALCHEMY_API is not configured");
   cachedProvider = new JsonRpcProvider(
     `https://eth-mainnet.g.alchemy.com/v2/${key}`,
-    WTXC_CHAIN_ID,
+    WISK_CHAIN_ID,
   );
   return cachedProvider;
 }
 
-export async function getWtxcBalance(address: string): Promise<number> {
+export async function getWiskBalance(address: string): Promise<number> {
   const provider = getProvider();
-  const c = new Contract(WTXC_CONTRACT, ERC20_ABI, provider);
+  const c = new Contract(WISK_CONTRACT, ERC20_ABI, provider);
   const raw: bigint = await c.balanceOf(address);
-  return Number(formatUnits(raw, WTXC_DECIMALS));
+  return Number(formatUnits(raw, WISK_DECIMALS));
 }
 
-export interface WtxcSendResult {
+export interface WiskSendResult {
   txid: string;
   /** True only when a receipt was observed (tx is mined). */
   mined?: boolean;
   fromAddress: string;
   toAddress: string;
-  amountWtxc: number;
+  amountWisk: number;
   feeSats: number; // gas used * price, in wei→gwei approximated; kept as 0 for schema fit
 }
 
@@ -64,38 +64,38 @@ async function waitBounded<T>(p: Promise<T>, ms: number): Promise<T | null> {
 
 
 /**
- * Sign + broadcast a wTXC ERC-20 transfer from the operator wallet (index 0).
+ * Sign + broadcast a wISK ERC-20 transfer from the operator wallet (index 0).
  * Waits for 1 confirmation before returning.
  *
  * `onSubmitted` fires the moment `eth_sendRawTransaction` returns — before
  * we start waiting on the receipt — so callers can persist the tx hash
  * immediately and survive a Worker eviction during `tx.wait`.
  */
-export async function sendWtxc(opts: {
+export async function sendWisk(opts: {
   toAddress: string;
-  amountWtxc: number;
+  amountWisk: number;
   onSubmitted?: (info: { txHash: string; nonce: number }) => Promise<void> | void;
   timeoutMs?: number;
   /** Explicit nonce. Pass this when the caller tracks nonces itself (see payout-send). */
   nonce?: number;
-}): Promise<WtxcSendResult> {
-  return serialize(() => sendWtxcInner({ ...opts, fromIndex: 0 }));
+}): Promise<WiskSendResult> {
+  return serialize(() => sendWiskInner({ ...opts, fromIndex: 0 }));
 }
 
 /**
- * Sign + broadcast a wTXC ERC-20 transfer from any HD-derived index.
+ * Sign + broadcast a wISK ERC-20 transfer from any HD-derived index.
  * The sender must hold enough ETH for gas.
  */
-export async function sendWtxcFrom(opts: {
+export async function sendWiskFrom(opts: {
   fromIndex: number;
   toAddress: string;
-  amountWtxc: number;
+  amountWisk: number;
   onSubmitted?: (info: { txHash: string; nonce: number }) => Promise<void> | void;
   timeoutMs?: number;
   /** Return as soon as the tx is broadcast instead of waiting for a receipt. */
   waitForReceipt?: boolean;
-}): Promise<WtxcSendResult> {
-  return serialize(() => sendWtxcInner(opts));
+}): Promise<WiskSendResult> {
+  return serialize(() => sendWiskInner(opts));
 }
 
 
@@ -138,7 +138,7 @@ export async function getEvmNonce(
 
 /**
  * Send native ETH from any HD-derived index. Used to fund gas on a
- * derived address before sweeping wTXC out of it.
+ * derived address before sweeping wISK out of it.
  */
 export async function sendEthFrom(opts: {
   fromIndex: number;
@@ -167,26 +167,26 @@ export async function sendEthFrom(opts: {
   });
 }
 
-async function sendWtxcInner(opts: {
+async function sendWiskInner(opts: {
   fromIndex: number;
   toAddress: string;
-  amountWtxc: number;
+  amountWisk: number;
   onSubmitted?: (info: { txHash: string; nonce: number }) => Promise<void> | void;
   timeoutMs?: number;
   waitForReceipt?: boolean;
   nonce?: number;
-}): Promise<WtxcSendResult> {
+}): Promise<WiskSendResult> {
   if (!/^0x[a-fA-F0-9]{40}$/.test(opts.toAddress)) {
-    throw new Error(`Invalid wTXC destination address: ${opts.toAddress}`);
+    throw new Error(`Invalid wISK destination address: ${opts.toAddress}`);
   }
-  if (!Number.isFinite(opts.amountWtxc) || opts.amountWtxc <= 0) {
-    throw new Error(`Invalid wTXC amount: ${opts.amountWtxc}`);
+  if (!Number.isFinite(opts.amountWisk) || opts.amountWisk <= 0) {
+    throw new Error(`Invalid wISK amount: ${opts.amountWisk}`);
   }
   const timeoutMs = opts.timeoutMs ?? 22_000;
   const provider = getProvider();
   const wallet = deriveEvmWallet(opts.fromIndex).connect(provider);
-  const contract = new Contract(WTXC_CONTRACT, ERC20_ABI, wallet);
-  const amountRaw = parseUnits(opts.amountWtxc.toFixed(WTXC_DECIMALS), WTXC_DECIMALS);
+  const contract = new Contract(WISK_CONTRACT, ERC20_ABI, wallet);
+  const amountRaw = parseUnits(opts.amountWisk.toFixed(WISK_DECIMALS), WISK_DECIMALS);
 
   // Hard timeout: without this, a stalled Alchemy pre-flight (estimateGas /
   // getFeeData / getTransactionCount) can silently run past the Cloudflare
@@ -198,7 +198,7 @@ async function sendWtxcInner(opts: {
       return { tx, nonce: Number(tx.nonce) };
     })();
   const timer = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error(`sendWtxc: broadcast timed out after ${timeoutMs}ms`)), timeoutMs),
+    setTimeout(() => reject(new Error(`sendWisk: broadcast timed out after ${timeoutMs}ms`)), timeoutMs),
   );
   const { tx, nonce } = await Promise.race([submitted, timer]);
 
@@ -209,7 +209,7 @@ async function sendWtxcInner(opts: {
     try {
       await opts.onSubmitted({ txHash: tx.hash, nonce });
     } catch (e) {
-      console.error("[sendWtxc] onSubmitted callback failed", e);
+      console.error("[sendWisk] onSubmitted callback failed", e);
     }
   }
 
@@ -221,7 +221,7 @@ async function sendWtxcInner(opts: {
     txid: tx.hash,
     fromAddress: wallet.address,
     toAddress: opts.toAddress,
-    amountWtxc: opts.amountWtxc,
+    amountWisk: opts.amountWisk,
     mined: receipt !== null,
     feeSats: Number(receipt?.gasUsed ?? 0n),
   };

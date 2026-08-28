@@ -1,7 +1,7 @@
 # HD Deposit Address Allocator & Recycler
 
-> **Purpose** — share the exact recycling logic we use across the TXC bridge / on-ramp for per-order deposit addresses.
-> Works for both EVM (EVM stable/ETH/wTXC) and TXC native (wrap) deposit addresses; the HD counter is reused for every chain.
+> **Purpose** — share the exact recycling logic we use across the ISK bridge / on-ramp for per-order deposit addresses.
+> Works for both EVM (EVM stable/ETH/wISK) and ISK native (wrap) deposit addresses; the HD counter is reused for every chain.
 
 ## 1. Data model
 
@@ -121,9 +121,9 @@ const derived = wallet.derivePath(`m/44'/60'/0'/0/${index}`);
 const depositAddress = derived.address;   // 0x...
 ```
 
-### TXC native deposit address
+### ISK native deposit address
 
-For the TXC wrap direction, derive from the same mnemonic but using the TXC BIP84 path:
+For the ISK wrap direction, derive from the same mnemonic but using the ISK BIP84 path:
 
 ```ts
 const wallet = bip39.mnemonicToSeedSync(BRIDGE_MNEMONIC);
@@ -131,7 +131,7 @@ const root = bip32.fromSeed(wallet);
 const child = root.derivePath(`m/84'/0'/0'/0/${index}`);
 const { address } = bitcoin.payments.p2wpkh({
   pubkey: child.publicKey,
-  network: txcNetwork,
+  network: iskNetwork,
 });
 ```
 
@@ -143,8 +143,8 @@ if (error || typeof idx !== "number") {
   throw new Error("Failed to allocate deposit index: " + error?.message);
 }
 
-const isWrap = sourceChain === "txc";
-const depositAddress = deriveDepositAddress(idx, isWrap ? "txc" : "evm");
+const isWrap = sourceChain === "isk";
+const depositAddress = deriveDepositAddress(idx, isWrap ? "isk" : "evm");
 
 const { data: order } = await supabaseAdmin
   .from("orders")

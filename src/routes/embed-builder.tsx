@@ -5,23 +5,23 @@ import { SiteFooter, SiteHeader } from "@/components/site-shell";
 export const Route = createFileRoute("/embed-builder")({
   head: () => ({
     meta: [
-      { title: "Embed the wTXC ↔ TXC bridge — snippet builder" },
+      { title: "Embed the wISK ↔ ISK bridge — snippet builder" },
       {
         name: "description",
         content:
-          "Drop the wTXC ↔ TXC bridge widget into any website with a single iframe snippet. Pick default direction, amount, and theme.",
+          "Drop the wISK ↔ ISK bridge widget into any website with a single iframe snippet. Pick default direction, amount, and theme.",
       },
     ],
   }),
   component: EmbedBuilder,
 });
 
-const ORIGIN = "https://swap.texitcoin.org";
+const ORIGIN = "https://swap.iskandercoin.com";
 
-type Side = "wTXC" | "TXC";
+type Side = "wISK" | "ISK";
 
 function EmbedBuilder() {
-  const [have, setHave] = useState<Side>("wTXC");
+  const [have, setHave] = useState<Side>("wISK");
   const [amount, setAmount] = useState<string>("100");
   const [lock, setLock] = useState<boolean>(false);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
@@ -48,14 +48,14 @@ function EmbedBuilder() {
     [have, amount, lock, theme],
   );
 
-  const want: Side = have === "wTXC" ? "TXC" : "wTXC";
+  const want: Side = have === "wISK" ? "ISK" : "wISK";
 
   const snippet = useMemo(() => {
     const widthAttr = /^\d+$/.test(width) ? `${width}px` : width;
     const heightAttr = /^\d+$/.test(height) ? `${height}px` : height;
-    const iframe = `<iframe id="wtxc-bridge" src="${url}" style="width:${widthAttr};height:${heightAttr};border:0;background:transparent" allow="clipboard-write" loading="lazy" title="${have} to ${want} bridge"></iframe>`;
+    const iframe = `<iframe id="wisk-bridge" src="${url}" style="width:${widthAttr};height:${heightAttr};border:0;background:transparent" allow="clipboard-write" loading="lazy" title="${have} to ${want} bridge"></iframe>`;
     const resizer = autoResize
-      ? `\n<script>(function(){window.addEventListener("message",function(e){if(!e.data||e.data.type!=="swap-embed:height")return;var f=document.getElementById("wtxc-bridge");if(f&&typeof e.data.height==="number")f.style.height=e.data.height+"px"});})();</script>`
+      ? `\n<script>(function(){window.addEventListener("message",function(e){if(!e.data||e.data.type!=="swap-embed:height")return;var f=document.getElementById("wisk-bridge");if(f&&typeof e.data.height==="number")f.style.height=e.data.height+"px"});})();</script>`
       : "";
     return iframe + resizer;
   }, [url, width, height, autoResize, have, want]);
@@ -83,7 +83,7 @@ function EmbedBuilder() {
           </h1>
           <p className="mt-4 text-muted-foreground max-w-2xl font-mono text-sm">
             Drop this iframe on any site — wallet, docs, project page — and
-            your visitors can swap wTXC ↔ TXC without leaving. No keys, no
+            your visitors can swap wISK ↔ ISK without leaving. No keys, no
             SDK, no signup.
           </p>
         </div>
@@ -96,7 +96,7 @@ function EmbedBuilder() {
 
             <Field label="Default direction">
               <div className="grid grid-cols-2 gap-2">
-                {(["wTXC", "TXC"] as const).map((a) => {
+                {(["wISK", "ISK"] as const).map((a) => {
                   const active = have === a;
                   return (
                     <button
@@ -110,7 +110,7 @@ function EmbedBuilder() {
                       }`}
                     >
                       {active ? "✓ " : ""}Have {a} → Want{" "}
-                      {a === "wTXC" ? "TXC" : "wTXC"}
+                      {a === "wISK" ? "ISK" : "wISK"}
                     </button>
                   );
                 })}

@@ -1,38 +1,38 @@
 // Destination-asset registry.
-// - TXC:  TEXITcoin native chain. Two address formats:
+// - ISK:  Iskander Coin native chain. Two address formats:
 //     • Legacy P2PKH → base58 starting with `T`
-//     • Native SegWit → starts with `txc1q…`
-// - wTXC: ERC-20 on Ethereum mainnet, 1:1 backed by TXC held in the
+//     • Native SegWit → starts with `isk1q…`
+// - wISK: ERC-20 on Ethereum mainnet, 1:1 backed by ISK held in the
 //   bridge operator wallet. Address = any Ethereum EOA (`0x…`).
 
 const B58 = "[1-9A-HJ-NP-Za-km-z]";
 const BECH32 = "[qpzry9x8gf2tvdw0s3jn54khce6mua7l]";
 
-const TXC_ADDRESS_REGEX = new RegExp(`^(T${B58}{33}|txc1${BECH32}{6,87})$`);
-const WTXC_ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
+const ISK_ADDRESS_REGEX = new RegExp(`^(T${B58}{33}|isk1${BECH32}{6,87})$`);
+const WISK_ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
 
 export const DESTINATIONS = {
-  TXC: {
-    key: "TXC",
-    label: "TXC",
+  ISK: {
+    key: "ISK",
+    label: "ISK",
     kind: "native" as const,
-    bitmartSymbol: "TXC_USDT",
-    bitmartCurrency: "TXC",
-    bitmartNetwork: "TXC",
-    addressRegex: TXC_ADDRESS_REGEX,
-    addressHint: "Your TEXITcoin address — legacy (T…) or SegWit (txc1q…)",
-    walletUrl: "https://wallet.texitcoin.org",
-    explorer: "https://mempool.texitcoin.org",
+    bitmartSymbol: "ISK_USDT",
+    bitmartCurrency: "ISK",
+    bitmartNetwork: "ISK",
+    addressRegex: ISK_ADDRESS_REGEX,
+    addressHint: "Your Iskander Coin address — legacy (T…) or SegWit (isk1q…)",
+    walletUrl: "https://wallet.iskandercoin.com",
+    explorer: "https://mempool.iskandercoin.com",
   },
-  wTXC: {
-    key: "wTXC",
-    label: "wTXC",
+  wISK: {
+    key: "wISK",
+    label: "wISK",
     kind: "erc20" as const,
-    bitmartSymbol: "TXC_USDT", // priced identically to TXC for on-ramp quotes
-    bitmartCurrency: "TXC",
-    bitmartNetwork: "TXC",
-    addressRegex: WTXC_ADDRESS_REGEX,
-    addressHint: "Your Ethereum address (0x…) to receive wTXC (ERC-20)",
+    bitmartSymbol: "ISK_USDT", // priced identically to ISK for on-ramp quotes
+    bitmartCurrency: "ISK",
+    bitmartNetwork: "ISK",
+    addressRegex: WISK_ADDRESS_REGEX,
+    addressHint: "Your Ethereum address (0x…) to receive wISK (ERC-20)",
     walletUrl: "https://ethereum.org/en/wallets/find-wallet/",
     explorer: "https://etherscan.io",
   },

@@ -1,10 +1,10 @@
-// SERVER-ONLY: TXC address scanning for per-order TXC deposits
-// (the wrap direction: user sends TXC → we detect it → we pay wTXC).
-// Uses the same Esplora endpoint as txc-sign.server.ts.
+// SERVER-ONLY: ISK address scanning for per-order ISK deposits
+// (the wrap direction: user sends ISK → we detect it → we pay wISK).
+// Uses the same Esplora endpoint as isk-sign.server.ts.
 
 const ESPLORA =
-  process.env.TXC_MEMPOOL_URL?.trim() ||
-  "https://api.mempool.texitcoin.org/api/v1";
+  process.env.ISK_MEMPOOL_URL?.trim() ||
+  "https://api.mempool.iskandercoin.com/api/v1";
 
 interface EsploraTx {
   txid: string;
@@ -24,12 +24,12 @@ async function esplora<T>(path: string): Promise<T> {
   }
 }
 
-export async function getTxcTipHeight(): Promise<number> {
+export async function getIskTipHeight(): Promise<number> {
   const h = await esplora<string>("/blocks/tip/height");
   return typeof h === "number" ? h : parseInt(String(h), 10);
 }
 
-export interface IncomingTxcTransfer {
+export interface IncomingIskTransfer {
   txid: string;
   fromAddress: string | null;
   amountSats: number;
@@ -41,17 +41,17 @@ export interface IncomingTxcTransfer {
  * Scan an address for incoming payments. Returns aggregated per-tx credits
  * (sum of vouts to this address). Filters out self-spends.
  */
-export async function scanTxcIncoming(
+export async function scanIskIncoming(
   address: string,
   tipHeight?: number,
-): Promise<IncomingTxcTransfer[]> {
+): Promise<IncomingIskTransfer[]> {
   const [txs, tip] = await Promise.all([
     esplora<EsploraTx[]>(`/address/${address}/txs`),
-    tipHeight ? Promise.resolve(tipHeight) : getTxcTipHeight(),
+    tipHeight ? Promise.resolve(tipHeight) : getIskTipHeight(),
   ]);
   if (!Array.isArray(txs)) return [];
 
-  const out: IncomingTxcTransfer[] = [];
+  const out: IncomingIskTransfer[] = [];
   for (const tx of txs) {
     // Skip if this address is on the input side (that would be a spend, not receive)
     const isInput = tx.vin.some((v) => v.prevout?.scriptpubkey_address === address);

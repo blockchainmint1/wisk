@@ -4,15 +4,15 @@ import { SiteFooter, SiteHeader } from "@/components/site-shell";
 export const Route = createFileRoute("/privacy")({
   head: () => ({
     meta: [
-      { title: "Privacy Policy — swapTXC" },
+      { title: "Privacy Policy — swapISK" },
       {
         name: "description",
-        content: "Privacy policy for swapTXC stablecoin-to-native swap protocol.",
+        content: "Privacy policy for swapISK stablecoin-to-native swap protocol.",
       },
-      { property: "og:title", content: "Privacy Policy — swapTXC" },
+      { property: "og:title", content: "Privacy Policy — swapISK" },
       {
         property: "og:description",
-        content: "Privacy policy for swapTXC stablecoin-to-native swap protocol.",
+        content: "Privacy policy for swapISK stablecoin-to-native swap protocol.",
       },
     ],
   }),
@@ -37,7 +37,7 @@ function PrivacyPage() {
         <div className="space-y-12 text-sm leading-relaxed text-muted-foreground">
           <Section title="1. Overview">
             <p>
-              This Privacy Policy describes how swapTXC collects, uses, and protects your information when you use our stablecoin-to-native asset swap service. By using the protocol, you consent to the practices described herein.
+              This Privacy Policy describes how swapISK collects, uses, and protects your information when you use our stablecoin-to-native asset swap service. By using the protocol, you consent to the practices described herein.
             </p>
           </Section>
 
@@ -45,7 +45,7 @@ function PrivacyPage() {
             <p className="mb-4">We collect minimal information necessary to process swaps:</p>
             <ul className="list-disc list-inside space-y-2">
               <li><strong>On-chain data:</strong> Wallet addresses, transaction hashes, and deposit/withdrawal details required to execute swaps.</li>
-              <li><strong>Destination addresses:</strong> Native TXC or wTXC wallet addresses provided for settlement.</li>
+              <li><strong>Destination addresses:</strong> Native ISK or wISK wallet addresses provided for settlement.</li>
               <li><strong>Contact information:</strong> Optional email or Telegram handle if you choose to receive order status notifications.</li>
               <li><strong>Technical data:</strong> IP addresses and browser metadata for fraud prevention and service security.</li>
             </ul>
@@ -88,7 +88,7 @@ function PrivacyPage() {
               <li>Object to or restrict certain processing activities.</li>
               <li>Withdraw consent for optional communications at any time.</li>
             </ul>
-            <p className="mt-4">Contact us at <a href="mailto:support@texitcoin.org" className="text-accent underline">support@texitcoin.org</a> to exercise these rights.</p>
+            <p className="mt-4">Contact us at <a href="mailto:support@iskandercoin.com" className="text-accent underline">support@iskandercoin.com</a> to exercise these rights.</p>
           </Section>
 
           <Section title="8. Changes to This Policy">
@@ -100,7 +100,7 @@ function PrivacyPage() {
           <Section title="9. Contact">
             <p>
               For questions about this Privacy Policy or our data practices, contact us at{" "}
-              <a href="mailto:support@texitcoin.org" className="text-accent underline">support@texitcoin.org</a>.
+              <a href="mailto:support@iskandercoin.com" className="text-accent underline">support@iskandercoin.com</a>.
             </p>
           </Section>
         </div>

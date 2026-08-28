@@ -1,8 +1,8 @@
 // SERVER-ONLY: single source of truth for wallet derivations from
 // BRIDGE_MNEMONIC. Powers three wallets off one seed:
-//   • EVM operator (m/44'/60'/0'/0/0)     — holds wTXC + ETH gas, pays out wTXC
-//   • EVM per-order deposit  (m/44'/60'/0'/0/N)  — customer sends stables/ETH/wTXC here
-//   • TXC hot (m/84'/0'/0'/0/0 legacy P2PKH form) — pays out TXC + collects deposits
+//   • EVM operator (m/44'/60'/0'/0/0)     — holds wISK + ETH gas, pays out wISK
+//   • EVM per-order deposit  (m/44'/60'/0'/0/N)  — customer sends stables/ETH/wISK here
+//   • ISK hot (m/84'/0'/0'/0/0 legacy P2PKH form) — pays out ISK + collects deposits
 //
 // The mnemonic never leaves this process. Only `.server.ts` files import this.
 
@@ -35,7 +35,7 @@ function getEvmRoot(): HDNodeWallet {
 
 /**
  * Derive the EVM child wallet at receive index N. Index 0 = operator wallet
- * (holds wTXC + ETH gas, pays out wTXC + is the treasury/admin address).
+ * (holds wISK + ETH gas, pays out wISK + is the treasury/admin address).
  * N ≥ 1 = per-order customer deposit addresses.
  */
 export function deriveEvmWallet(index: number): Wallet {
@@ -54,59 +54,59 @@ export function getOperatorEvmAddress(): `0x${string}` {
   return deriveEvmAddress(0);
 }
 
-// ---- TXC (legacy P2PKH via BIP44 for compatibility with existing signer) ----
-// We keep P2PKH so the signer in txc-sign.server.ts (nonWitnessUtxo path)
-// stays unchanged; only the keypair source moves from TXC_WIF → mnemonic.
-const TXC_NETWORK = {
-  messagePrefix: "\x19Texitcoin Signed Message:\n",
-  bech32: "txc",
+// ---- ISK (legacy P2PKH via BIP44 for compatibility with existing signer) ----
+// We keep P2PKH so the signer in isk-sign.server.ts (nonWitnessUtxo path)
+// stays unchanged; only the keypair source moves from ISK_WIF → mnemonic.
+const ISK_NETWORK = {
+  messagePrefix: "\x19Iskander Signed Message:\n",
+  bech32: "isk",
   bip32: { public: 0x0488b21e, private: 0x0488ade4 },
   pubKeyHash: 0x42,
   scriptHash: 0x32,
   wif: 0xc1,
 } as const;
 
-let cachedTxcRoot: HDKey | null = null;
-function getTxcRoot(): HDKey {
-  if (cachedTxcRoot) return cachedTxcRoot;
+let cachedIskRoot: HDKey | null = null;
+function getIskRoot(): HDKey {
+  if (cachedIskRoot) return cachedIskRoot;
   const seed = mnemonicToSeedSync(getMnemonic());
-  // BIP44 TXC: registered coin_type 696969 (matches the TXC Web Wallet
+  // BIP44 ISK: registered coin_type 696969 (matches the ISK Web Wallet
   // derivation so the same seed yields the same T… address everywhere).
-  cachedTxcRoot = HDKey.fromMasterSeed(seed).derive("m/44'/696969'/0'/0");
-  return cachedTxcRoot;
+  cachedIskRoot = HDKey.fromMasterSeed(seed).derive("m/44'/696969'/0'/0");
+  return cachedIskRoot;
 }
 
 /**
- * Derive a TXC keypair at receive index N. Index 0 = hot wallet
- * (holds TXC, pays out). N ≥ 1 = per-order TXC deposit addresses.
+ * Derive a ISK keypair at receive index N. Index 0 = hot wallet
+ * (holds ISK, pays out). N ≥ 1 = per-order ISK deposit addresses.
  */
-export function deriveTxcKeypair(index: number): ECPairInterface {
+export function deriveIskKeypair(index: number): ECPairInterface {
   if (!Number.isInteger(index) || index < 0) {
-    throw new Error(`Invalid TXC HD index: ${index}`);
+    throw new Error(`Invalid ISK HD index: ${index}`);
   }
-  const child = getTxcRoot().deriveChild(index);
-  if (!child.privateKey) throw new Error("TXC HD derivation produced no priv");
+  const child = getIskRoot().deriveChild(index);
+  if (!child.privateKey) throw new Error("ISK HD derivation produced no priv");
   return ECPair.fromPrivateKey(Buffer.from(child.privateKey), {
-    network: TXC_NETWORK as unknown as bitcoin.networks.Network,
+    network: ISK_NETWORK as unknown as bitcoin.networks.Network,
   });
 }
 
-export function deriveTxcAddress(index: number): string {
-  const kp = deriveTxcKeypair(index);
+export function deriveIskAddress(index: number): string {
+  const kp = deriveIskKeypair(index);
   const { address } = bitcoin.payments.p2pkh({
     pubkey: Buffer.from(kp.publicKey),
-    network: TXC_NETWORK as unknown as bitcoin.networks.Network,
+    network: ISK_NETWORK as unknown as bitcoin.networks.Network,
   });
-  if (!address) throw new Error("Failed to derive TXC address");
+  if (!address) throw new Error("Failed to derive ISK address");
   return address;
 }
 
-export function getTxcHotAddressFromMnemonic(): string {
-  return deriveTxcAddress(0);
+export function getIskHotAddressFromMnemonic(): string {
+  return deriveIskAddress(0);
 }
 
-export function getTxcHotKeypair(): ECPairInterface {
-  return deriveTxcKeypair(0);
+export function getIskHotKeypair(): ECPairInterface {
+  return deriveIskKeypair(0);
 }
 
 // Helper: return an EVM address from a raw uncompressed pubkey (used

@@ -1,7 +1,7 @@
-// Dedicated single-order wTXC payout endpoint.
+// Dedicated single-order wISK payout endpoint.
 //
 // Why this exists as its own route:
-// Doing `sendWtxc()` inside the main `swap-tick` handler was consistently
+// Doing `sendWisk()` inside the main `swap-tick` handler was consistently
 // dying mid-broadcast — the isolate would be evicted before `contract.transfer`
 // finished its 4-5 sequential Alchemy round-trips (chainId, feeData,
 // estimateGas, nonce, sendRawTransaction), so no `broadcast_submitted` event
@@ -16,7 +16,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { sendWtxc, evmTxExists, getEvmNonce } from "@/lib/wtxc.server";
+import { sendWisk, evmTxExists, getEvmNonce } from "@/lib/wisk.server";
 import { getOperatorEvmAddress } from "@/lib/bridge-wallet.server";
 import { logOrderEvent, notifyOrderEvent, sendAdminAlert } from "@/lib/telegram.server";
 
@@ -41,7 +41,7 @@ export const Route = createFileRoute("/api/public/hooks/payout-send")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        // Auth: this endpoint signs and broadcasts real on-chain wTXC
+        // Auth: this endpoint signs and broadcasts real on-chain wISK
         // transfers. Only internal callers (swap-tick / cron) that present the
         // project's publishable key may invoke it.
         const expected = process.env.SUPABASE_PUBLISHABLE_KEY;
@@ -65,7 +65,7 @@ export const Route = createFileRoute("/api/public/hooks/payout-send")({
         }
         const { orderId } = parsed;
 
-        // Load + guard: must be in `sending` state, wTXC, and not already broadcast.
+        // Load + guard: must be in `sending` state, wISK, and not already broadcast.
         const { data: o } = await supabaseAdmin
           .from("orders")
           .select("id,public_id,status,dest_asset,dest_address,quoted_dest_out,dest_tx_hash")
@@ -77,7 +77,7 @@ export const Route = createFileRoute("/api/public/hooks/payout-send")({
             headers: { "content-type": "application/json" },
           });
         }
-        if (o.status !== "sending" || o.dest_asset !== "wTXC") {
+        if (o.status !== "sending" || o.dest_asset !== "wISK") {
           return new Response(
             JSON.stringify({ ok: true, skipped: `status=${o.status} asset=${o.dest_asset}` }),
             { headers: { "content-type": "application/json" } },
@@ -91,7 +91,7 @@ export const Route = createFileRoute("/api/public/hooks/payout-send")({
           );
         }
 
-        // Cross-isolate nonce lease. `sendWtxc`'s in-process serializer only
+        // Cross-isolate nonce lease. `sendWisk`'s in-process serializer only
         // orders payouts inside ONE Worker isolate; each payout-send request
         // gets its own isolate, so two concurrent payouts used to read the same
         // pending nonce and race — the loser silently vanished from the mempool
@@ -119,7 +119,7 @@ export const Route = createFileRoute("/api/public/hooks/payout-send")({
           const { data: lastNonceRow } = await supabaseAdmin
             .from("orders")
             .select("dest_broadcast_nonce")
-            .eq("dest_asset", "wTXC")
+            .eq("dest_asset", "wISK")
             .not("dest_tx_hash", "is", null)
             .not("dest_broadcast_nonce", "is", null)
             .order("dest_broadcast_nonce", { ascending: false })
@@ -133,9 +133,9 @@ export const Route = createFileRoute("/api/public/hooks/payout-send")({
             use: useNonce,
           });
 
-          const r = await sendWtxc({
+          const r = await sendWisk({
             toAddress: o.dest_address,
-            amountWtxc: Number(o.quoted_dest_out),
+            amountWisk: Number(o.quoted_dest_out),
             nonce: useNonce,
             onSubmitted: async ({ txHash, nonce }) => {
               await supabaseAdmin
@@ -187,7 +187,7 @@ export const Route = createFileRoute("/api/public/hooks/payout-send")({
             txid: r.txid,
             fromAddress: r.fromAddress,
             feeSats: r.feeSats,
-            amountWtxc: r.amountWtxc,
+            amountWisk: r.amountWisk,
           });
           await notifyById("completed", o.id);
           return new Response(

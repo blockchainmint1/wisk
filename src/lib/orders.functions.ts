@@ -3,14 +3,14 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getSpotPrice } from "./bitmart.server";
-import { CHAINS, isWtxcSource, type ChainKey } from "./chains";
+import { CHAINS, isWiskSource, type ChainKey } from "./chains";
 import { getMergedChain, getMergedChains, getMergedToken } from "./chains.server";
 import { DEST_ASSETS, getDestination, type DestAsset } from "./destinations";
 import { deriveDepositAddress } from "./hd.server";
 import { getSettings } from "./settings.server";
 import { notifyOrderEvent, sendAdminAlert } from "./telegram.server";
 import { getBlockNumber } from "./evm-scan.server";
-import { getTxcTipHeight } from "./txc-scan.server";
+import { getIskTipHeight } from "./isk-scan.server";
 
 // Anti-abuse limits on order creation, keyed on destination address.
 // - MAX_OPEN_PER_DEST: cap concurrent unpaid orders per destination.
@@ -21,23 +21,23 @@ const MAX_OPEN_PER_DEST = 3;
 const MIN_INTERVAL_MS = 20_000;
 
 const EVM_CHAIN_KEYS = Object.keys(CHAINS) as [ChainKey, ...ChainKey[]];
-// "txc" is the native TEXITcoin chain used as a *source* for the wrap
-// direction (user sends TXC → we pay wTXC). It's not in CHAINS because
+// "isk" is the native Iskander Coin chain used as a *source* for the wrap
+// direction (user sends ISK → we pay wISK). It's not in CHAINS because
 // CHAINS is the EVM registry.
-const ALL_SOURCE_CHAINS = [...EVM_CHAIN_KEYS, "txc"] as [string, ...string[]];
+const ALL_SOURCE_CHAINS = [...EVM_CHAIN_KEYS, "isk"] as [string, ...string[]];
 
 const CreateInput = z
   .object({
     sourceChain: z.enum(ALL_SOURCE_CHAINS),
     sourceToken: z.string().min(1).max(20),
     usdAmount: z.number().nonnegative().max(1_000_000).optional(),
-    // Native source-token amount (TXC or wTXC). This is the authoritative
+    // Native source-token amount (ISK or wISK). This is the authoritative
     // input for the 1:1 bridge; usdAmount is legacy/informational.
     sourceAmount: z.number().positive().max(100_000_000).optional(),
 
     destAsset: z
       .enum(DEST_ASSETS as [DestAsset, ...DestAsset[]])
-      .default("TXC"),
+      .default("ISK"),
     destAddress: z.string().trim().min(20).max(120),
   })
   .superRefine((data, ctx) => {
@@ -49,34 +49,34 @@ const CreateInput = z
         message: `Invalid ${dest.label} address`,
       });
     }
-    // Wrap direction: source = native TXC → dest MUST be wTXC.
-    if (data.sourceChain === "txc") {
-      if (data.sourceToken !== "TXC") {
+    // Wrap direction: source = native ISK → dest MUST be wISK.
+    if (data.sourceChain === "isk") {
+      if (data.sourceToken !== "ISK") {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["sourceToken"],
-          message: "TXC source chain requires TXC token",
+          message: "ISK source chain requires ISK token",
         });
       }
-      if (data.destAsset !== "wTXC") {
+      if (data.destAsset !== "wISK") {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["destAsset"],
-          message: "TXC → must go to wTXC (wrap)",
+          message: "ISK → must go to wISK (wrap)",
         });
       }
     }
-    // Guard against nonsensical pairs. wTXC → wTXC and TXC → wTXC-from-wTXC
+    // Guard against nonsensical pairs. wISK → wISK and ISK → wISK-from-wISK
     // would be a no-op or self-loop.
     if (
-      data.sourceChain !== "txc" &&
-      isWtxcSource(data.sourceChain as ChainKey, data.sourceToken) &&
-      data.destAsset === "wTXC"
+      data.sourceChain !== "isk" &&
+      isWiskSource(data.sourceChain as ChainKey, data.sourceToken) &&
+      data.destAsset === "wISK"
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["destAsset"],
-        message: "wTXC → wTXC is not a valid swap",
+        message: "wISK → wISK is not a valid swap",
       });
     }
   });
@@ -84,7 +84,7 @@ const CreateInput = z
 export const createOrder = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => CreateInput.parse(input))
   .handler(async ({ data }) => {
-    const isWrap = data.sourceChain === "txc";
+    const isWrap = data.sourceChain === "isk";
     // Validate chain/token pairing (merged registry) — EVM sources only.
     if (!isWrap) {
       await getMergedToken(data.sourceChain as ChainKey, data.sourceToken);
@@ -123,7 +123,7 @@ export const createOrder = createServerFn({ method: "POST" })
     }
 
     // Per-destination rate limits. Both keyed on lowercased address so EVM
-    // casing games don't bypass. TXC addresses are already case-sensitive.
+    // casing games don't bypass. ISK addresses are already case-sensitive.
     const { count: openCount } = await supabaseAdmin
       .from("orders")
       .select("id", { count: "exact", head: true })
@@ -152,11 +152,11 @@ export const createOrder = createServerFn({ method: "POST" })
 
 
     // Quote calculation:
-    //  - Wrap (source = native TXC → dest = wTXC): 1 TXC = (1 - wrap fee) wTXC.
-    //  - Bridge unwrap (source = wTXC → dest = TXC): 1 wTXC = (1 - unwrap fee) TXC.
-    //  - Everything else (stables/ETH → TXC or wTXC): Bitmart spot + 5%.
+    //  - Wrap (source = native ISK → dest = wISK): 1 ISK = (1 - wrap fee) wISK.
+    //  - Bridge unwrap (source = wISK → dest = ISK): 1 wISK = (1 - unwrap fee) ISK.
+    //  - Everything else (stables/ETH → ISK or wISK): Bitmart spot + 5%.
     const isUnwrap =
-      !isWrap && isWtxcSource(data.sourceChain as ChainKey, data.sourceToken);
+      !isWrap && isWiskSource(data.sourceChain as ChainKey, data.sourceToken);
     const isOneToOne = isWrap || isUnwrap;
 
     // Spot price is informational for 1:1 wrap/unwrap — never block on it.
@@ -193,7 +193,7 @@ export const createOrder = createServerFn({ method: "POST" })
 
 
     // Allocate HD address.
-    //  - TXC deposits (wrap): NEVER recycle — always a brand-new index, so a
+    //  - ISK deposits (wrap): NEVER recycle — always a brand-new index, so a
     //    deposit address is never handed out twice and can't be gamed.
     //  - EVM deposits (unwrap): keep recycling indexes idle for >1h.
     const { data: idxData, error: idxErr } = await supabaseAdmin.rpc(
@@ -204,7 +204,7 @@ export const createOrder = createServerFn({ method: "POST" })
     if (idxErr || typeof idxData !== "number") {
       throw new Error("Failed to allocate deposit address: " + (idxErr?.message ?? "no index"));
     }
-    const depositAddress = deriveDepositAddress(idxData, isWrap ? "txc" : "evm");
+    const depositAddress = deriveDepositAddress(idxData, isWrap ? "isk" : "evm");
 
     const expiresAt = new Date(Date.now() + settings.expiry_minutes * 60_000).toISOString();
 
@@ -213,11 +213,11 @@ export const createOrder = createServerFn({ method: "POST" })
     // which blocks stale-deposit replay at recycled HD addresses. The cushion
     // absorbs shallow reorgs / RPC tip lag so a legit deposit that lands
     // 1-2 blocks "behind" the reported tip still credits normally.
-    const REORG_CUSHION_BLOCKS = 3; // same for EVM and TXC
+    const REORG_CUSHION_BLOCKS = 3; // same for EVM and ISK
     let depositStartBlock: number | null = null;
     try {
       const tip = isWrap
-        ? await getTxcTipHeight()
+        ? await getIskTipHeight()
         : await getBlockNumber(data.sourceChain as ChainKey);
       depositStartBlock = Math.max(0, tip - REORG_CUSHION_BLOCKS);
     } catch (e) {
@@ -292,23 +292,23 @@ export const getOrder = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!order) return null;
 
-    const isTxcSource = order.source_chain === "txc";
-    let chainName = "TEXITcoin";
-    let chainExplorer = "https://mempool.texitcoin.org";
-    if (!isTxcSource) {
+    const isIskSource = order.source_chain === "isk";
+    let chainName = "Iskander Coin";
+    let chainExplorer = "https://mempool.iskandercoin.com";
+    if (!isIskSource) {
       const chain = await getMergedChain(order.source_chain);
       chainName = chain.name;
       chainExplorer = chain.explorer;
     }
 
-    // For any priced (non-$1) source token — native ETH, wTXC (unwrap),
-    // native TXC (wrap) — surface a live USD spot so the UI can render an
+    // For any priced (non-$1) source token — native ETH, wISK (unwrap),
+    // native ISK (wrap) — surface a live USD spot so the UI can render an
     // approximate "send ~X TOKEN" hint. Stables stay $1.
     let sourceSpotUsd: number | null = null;
     let sourceNativeAmount: number | null = null;
     try {
-      if (isTxcSource) {
-        sourceSpotUsd = await getSpotPrice("TXC_USDT");
+      if (isIskSource) {
+        sourceSpotUsd = await getSpotPrice("ISK_USDT");
       } else {
         const token = await getMergedToken(order.source_chain as ChainKey, order.source_token);
         if (token.bitmartSymbol) {

@@ -4,15 +4,15 @@ import { SiteFooter, SiteHeader } from "@/components/site-shell";
 export const Route = createFileRoute("/terms")({
   head: () => ({
     meta: [
-      { title: "Terms of Use — swapTXC" },
+      { title: "Terms of Use — swapISK" },
       {
         name: "description",
-        content: "Terms of use for swapTXC stablecoin-to-native swap protocol.",
+        content: "Terms of use for swapISK stablecoin-to-native swap protocol.",
       },
-      { property: "og:title", content: "Terms of Use — swapTXC" },
+      { property: "og:title", content: "Terms of Use — swapISK" },
       {
         property: "og:description",
-        content: "Terms of use for swapTXC stablecoin-to-native swap protocol.",
+        content: "Terms of use for swapISK stablecoin-to-native swap protocol.",
       },
     ],
   }),
@@ -37,13 +37,13 @@ function TermsPage() {
         <div className="space-y-12 text-sm leading-relaxed text-muted-foreground">
           <Section title="1. Acceptance of Terms">
             <p>
-              By accessing or using swapTXC ("the Protocol"), you agree to be bound by these Terms of Use. If you do not agree, do not use the Protocol. These terms constitute a legally binding agreement between you and the Protocol operators.
+              By accessing or using swapISK ("the Protocol"), you agree to be bound by these Terms of Use. If you do not agree, do not use the Protocol. These terms constitute a legally binding agreement between you and the Protocol operators.
             </p>
           </Section>
 
           <Section title="2. Service Description">
             <p>
-              SWAP operates a custodial bridge between native TEXITcoin (TXC) and its ERC-20 representation on Ethereum, wTXC (contract 0x9FC65df3997073B8551Ffd617154B5102fACbb88), plus a stablecoin and ETH on-ramp into either asset. TXC held by the operator wallet backs wTXC in circulation 1:1. The on-ramp sources liquidity from Bitmart and applies a fixed 5% protocol premium above the live spot price.
+              SWAP operates a custodial bridge between native Iskander Coin (ISK) and its ERC-20 representation on Ethereum, wISK (contract 0x9FC65df3997073B8551Ffd617154B5102fACbb88), plus a stablecoin and ETH on-ramp into either asset. ISK held by the operator wallet backs wISK in circulation 1:1. The on-ramp sources liquidity from Bitmart and applies a fixed 5% protocol premium above the live spot price.
             </p>
           </Section>
 
@@ -59,15 +59,15 @@ function TermsPage() {
 
           <Section title="4. Custodial Nature">
             <p>
-              SWAP is custodial by design. TXC backing wTXC in circulation is held in an operator wallet. On-ramp deposits are held for the brief window between confirmation and payout. You retain sole control of your own wallets and are solely responsible for the accuracy of destination addresses you provide.
+              SWAP is custodial by design. ISK backing wISK in circulation is held in an operator wallet. On-ramp deposits are held for the brief window between confirmation and payout. You retain sole control of your own wallets and are solely responsible for the accuracy of destination addresses you provide.
             </p>
           </Section>
 
           <Section title="5. Fees & Pricing">
             <ul className="list-disc list-inside space-y-2">
-              <li>Wrapping (TXC → wTXC) is free.</li>
-              <li>Unwrapping (wTXC → TXC) costs 1% of the amount unwrapped.</li>
-              <li>On-ramp swaps (stablecoins or ETH → TXC or wTXC) carry a 5.00% protocol premium above the live Bitmart spot price.</li>
+              <li>Wrapping (ISK → wISK) is free.</li>
+              <li>Unwrapping (wISK → ISK) costs 1% of the amount unwrapped.</li>
+              <li>On-ramp swaps (stablecoins or ETH → ISK or wISK) carry a 5.00% protocol premium above the live Bitmart spot price.</li>
               <li>Network gas fees for deposit transactions are borne by the user and are separate from the protocol fee.</li>
               <li>Quotes are valid for a limited time window and are locked at the moment of confirmation.</li>
               <li>All fees are non-refundable once a swap has been initiated and confirmed on-chain.</li>
@@ -123,7 +123,7 @@ function TermsPage() {
           <Section title="12. Contact">
             <p>
               For questions about these Terms of Use, contact us at{" "}
-              <a href="mailto:support@texitcoin.org" className="text-accent underline">support@texitcoin.org</a>.
+              <a href="mailto:support@iskandercoin.com" className="text-accent underline">support@iskandercoin.com</a>.
             </p>
           </Section>
         </div>

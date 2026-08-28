@@ -16,19 +16,19 @@ function PricePill({ label, price }: { label: string; price: number | null }) {
 export function LiveTicker() {
   const fn = useServerFn(getQuote);
 
-  const txc = useQuery({
-    queryKey: ["spot-ticker", "TXC"],
-    queryFn: () => fn({ data: { usdAmount: 1, destAsset: "TXC" } }),
+  const isk = useQuery({
+    queryKey: ["spot-ticker", "ISK"],
+    queryFn: () => fn({ data: { usdAmount: 1, destAsset: "ISK" } }),
     refetchInterval: 30_000,
     staleTime: 15_000,
   });
 
-  const txcPrice = txc.data?.ok ? txc.data.spotPriceUsd : null;
+  const iskPrice = isk.data?.ok ? isk.data.spotPriceUsd : null;
 
   return (
     <>
-      <PricePill label="TXC" price={txcPrice} />
-      <PricePill label="wTXC" price={txcPrice} />
+      <PricePill label="ISK" price={iskPrice} />
+      <PricePill label="wISK" price={iskPrice} />
       <span className="text-muted-foreground">WRAP 5% · UNWRAP FREE</span>
     </>
   );

@@ -59,8 +59,8 @@ All notable changes to this project. Newest entries on top. Dates are UTC.
   - File: `src/routes/api/public/hooks/swap-tick.ts`
 
 - **Swap form: "Get a wallet" button.** Added a wallet icon button to the right
-  of the TXC destination address field linking to
-  https://wallet.texitcoin.org, with a tooltip.
+  of the ISK destination address field linking to
+  https://wallet.iskandercoin.com, with a tooltip.
   - File: `src/routes/swap.tsx`
 
 - **CHANGELOG.md created.** Keeping a running log of user-visible and
@@ -74,11 +74,11 @@ All notable changes to this project. Newest entries on top. Dates are UTC.
   self-elevation to admin). SELECT remains admin-all + self-read.
   - Migration: `20260601161050_*.sql`
 
-- **Initial swap platform build.** End-to-end stablecoin → native TXC swap
+- **Initial swap platform build.** End-to-end stablecoin → native ISK swap
   pipeline. Core components:
   - Database: `orders`, `deposits`, `user_roles`, `admin_audit`,
     `hd_address_counter` tables with RLS policies.
-  - Bitmart integration: live TXC/USDT spot price, market buy, withdrawal
+  - Bitmart integration: live ISK/USDT spot price, market buy, withdrawal
     polling, wallet balances.
   - EVM scanning: ERC-20 transfer detection on Ethereum, Base, Arbitrum,
     Polygon, BSC via Alchemy RPC.
@@ -90,7 +90,7 @@ All notable changes to this project. Newest entries on top. Dates are UTC.
   - Admin dashboard (`/admin`): auth-gated order table, Bitmart balance
     cards, retry action with audit logging.
   - Fulfillment cron (`/api/public/hooks/swap-tick`): pg_cron-driven tick
-    that watches deposits, buys TXC, triggers withdrawals, and polls completion.
+    that watches deposits, buys ISK, triggers withdrawals, and polls completion.
   - Live price ticker in header.
   - Files: `src/lib/bitmart.server.ts`, `src/lib/evm-scan.server.ts`,
     `src/lib/hd.server.ts`, `src/lib/orders.functions.ts`,
