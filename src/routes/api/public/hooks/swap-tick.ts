@@ -1171,6 +1171,7 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           settle: { sent: 0 },
           balances: { isk: null as number | null, wisk: null as number | null },
           reconcile: { reconciled: 0, retried: 0 },
+          burns: { burned: 0 },
           ms: 0,
         };
         // Run each phase independently so one failure doesn't starve the
@@ -1194,6 +1195,7 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           result.watch = (await runPhase("watchDeposits", watchDeposits)) ?? result.watch;
           result.watchIsk = (await runPhase("watchIskDeposits", watchIskDeposits)) ?? result.watchIsk;
           result.settle = (await runPhase("settleConfirmed", settleConfirmed)) ?? result.settle;
+          result.burns = (await runPhase("reconcileBurns", reconcileBurns)) ?? result.burns;
           result.balances = (await runPhase("checkHotBalances", checkHotBalances)) ?? result.balances;
 
           // Fast mempool loop: pg_cron's minimum cadence is 1 minute, but ISK
