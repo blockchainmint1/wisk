@@ -214,6 +214,8 @@ export const createOrder = createServerFn({ method: "POST" })
           : isUnwrap
             ? -settings.unwrap_fee_bps
             : settings.premium_bps,
+        // Legacy NOT NULL column from the exchange era; always 0 now.
+        bitmart_spot_price: 0,
         expires_at: expiresAt,
       })
       .select("public_id")
