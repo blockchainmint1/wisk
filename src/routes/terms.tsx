@@ -63,17 +63,16 @@ function TermsPage() {
 
           <Section title="4. Custodial Nature">
             <p>
-              SWAP is custodial by design. ISK backing wISK in circulation is held in an operator wallet. On-ramp deposits are held for the brief window between confirmation and payout. You retain sole control of your own wallets and are solely responsible for the accuracy of destination addresses you provide.
+              The Protocol is custodial by design. ISK backing wISK in circulation is held in an operator wallet for as long as that wISK exists. Deposits are held for the window between confirmation and payout. You retain sole control of your own wallets and are solely responsible for the accuracy of destination addresses you provide.
             </p>
           </Section>
 
-          <Section title="5. Fees & Pricing">
+          <Section title="5. Fees">
             <ul className="list-disc list-inside space-y-2">
-              <li>Wrapping (ISK → wISK) is free.</li>
-              <li>Unwrapping (wISK → ISK) costs 1% of the amount unwrapped.</li>
-              <li>On-ramp swaps (stablecoins or ETH → ISK or wISK) carry a 5.00% protocol premium above the live Bitmart spot price.</li>
-              <li>Network gas fees for deposit transactions are borne by the user and are separate from the protocol fee.</li>
-              <li>Quotes are valid for a limited time window and are locked at the moment of confirmation.</li>
+              <li>Swaps are one-for-one on quantity. A protocol fee is deducted from the amount you receive.</li>
+              <li>The current wrap and unwrap fees are displayed on the swap form and in the site footer before you confirm an order, and are the fees that apply to that order.</li>
+              <li>Fees may be changed by the operator at any time; a change never affects an order already created.</li>
+              <li>Network transaction fees for your deposit are borne by you and are separate from the protocol fee.</li>
               <li>All fees are non-refundable once a swap has been initiated and confirmed on-chain.</li>
             </ul>
           </Section>
