@@ -11,9 +11,6 @@ export interface TokenConfig {
   address: string; // ERC-20 contract address (lowercase) OR "native" for native coin
   decimals: number;
   isNative?: boolean;
-  // Bitmart spot symbol used to price this token in USD when it isn't a $1
-  // stable (e.g. ETH, wISK). Stables omit this — they're treated as $1.
-  bitmartSymbol?: string;
 }
 
 export interface ChainConfig {
@@ -32,24 +29,17 @@ const stable = (symbol: string, address: string, decimals: number): TokenConfig 
   decimals,
 });
 
-const priced = (
-  symbol: string,
-  address: string,
-  decimals: number,
-  bitmartSymbol: string,
-): TokenConfig => ({
+const priced = (symbol: string, address: string, decimals: number): TokenConfig => ({
   symbol,
   address: address.toLowerCase(),
   decimals,
-  bitmartSymbol,
 });
 
-const native = (symbol: string, bitmartSymbol: string): TokenConfig => ({
+const native = (symbol: string): TokenConfig => ({
   symbol,
   address: NATIVE_TOKEN_ADDRESS,
   decimals: 18,
   isNative: true,
-  bitmartSymbol,
 });
 
 export const WISK_ADDRESS_ETHEREUM = "0xFB38867D064Df981F159b886007F1273a346b0BB";
@@ -71,9 +61,9 @@ export const CHAINS: Record<ChainKey, ChainConfig> = {
       stable("TUSD",  "0x0000000000085d4780B73119b644AE5ecd22b376", 18),
       stable("USDP",  "0x8E870D67F660D95d5be530380D0eC0bd388289E1", 18),
       stable("USDe",  "0x4c9EDD5852cd905f086C759E8383e09bff1E68B3", 18),
-      native("ETH", "ETH_USDT"),
+      native("ETH"),
       // wISK as a source token → unwrap direction (user sends wISK → we pay ISK).
-      priced("wISK", WISK_ADDRESS_ETHEREUM, 8, "ISK_USDT"),
+      priced("wISK", WISK_ADDRESS_ETHEREUM, 8),
     ],
   },
   base: {
@@ -87,7 +77,7 @@ export const CHAINS: Record<ChainKey, ChainConfig> = {
       stable("USDC",  "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", 6),
       stable("USDbC", "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA", 6),
       stable("USDT",  "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2", 6),
-      native("ETH", "ETH_USDT"),
+      native("ETH"),
     ],
   },
   arbitrum: {
@@ -103,7 +93,7 @@ export const CHAINS: Record<ChainKey, ChainConfig> = {
       stable("USDT",   "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9", 6),
       stable("DAI",    "0xDA10009cBd5D07dD0CeCc66161FC93D7c9000da1", 18),
       stable("FRAX",   "0x17FC002b466eEc40DaE837Fc4bE5c67993ddBd6F", 18),
-      native("ETH", "ETH_USDT"),
+      native("ETH"),
     ],
   },
   polygon: {

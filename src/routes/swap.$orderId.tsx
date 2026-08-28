@@ -43,7 +43,7 @@ function makeSteps(asset: string) {
     { key: "awaiting_payment", label: "Awaiting Payment", detail: "Send the exact amount to the deposit address" },
     { key: "payment_detected", label: "Payment Detected", detail: "Waiting for chain confirmations" },
     { key: "confirmed", label: "Payment Confirmed", detail: "Preparing release" },
-    { key: "buying_on_bitmart", label: `Issuing ${asset}`, detail: "Sending from operator wallet" },
+    { key: "sending", label: `Issuing ${asset}`, detail: "Sending from operator wallet" },
     { key: "bought", label: `${asset} Issued`, detail: "Preparing withdrawal" },
     { key: "withdrawing", label: `Withdrawing ${asset}`, detail: "Broadcasting to network" },
     { key: "completed", label: "Completed", detail: `Funds delivered to your ${asset} address` },
@@ -125,10 +125,7 @@ function OrderPage() {
 
   const destAsset = order.dest_asset || "ISK";
   const steps = makeSteps(destAsset);
-  // Backend uses "sending" for the wrap flow (ISK→wISK) where the operator
-  // wallet is broadcasting the payout — map it to the "Issuing" step so the
-  // UI advances instead of appearing stuck on "Awaiting Payment".
-  const normalizedStatus = order.status === "sending" ? "buying_on_bitmart" : order.status;
+  const normalizedStatus = order.status;
   const stepIdx = Math.max(
     0,
     steps.findIndex((s) => s.key === normalizedStatus),
@@ -219,12 +216,7 @@ function OrderPage() {
               <KV label="Source" value={`${order.chainName} · ${order.source_token}`} />
               <KV
                 label="Sending"
-                value={
-                  order.sourceNativeAmount
-                    ? `≈ ${order.sourceNativeAmount.toFixed(6)} ${order.source_token}`
-                    : `— ${order.source_token}`
-
-                }
+                value={order.source_token}
               />
               <KV
                 label="Quote"
@@ -277,9 +269,7 @@ function OrderPage() {
               </div>
               <div className="space-y-2">
                 <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
-                  {order.sourceNativeAmount
-                    ? `Send ≈ ${order.sourceNativeAmount.toFixed(6)} ${order.source_token} on ${order.chainName} to`
-                    : `Send ${order.source_token} on ${order.chainName} to`}
+                  {`Send ${order.source_token} on ${order.chainName} to`}
                 </div>
                 <div className="font-mono text-[11px] bg-secondary p-3 rounded border border-border break-all leading-relaxed">
                   {order.deposit_address}

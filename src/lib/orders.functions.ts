@@ -2,7 +2,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { getSpotPrice } from "./bitmart.server";
 import { CHAINS, isWiskSource, type ChainKey } from "./chains";
 import { getMergedChain, getMergedChains, getMergedToken } from "./chains.server";
 import { DEST_ASSETS, getDestination, type DestAsset } from "./destinations";
@@ -30,10 +29,9 @@ const CreateInput = z
   .object({
     sourceChain: z.enum(ALL_SOURCE_CHAINS),
     sourceToken: z.string().min(1).max(20),
-    usdAmount: z.number().nonnegative().max(1_000_000).optional(),
-    // Native source-token amount (ISK or wISK). This is the authoritative
-    // input for the 1:1 bridge; usdAmount is legacy/informational.
-    sourceAmount: z.number().positive().max(100_000_000).optional(),
+    // Native source-token amount (ISK or wISK). Authoritative input for the
+    // pure 1:1 bridge — there is no USD notion anywhere in this flow.
+    sourceAmount: z.number().positive().max(100_000_000),
 
     destAsset: z
       .enum(DEST_ASSETS as [DestAsset, ...DestAsset[]])
@@ -98,17 +96,6 @@ export const createOrder = createServerFn({ method: "POST" })
           "New orders are temporarily paused. Please try again shortly.",
       );
     }
-    // USD limits only apply to legacy USD-denominated orders. The 1:1 bridge
-    // sends a native token amount and has no dollar notion at all.
-    if (typeof data.usdAmount === "number" && data.usdAmount > 0) {
-      if (data.usdAmount < settings.min_usd) {
-        throw new Error(`Minimum order is $${settings.min_usd}`);
-      }
-      if (data.usdAmount > settings.max_usd) {
-        throw new Error(`Maximum order is $${settings.max_usd.toLocaleString()}`);
-      }
-    }
-
 
     // Blocked-address check — reject if destination wallet is on the blacklist.
     // Compared case-insensitively (EVM addresses stored lowercased).
@@ -151,45 +138,20 @@ export const createOrder = createServerFn({ method: "POST" })
     }
 
 
-    // Quote calculation:
-    //  - Wrap (source = native ISK → dest = wISK): 1 ISK = (1 - wrap fee) wISK.
-    //  - Bridge unwrap (source = wISK → dest = ISK): 1 wISK = (1 - unwrap fee) ISK.
-    //  - Everything else (stables/ETH → ISK or wISK): Bitmart spot + 5%.
+    // Pure 1:1 bridge quote: native token in → native token out, minus the
+    // configured wrap/unwrap fee. No USD notion anywhere in this flow.
     const isUnwrap =
       !isWrap && isWiskSource(data.sourceChain as ChainKey, data.sourceToken);
-    const isOneToOne = isWrap || isUnwrap;
+    const feeBps = isWrap ? settings.wrap_fee_bps : settings.unwrap_fee_bps;
+    const feeMul = 1 - feeBps / 10_000;
 
-    // Spot price is informational for 1:1 wrap/unwrap — never block on it.
-    const spot: number | null = await getSpotPrice(dest.bitmartSymbol).catch((e) => {
-      if (!isOneToOne) throw e;
-      console.warn("[createOrder] spot price unavailable", e);
-      return null;
-    });
-
-    let assetPerUsd: number;
-    let assetOut: number;
-    let sourceAmount: number;
-    if (isOneToOne) {
-      const feeMul =
-        1 - (isWrap ? settings.wrap_fee_bps : settings.unwrap_fee_bps) / 10_000;
-      // Native token in → native token out, 1:1 minus fee.
-      sourceAmount =
-        data.sourceAmount ??
-        (spot && data.usdAmount ? data.usdAmount / spot : 0);
-      if (!(sourceAmount > 0)) {
-        throw new Error("Invalid amount");
-      }
-      assetOut = sourceAmount * feeMul;
-      assetPerUsd = spot ? (1 / spot) * feeMul : feeMul;
-    } else {
-      if (spot === null || !data.usdAmount) throw new Error("Quote unavailable");
-      const premiumMultiplier = 1 + settings.premium_bps / 10_000;
-      const effectivePrice = spot * premiumMultiplier;
-      assetOut = data.usdAmount / effectivePrice;
-      assetPerUsd = 1 / effectivePrice;
-      sourceAmount = data.usdAmount;
+    const sourceAmount = data.sourceAmount;
+    if (!(sourceAmount > 0)) {
+      throw new Error("Invalid amount");
     }
-    const usdAmount = data.usdAmount ?? (spot ? sourceAmount * spot : 0);
+    const assetOut = sourceAmount * feeMul;
+    const assetPerUsd = feeMul;
+    const usdAmount = 0;
 
 
     // Allocate HD address.
@@ -252,7 +214,7 @@ export const createOrder = createServerFn({ method: "POST" })
           : isUnwrap
             ? -settings.unwrap_fee_bps
             : settings.premium_bps,
-        bitmart_spot_price: spot ?? 0,
+        bitmart_spot_price: 0,
         expires_at: expiresAt,
       })
       .select("public_id")
@@ -261,7 +223,7 @@ export const createOrder = createServerFn({ method: "POST" })
     if (error || !order) throw new Error("Failed to create order: " + (error?.message ?? ""));
 
     // Fire-and-forget Telegram notification (respect notify threshold)
-    if (usdAmount >= settings.notify_min_usd_created || isOneToOne) {
+    if (usdAmount >= settings.notify_min_usd_created || true) {
       void notifyOrderEvent("created", {
         public_id: order.public_id,
         source_chain: data.sourceChain,
@@ -301,33 +263,14 @@ export const getOrder = createServerFn({ method: "POST" })
       chainExplorer = chain.explorer;
     }
 
-    // For any priced (non-$1) source token — native ETH, wISK (unwrap),
-    // native ISK (wrap) — surface a live USD spot so the UI can render an
-    // approximate "send ~X TOKEN" hint. Stables stay $1.
-    let sourceSpotUsd: number | null = null;
-    let sourceNativeAmount: number | null = null;
-    try {
-      if (isIskSource) {
-        sourceSpotUsd = await getSpotPrice("ISK_USDT");
-      } else {
-        const token = await getMergedToken(order.source_chain as ChainKey, order.source_token);
-        if (token.bitmartSymbol) {
-          sourceSpotUsd = await getSpotPrice(token.bitmartSymbol);
-        }
-      }
-      if (sourceSpotUsd && sourceSpotUsd > 0) {
-        sourceNativeAmount = Number(order.source_amount_usd) / sourceSpotUsd;
-      }
-    } catch {
-      // Non-fatal: detail page just falls back to USD.
-    }
-
+    // Pure 1:1 bridge: no USD/spot pricing. Source amount is always the
+    // native on-chain amount already tracked on the order.
     return {
       ...order,
       chainName,
       chainExplorer,
-      sourceSpotUsd,
-      sourceNativeAmount,
+      sourceSpotUsd: null,
+      sourceNativeAmount: null,
     };
   });
 

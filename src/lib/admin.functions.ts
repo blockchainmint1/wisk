@@ -3,7 +3,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { getBalances, getSpotPrice, submitMarketBuy } from "./bitmart.server";
 import { invalidateChainsCache } from "./chains.server";
 import { deriveEvmAddress, deriveIskAddress, getOperatorEvmAddress } from "./bridge-wallet.server";
 import { getEthBalance, getWiskBalance, sendEthFrom, sendWisk, sendWiskFrom } from "./wisk.server";
@@ -170,27 +169,6 @@ export const adminOrderDetail = createServerFn({ method: "POST" })
           .order("created_at", { ascending: true }),
       ]);
 
-    // Resolve Bitmart fill detail live if we have an order id and no fill yet
-    let bitmartLive:
-      | { order_id: string; state: string; filled_size: string; filled_notional: string; price_avg: string }
-      | { error: string }
-      | null = null;
-    if (order.bitmart_order_id && order.bitmart_filled_dest == null) {
-      try {
-        const { getOrderDetail } = await import("./bitmart.server");
-        const d = await getOrderDetail(order.bitmart_order_id);
-        bitmartLive = {
-          order_id: d.order_id,
-          state: d.state,
-          filled_size: d.filled_size,
-          filled_notional: d.filled_notional,
-          price_avg: d.price_avg,
-        };
-      } catch (e) {
-        bitmartLive = { error: e instanceof Error ? e.message : String(e) };
-      }
-    }
-
     // Hot wallet balance (ISK + wISK). Bounded with a hard timeout so a
     // slow/stalled chain RPC (Esplora, Alchemy) can never wedge the admin
     // detail panel — the panel just renders without the balance if the
@@ -244,7 +222,6 @@ export const adminOrderDetail = createServerFn({ method: "POST" })
       deposits: deposits ?? [],
       events: events ?? [],
       audit: auditRows ?? [],
-      bitmartLive,
       hotBalance,
     };
   });
@@ -277,7 +254,7 @@ export const adminRetryOrder = createServerFn({ method: "POST" })
  * Force an order back into the `confirmed` queue so the swap-tick payout
  * loop will (re)try sending the customer their native asset. Works from
  * any non-terminal state — useful when an order is wedged in
- * `buying_on_bitmart` (legacy flow), `payment_detected`, or similar.
+ * `sending`, `payment_detected`, or similar.
  */
 export const adminForceComplete = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -346,27 +323,6 @@ export const adminForceFail = createServerFn({ method: "POST" })
   });
 
 
-
-// ===== Bitmart balances =====
-const WATCHED_CURRENCIES = ["ISK", "USDT"] as const;
-export const adminBitmartBalances = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    await assertAdmin(context.userId);
-    try {
-      const wallet = await getBalances();
-      const byCurrency = new Map(wallet.map((w) => [w.currency.toUpperCase(), w.available]));
-      return {
-        ok: true as const,
-        items: WATCHED_CURRENCIES.map((currency) => ({
-          currency,
-          available: byCurrency.get(currency) ?? "0",
-        })),
-      };
-    } catch (e) {
-      return { ok: false as const, error: e instanceof Error ? e.message : "Unknown error" };
-    }
-  });
 
 // ===== Hot wallet balances (EVM stables + ISK + wISK) =====
 export const adminHotWalletBalances = createServerFn({ method: "POST" })
@@ -493,115 +449,41 @@ export const adminHotWalletBalances = createServerFn({ method: "POST" })
 
 
 // ===== Reconciliation =====
-// Compare what we *should* hold (USD in − USD spent on Bitmart buybacks)
-// against what we *actually* hold (EVM stables + Bitmart USDT), and surface
-// any unfilled asset debt (ISK + wISK) at current spot price.
+// Pure DeFi reconciliation: no USD, no exchange. Compares the wISK we've
+// issued and the ISK we've paid out (both from completed order rows) against
+// the operator wallet's actual wISK balance.
 export const adminReconcile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertAdmin(context.userId);
 
-    // 1) Completed orders — money in + assets sold + USDT spent rebuying.
     const { data: rows, error } = await supabaseAdmin
       .from("orders")
-      .select(
-        "dest_asset,quoted_dest_out,bitmart_filled_dest,bitmart_avg_price,paid_amount_usd,status,bitmart_order_id",
-      )
+      .select("dest_asset,quoted_dest_out,status")
       .eq("status", "completed");
     if (error) throw new Error(error.message);
 
-    let usdIn = 0;
-    let usdSpentBuying = 0;
-    const byAsset: Record<"ISK" | "wISK", { sold: number; bought: number; pendingBuys: number }> = {
-      ISK: { sold: 0, bought: 0, pendingBuys: 0 },
-      wISK: { sold: 0, bought: 0, pendingBuys: 0 },
-    };
+    const byAsset: Record<"ISK" | "wISK", number> = { ISK: 0, wISK: 0 };
     for (const r of rows ?? []) {
-      usdIn += Number(r.paid_amount_usd ?? 0);
-      const bought = Number(r.bitmart_filled_dest ?? 0);
-      const avg = Number(r.bitmart_avg_price ?? 0);
-      if (bought > 0 && avg > 0) usdSpentBuying += bought * avg;
       const asset = (r.dest_asset ?? "ISK") as "ISK" | "wISK";
-      if (byAsset[asset]) {
-        byAsset[asset].sold += Number(r.quoted_dest_out ?? 0);
-        byAsset[asset].bought += bought;
-        if (r.bitmart_order_id && r.bitmart_filled_dest == null) byAsset[asset].pendingBuys += 1;
+      if (byAsset[asset] !== undefined) {
+        byAsset[asset] += Number(r.quoted_dest_out ?? 0);
       }
     }
 
-    const expectedStablesUsd = usdIn - usdSpentBuying;
-
-    // 2) Actual stables on hand: admin EVM + Bitmart USDT.  wISK held in
-    // the operator wallet is counted as asset inventory at ISK spot.
-    const [evmRes, bitmartRes, iskSpot, wiskBalRes] = await Promise.allSettled([
-      scanHdWallet({ maxAddresses: 1 }),
-      getBalances(),
-      getSpotPrice("ISK_USDT"),
+    const [wiskBalRes] = await Promise.allSettled([
       getWiskBalance(getOperatorEvmAddress()),
     ]);
-
-    const evmStablesUsd =
-      evmRes.status === "fulfilled"
-        ? evmRes.value.addresses.find((a) => a.index === 0)?.totalUsd ?? 0
-        : 0;
-
-    let bitmartUsdt = 0;
-    let bitmartIsk = 0;
-    if (bitmartRes.status === "fulfilled") {
-      for (const b of bitmartRes.value) {
-        const c = b.currency.toUpperCase();
-        const amt = Number(b.available);
-        if (c === "USDT") bitmartUsdt += amt;
-        else if (c === "ISK") bitmartIsk += amt;
-      }
-    }
-
-    const iskPrice = iskSpot.status === "fulfilled" ? iskSpot.value : 0;
     const operatorWisk = wiskBalRes.status === "fulfilled" ? wiskBalRes.value : 0;
 
-    const actualStablesUsd = evmStablesUsd + bitmartUsdt;
-    const stablesDiff = actualStablesUsd - expectedStablesUsd;
-
-    const iskDebt = Math.max(0, byAsset.ISK.sold - byAsset.ISK.bought);
-    const wiskDebt = Math.max(0, byAsset.wISK.sold - byAsset.wISK.bought);
-    const iskDebtUsd = iskDebt * iskPrice;
-    const wiskDebtUsd = wiskDebt * iskPrice;
-
-    // Net position: stables we hold + bitmart ISK inventory + operator wISK
-    // − the still-owed asset debt at current spot.
-    const bitmartIskUsd = bitmartIsk * iskPrice;
-    const operatorWiskUsd = operatorWisk * iskPrice;
-    const netPositionUsd =
-      actualStablesUsd + bitmartIskUsd + operatorWiskUsd - iskDebtUsd - wiskDebtUsd;
-
     return {
-      usdIn: +usdIn.toFixed(2),
-      usdSpentBuying: +usdSpentBuying.toFixed(2),
-      expectedStablesUsd: +expectedStablesUsd.toFixed(2),
-      actualStablesUsd: +actualStablesUsd.toFixed(2),
-      stablesDiff: +stablesDiff.toFixed(2),
-      evmStablesUsd: +evmStablesUsd.toFixed(2),
-      bitmartUsdt: +bitmartUsdt.toFixed(2),
-      bitmartIsk: +bitmartIsk.toFixed(4),
-      operatorWisk: +operatorWisk.toFixed(4),
-      bitmartIskUsd: +bitmartIskUsd.toFixed(2),
-      operatorWiskUsd: +operatorWiskUsd.toFixed(2),
-      iskDebt: +iskDebt.toFixed(4),
-      wiskDebt: +wiskDebt.toFixed(4),
-      iskDebtUsd: +iskDebtUsd.toFixed(2),
-      wiskDebtUsd: +wiskDebtUsd.toFixed(2),
-      iskPrice,
-      netPositionUsd: +netPositionUsd.toFixed(2),
+      iskPaidOut: +byAsset.ISK.toFixed(6),
+      wiskIssued: +byAsset.wISK.toFixed(6),
+      operatorWisk: +operatorWisk.toFixed(6),
       orderCount: rows?.length ?? 0,
-      pendingIskBuys: byAsset.ISK.pendingBuys,
-      pendingWiskBuys: byAsset.wISK.pendingBuys,
-      bitmartError:
-        bitmartRes.status === "rejected"
-          ? (bitmartRes.reason as Error)?.message ?? "bitmart failed"
-          : null,
-      evmError:
-        evmRes.status === "rejected"
-          ? (evmRes.reason as Error)?.message ?? "evm scan failed"
+      operatorWiskError:
+        wiskBalRes.status === "rejected"
+          ? (wiskBalRes.reason as Error)?.message ?? "wisk balance failed"
           : null,
     };
   });
@@ -838,110 +720,6 @@ export const adminTelegramTest = createServerFn({ method: "POST" })
     }
   });
 
-// ===== Treasury debt (ISK sold vs ISK re-bought on Bitmart) =====
-// Tracks the running gap between ISK we've paid out to customers from the hot
-// wallet and ISK we've actually replenished via Bitmart. Small market buys can
-// be partially canceled when the unfilled remainder drops under Bitmart's
-// min notional (~5 USDT) — those tiny gaps accumulate here so we can square
-// up in one bulk buy at our convenience.
-export const adminTreasuryDebt = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    await assertAdmin(context.userId);
-
-    // All ISK orders that went to the customer (completed) — the hot wallet
-    // already sent quoted_dest_out; bitmart_filled_dest is what we re-bought.
-    const { data: rows, error } = await supabaseAdmin
-      .from("orders")
-      .select("public_id,quoted_dest_out,bitmart_filled_dest,bitmart_avg_price,paid_amount_usd,created_at,status,bitmart_order_id")
-      .eq("dest_asset", "ISK")
-      .eq("status", "completed");
-    if (error) throw new Error(error.message);
-
-    let iskSold = 0;
-    let iskBought = 0;
-    let usdtSpent = 0;
-    let usdtTakenIn = 0;
-    let pendingBuys = 0;
-    const shortfalls: Array<{
-      public_id: string;
-      sold: number;
-      bought: number;
-      shortfall: number;
-      created_at: string;
-    }> = [];
-
-    for (const r of rows ?? []) {
-      const sold = Number(r.quoted_dest_out ?? 0);
-      const bought = Number(r.bitmart_filled_dest ?? 0);
-      const avg = Number(r.bitmart_avg_price ?? 0);
-      iskSold += sold;
-      iskBought += bought;
-      if (bought > 0 && avg > 0) usdtSpent += bought * avg;
-      usdtTakenIn += Number(r.paid_amount_usd ?? 0);
-      if (r.bitmart_order_id && r.bitmart_filled_dest == null) pendingBuys += 1;
-      const gap = sold - bought;
-      if (gap > 0.0001) {
-        shortfalls.push({
-          public_id: r.public_id,
-          sold,
-          bought,
-          shortfall: gap,
-          created_at: r.created_at,
-        });
-      }
-    }
-    shortfalls.sort((a, b) => b.shortfall - a.shortfall);
-
-    const iskDebt = Math.max(0, iskSold - iskBought);
-    let spotPrice = 0;
-    try {
-      spotPrice = await getSpotPrice("ISK_USDT");
-    } catch {
-      spotPrice = 0;
-    }
-    const estUsdtToSquareUp = spotPrice > 0 ? +(iskDebt * spotPrice * 1.01).toFixed(2) : 0;
-
-    return {
-      iskSold: +iskSold.toFixed(6),
-      iskBought: +iskBought.toFixed(6),
-      iskDebt: +iskDebt.toFixed(6),
-      usdtSpent: +usdtSpent.toFixed(2),
-      usdtTakenIn: +usdtTakenIn.toFixed(2),
-      orderCount: rows?.length ?? 0,
-      pendingBuys,
-      spotPrice,
-      estUsdtToSquareUp,
-      topShortfalls: shortfalls.slice(0, 10),
-    };
-  });
-
-// Place a standalone Bitmart market buy to clear the treasury debt.
-// Not tied to a specific order — pure treasury op, logged in admin_audit.
-export const adminBulkReplenish = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ notionalUsdt: z.number().min(5).max(5000) }).parse(input),
-  )
-  .handler(async ({ data, context }) => {
-    await assertAdmin(context.userId);
-    try {
-      const { order_id } = await submitMarketBuy({ notionalUsdt: data.notionalUsdt });
-      await audit(context.userId, "treasury_bulk_replenish", {
-        notionalUsdt: data.notionalUsdt,
-        bitmart_order_id: order_id,
-      });
-      return { ok: true as const, bitmart_order_id: order_id };
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Unknown";
-      await audit(context.userId, "treasury_bulk_replenish_failed", {
-        notionalUsdt: data.notionalUsdt,
-        error: msg,
-      });
-      return { ok: false as const, error: msg };
-    }
-  });
-
 // ===== Custom tokens (admin-managed source asset registry) =====
 const CHAIN_ENUM = z.enum(["ethereum", "base", "arbitrum", "polygon", "bsc"]);
 
@@ -957,32 +735,15 @@ const CustomTokenInput = z
     address: z.string().trim().max(80).default(""),
     decimals: z.number().int().min(0).max(36),
     isNative: z.boolean().default(false),
-    bitmartSymbol: z
-      .string()
-      .trim()
-      .max(40)
-      .regex(/^[A-Z0-9_]+$/i, "Bitmart symbol like ETH_USDT")
-      .optional()
-      .or(z.literal("")),
     enabled: z.boolean().default(true),
   })
   .superRefine((data, ctx) => {
-    if (data.isNative) {
-      if (!data.bitmartSymbol) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["bitmartSymbol"],
-          message: "Native tokens need a Bitmart symbol (e.g. ETH_USDT) for pricing",
-        });
-      }
-    } else {
-      if (!/^0x[a-fA-F0-9]{40}$/.test(data.address)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["address"],
-          message: "ERC-20 address must be 0x + 40 hex",
-        });
-      }
+    if (!data.isNative && !/^0x[a-fA-F0-9]{40}$/.test(data.address)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["address"],
+        message: "ERC-20 address must be 0x + 40 hex",
+      });
     }
   });
 
@@ -1010,7 +771,6 @@ export const adminCreateCustomToken = createServerFn({ method: "POST" })
       address: data.isNative ? "native" : data.address.toLowerCase(),
       decimals: data.decimals,
       is_native: data.isNative,
-      bitmart_symbol: data.bitmartSymbol ? data.bitmartSymbol.toUpperCase() : null,
       enabled: data.enabled,
       created_by: context.userId,
     };
@@ -1034,7 +794,6 @@ const UpdateCustomTokenInput = z.object({
   id: z.string().uuid(),
   enabled: z.boolean().optional(),
   decimals: z.number().int().min(0).max(36).optional(),
-  bitmartSymbol: z.string().trim().max(40).optional().nullable(),
 });
 
 export const adminUpdateCustomToken = createServerFn({ method: "POST" })
@@ -1045,15 +804,9 @@ export const adminUpdateCustomToken = createServerFn({ method: "POST" })
     const patch: {
       enabled?: boolean;
       decimals?: number;
-      bitmart_symbol?: string | null;
     } = {};
     if (data.enabled !== undefined) patch.enabled = data.enabled;
     if (data.decimals !== undefined) patch.decimals = data.decimals;
-    if (data.bitmartSymbol !== undefined) {
-      patch.bitmart_symbol = data.bitmartSymbol
-        ? data.bitmartSymbol.toUpperCase()
-        : null;
-    }
     if (Object.keys(patch).length === 0) return { ok: true as const };
     const { error } = await supabaseAdmin
       .from("custom_tokens")

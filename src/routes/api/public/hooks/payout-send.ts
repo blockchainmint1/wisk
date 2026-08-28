@@ -29,7 +29,7 @@ async function notifyById(
   const { data } = await supabaseAdmin
     .from("orders")
     .select(
-      "id,public_id,source_chain,source_token,source_amount_usd,paid_amount_usd,dest_asset,dest_address,quoted_dest_out,bitmart_order_id,bitmart_filled_dest,bitmart_avg_price,paid_tx_hash,dest_tx_hash,dest_fee_sats,dest_from_address,error_message",
+      "id,public_id,source_chain,source_token,source_amount_usd,paid_amount_usd,dest_asset,dest_address,quoted_dest_out,paid_tx_hash,dest_tx_hash,dest_fee_sats,dest_from_address,error_message",
     )
     .eq("id", orderId)
     .maybeSingle();
