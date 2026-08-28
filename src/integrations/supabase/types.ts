@@ -360,6 +360,24 @@ export type Database = {
         }
         Relationships: []
       }
+      isk_balance_snapshots: {
+        Row: {
+          balance_isk: number
+          id: number
+          taken_at: string
+        }
+        Insert: {
+          balance_isk: number
+          id?: number
+          taken_at?: string
+        }
+        Update: {
+          balance_isk?: number
+          id?: number
+          taken_at?: string
+        }
+        Relationships: []
+      }
       order_events: {
         Row: {
           created_at: string
@@ -516,24 +534,6 @@ export type Database = {
           id?: string
           metadata?: Json | null
           reason?: string
-        }
-        Relationships: []
-      }
-      isk_balance_snapshots: {
-        Row: {
-          balance_isk: number
-          id: number
-          taken_at: string
-        }
-        Insert: {
-          balance_isk: number
-          id?: number
-          taken_at?: string
-        }
-        Update: {
-          balance_isk?: number
-          id?: number
-          taken_at?: string
         }
         Relationships: []
       }
