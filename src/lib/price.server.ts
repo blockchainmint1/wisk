@@ -60,15 +60,13 @@ export async function getIskPrice(): Promise<IskPrice> {
   const wiskIsToken0 =
     String(token0).toLowerCase() === WISK_CONTRACT.toLowerCase();
 
-  // Adjust for decimals, then orient to USDC-per-wISK.
+  // raw = human price of token0 expressed in token1, before decimal scaling.
   const usd = wiskIsToken0
-    ? raw * 10 ** (WISK_DECIMALS - USDC_DECIMALS)
-    : (1 / raw) * 10 ** (USDC_DECIMALS - WISK_DECIMALS) * 10 ** 0;
+    ? raw * 10 ** (WISK_DECIMALS - USDC_DECIMALS) // wISK priced in USDC
+    : 1 / (raw * 10 ** (USDC_DECIMALS - WISK_DECIMALS)); // invert USDC/wISK
 
   const value: IskPrice = {
-    usd: Number(
-      (wiskIsToken0 ? usd : (1 / raw) * 10 ** (WISK_DECIMALS - USDC_DECIMALS)).toFixed(8),
-    ),
+    usd: Number(usd.toFixed(8)),
     source: "uniswap-v3",
     pool: WISK_USDC_POOL,
     feeBps: POOL_FEE_BPS,
