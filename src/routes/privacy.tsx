@@ -4,16 +4,19 @@ import { SiteFooter, SiteHeader } from "@/components/site-shell";
 export const Route = createFileRoute("/privacy")({
   head: () => ({
     meta: [
-      { title: "Privacy Policy — swapISK" },
+      { title: "Privacy Policy — wISK Bridge" },
       {
         name: "description",
-        content: "Privacy policy for swapISK stablecoin-to-native swap protocol.",
+        content:
+          "What the wISK bridge collects, why, who it is shared with, and how long it is kept when you wrap ISK into wISK or unwrap it.",
       },
-      { property: "og:title", content: "Privacy Policy — swapISK" },
+      { property: "og:title", content: "Privacy Policy — wISK Bridge" },
       {
         property: "og:description",
-        content: "Privacy policy for swapISK stablecoin-to-native swap protocol.",
+        content: "What the wISK bridge collects, why, and how long it is kept.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: PrivacyPage,
