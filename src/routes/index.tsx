@@ -48,17 +48,17 @@ export const Route = createFileRoute("/")({
   },
   head: () => ({
     meta: [
-      { title: "SWAP — The ISK ↔ wISK bridge" },
+      { title: "wISK Wrap — The ISK ↔ wISK Bridge" },
       {
         name: "description",
         content:
-          "Wrap native ISK into wISK on Ethereum, or unwrap wISK back to ISK. Custodial bridge, live Bitmart pricing, settled direct to your wallet.",
+          "Wrap native Iskander Coin into wISK on Ethereum, or unwrap it back to ISK. One for one, minted on deposit and burned on unwrap, settled straight to your wallet.",
       },
-      { property: "og:title", content: "SWAP — The ISK ↔ wISK bridge" },
+      { property: "og:title", content: "wISK Wrap — The ISK ↔ wISK Bridge" },
       {
         property: "og:description",
         content:
-          "The custodial bridge for Iskander Coin — wrap ISK to wISK and back.",
+          "Wrap native Iskander Coin into wISK on Ethereum and unwrap it back, one for one.",
       },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "https://wisk.iskandercoin.com/" },
