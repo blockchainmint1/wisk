@@ -1,0 +1,1 @@
+INSERT INTO public.hd_address_counter (id, next_index, updated_at) VALUES (1, 0, now()) ON CONFLICT (id) DO NOTHING;
