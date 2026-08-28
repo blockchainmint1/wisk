@@ -16,7 +16,7 @@ export const Route = createFileRoute("/swap/$orderId")({
   loader: ({ params }) => getOrder({ data: { publicId: params.orderId } }),
   head: ({ params }) => ({
     meta: [
-      { title: `Order ${params.orderId} — TEXIT Runner` },
+      { title: `Order ${params.orderId} — wISK Wrap` },
       { name: "description", content: "Track your ISK swap order in real time." },
       { name: "robots", content: "noindex" },
     ],

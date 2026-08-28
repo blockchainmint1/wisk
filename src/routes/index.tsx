@@ -61,10 +61,10 @@ export const Route = createFileRoute("/")({
           "The custodial bridge for Iskander Coin — wrap ISK to wISK and back.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://swap.iskandercoin.com/" },
+      { property: "og:url", content: "https://wisk.iskandercoin.com/" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
-    links: [{ rel: "canonical", href: "https://swap.iskandercoin.com/" }],
+    links: [{ rel: "canonical", href: "https://wisk.iskandercoin.com/" }],
     scripts: [
       {
         type: "application/ld+json",
@@ -72,7 +72,7 @@ export const Route = createFileRoute("/")({
           "@context": "https://schema.org",
           "@type": "WebSite",
           name: "SWAP",
-          url: "https://swap.iskandercoin.com/",
+          url: "https://wisk.iskandercoin.com/",
           description: "ISK ↔ wISK custodial bridge.",
         }),
       },

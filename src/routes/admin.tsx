@@ -38,7 +38,7 @@ import {
 export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
-      { title: "Admin — TEXIT Runner" },
+      { title: "Admin — wISK Wrap" },
       { name: "robots", content: "noindex" },
     ],
   }),

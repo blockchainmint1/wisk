@@ -16,7 +16,7 @@ export const Route = createFileRoute("/embed-builder")({
   component: EmbedBuilder,
 });
 
-const ORIGIN = "https://swap.iskandercoin.com";
+const ORIGIN = "https://wisk.iskandercoin.com";
 
 type Side = "wISK" | "ISK";
 

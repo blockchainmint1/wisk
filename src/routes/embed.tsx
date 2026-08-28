@@ -120,7 +120,7 @@ function EmbedPage() {
           {
             type: "swap-embed:order-created",
             orderId: id,
-            url: `https://swap.iskandercoin.com/swap/${id}`,
+            url: `https://wisk.iskandercoin.com/swap/${id}`,
           },
           "*",
         );
@@ -145,12 +145,12 @@ function EmbedPage() {
             {isUnwrap ? "Unwrap wISK → ISK" : "Wrap ISK → wISK"}
           </div>
           <a
-            href="https://swap.iskandercoin.com/swap"
+            href="https://wisk.iskandercoin.com/swap"
             target="_blank"
             rel="noopener noreferrer"
             className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground hover:text-accent"
           >
-            swap.iskandercoin.com ↗
+            wisk.iskandercoin.com ↗
           </a>
         </div>
 
@@ -281,7 +281,7 @@ function EmbedPage() {
           </button>
 
           <p className="mt-3 text-center text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
-            Powered by swap.iskandercoin.com · quote locks 15 min
+            Powered by wisk.iskandercoin.com · quote locks 15 min
           </p>
         </div>
       </div>

@@ -36,7 +36,7 @@ const FAQS: Array<{ q: string; a: ReactNode }> = [
   },
   {
     q: "Which assets can I receive?",
-    a: "Native ISK (paid to any ISK address — legacy T… or SegWit isk1q…) or wISK (paid to any Ethereum 0x… address).",
+    a: "Native ISK (paid to any ISK address — legacy K… or SegWit isk1q…) or wISK (paid to any Ethereum 0x… address).",
   },
   {
     q: "How long does a swap take?",
@@ -73,7 +73,7 @@ const SCHEMA_TEXTS = [
   "Wrap (ISK → wISK) is 5%. Unwrap (wISK → ISK) is free. Fees are set by the operator and shown live on the swap form before you confirm.",
   "By choice. A one-operator hot wallet with a public reconciliation dashboard is simpler, cheaper to run, and easier to audit than a contract we'd have to trust ourselves to secure. ISK held by the bridge matches wISK in circulation — publicly checkable at any time.",
   "Native ISK on the Iskander Coin network, or wISK on Ethereum. We do not offer stablecoin or ETH on-ramp swaps.",
-  "Native ISK (paid to any ISK address — legacy T… or SegWit isk1q…) or wISK (paid to any Ethereum 0x… address).",
+  "Native ISK (paid to any ISK address — legacy K… or SegWit isk1q…) or wISK (paid to any Ethereum 0x… address).",
   "Around 5 minutes end-to-end. We wait for chain-specific confirmations on your deposit, then sign and broadcast the payout from the hot wallet. Slower chains (Ethereum mainnet) take longer than the Iskander Coin network.",
   "Funds sent on an unsupported chain or with an unsupported token aren't picked up automatically. Contact the Help Center with your order ID and deposit tx hash — manual recovery may be possible.",
   "We can only send to the address you provided at order creation. Double-check before confirming — payouts can't be reversed.",
@@ -98,9 +98,9 @@ export const Route = createFileRoute("/faq")({
         content:
           "Common questions about the ISK ↔ wISK bridge.",
       },
-      { property: "og:url", content: "https://swap.iskandercoin.com/faq" },
+      { property: "og:url", content: "https://wisk.iskandercoin.com/faq" },
     ],
-    links: [{ rel: "canonical", href: "https://swap.iskandercoin.com/faq" }],
+    links: [{ rel: "canonical", href: "https://wisk.iskandercoin.com/faq" }],
     scripts: [
       {
         type: "application/ld+json",
