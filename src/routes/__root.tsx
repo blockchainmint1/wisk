@@ -77,21 +77,28 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "wISK — wrapped Iskander Coin Swap Service" },
+      { title: "wISK — Wrapped Iskander Coin Bridge" },
       {
         name: "description",
         content:
-          "Swap stablecoins on major EVM chains for native ISK or wISK at live Bitmart pricing with a 5% protocol fee.",
+          "Wrap native Iskander Coin (ISK) into wISK on Ethereum and unwrap it back, one for one. Minted on deposit, burned on unwrap.",
       },
-      { property: "og:site_name", content: "swapISK" },
+      { property: "og:site_name", content: "wISK Wrap" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@honestmoney_xyz" },
-      { property: "og:title", content: "wISK — wrapped Iskander Coin Swap Service" },
-      { name: "twitter:title", content: "wISK — wrapped Iskander Coin Swap Service" },
-      { name: "description", content: "wISK Swap facilitates the exchange of stablecoins on EVM chains for ISK or wISK." },
-      { property: "og:description", content: "wISK Swap facilitates the exchange of stablecoins on EVM chains for ISK or wISK." },
-      { name: "twitter:description", content: "wISK Swap facilitates the exchange of stablecoins on EVM chains for ISK or wISK." },
+      { property: "og:title", content: "wISK — Wrapped Iskander Coin Bridge" },
+      { name: "twitter:title", content: "wISK — Wrapped Iskander Coin Bridge" },
+      {
+        property: "og:description",
+        content:
+          "Wrap native Iskander Coin (ISK) into wISK on Ethereum and unwrap it back, one for one.",
+      },
+      {
+        name: "twitter:description",
+        content:
+          "Wrap native Iskander Coin (ISK) into wISK on Ethereum and unwrap it back, one for one.",
+      },
       { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/f67a89c2-6927-46cc-8792-7e52ad6c191b/id-preview-d7ee4f4d--37e0fc25-49e9-44a1-af26-373478d95e3b.lovable.app-1782982183469.png" },
       { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/f67a89c2-6927-46cc-8792-7e52ad6c191b/id-preview-d7ee4f4d--37e0fc25-49e9-44a1-af26-373478d95e3b.lovable.app-1782982183469.png" },
     ],
