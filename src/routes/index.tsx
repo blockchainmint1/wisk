@@ -14,9 +14,13 @@ import {
   type PublicHolderRow,
 } from "@/lib/homepage-stats.functions";
 
-const UNISWAP_URL =
-  "https://app.uniswap.org/#/swap?outputCurrency=0xFB38867D064Df981F159b886007F1273a346b0BB&theme=dark";
 const WISK_CONTRACT = "0xFB38867D064Df981F159b886007F1273a346b0BB";
+const USDC_CONTRACT = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+const POOL_ADDRESS = "0xF364A7EA901569B4eA3d0e5bFE2cCDDFB1063142";
+const UNISWAP_URL = `https://app.uniswap.org/swap?chain=mainnet&inputCurrency=${USDC_CONTRACT}&outputCurrency=${WISK_CONTRACT}`;
+const UNISWAP_POOL_URL = `https://app.uniswap.org/explore/pools/ethereum/${POOL_ADDRESS}`;
+const UNISWAP_ADD_LIQUIDITY_URL = `https://app.uniswap.org/positions/create/v3?currencyA=${USDC_CONTRACT}&currencyB=${WISK_CONTRACT}&chain=mainnet&feeTier=3000`;
+
 
 const fmtAmount = (n: number) =>
   n >= 1
