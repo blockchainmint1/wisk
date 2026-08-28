@@ -92,9 +92,9 @@ function TermsPage() {
             <p className="mb-4">You acknowledge and accept the following risks inherent in using the Protocol:</p>
             <ul className="list-disc list-inside space-y-2">
               <li><strong>Blockchain risk:</strong> Transactions are irreversible. Incorrect addresses may result in permanent loss of funds.</li>
-              <li><strong>Price volatility:</strong> Market prices can fluctuate between quote and settlement.</li>
-              <li><strong>Smart contract risk:</strong> While the Protocol minimizes on-chain exposure, interacting with any blockchain carries technical risks.</li>
-              <li><strong>Third-party risk:</strong> Liquidity sourcing depends on Bitmart and other exchange partners.</li>
+              <li><strong>Custodial risk:</strong> ISK backing wISK is held by the operator. Loss, compromise, or seizure of the operator wallet could affect your ability to unwrap.</li>
+              <li><strong>Smart contract risk:</strong> The wISK contract governs minting and burning on Ethereum. Interacting with any contract carries technical risk.</li>
+              <li><strong>Availability risk:</strong> Bridge operations depend on both the Iskander Coin and Ethereum networks and on third-party node providers, any of which may be unavailable or delayed.</li>
               <li><strong>Regulatory risk:</strong> Cryptocurrency regulations may change and affect your use of the Protocol.</li>
             </ul>
           </Section>
