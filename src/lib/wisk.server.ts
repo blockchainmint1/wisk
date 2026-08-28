@@ -213,9 +213,11 @@ async function sendWiskInner(opts: {
   // getFeeData / getTransactionCount) can silently run past the Cloudflare
   // Worker wall-clock limit and the isolate dies with no error thrown.
   const overrides = opts.nonce !== undefined ? { nonce: opts.nonce } : {};
-  const submitted: Promise<{ tx: Awaited<ReturnType<typeof contract.transfer>>; nonce: number }> =
+  const submitted: Promise<{ tx: { hash: string; nonce: bigint | number; wait: (confirms?: number) => Promise<{ gasUsed?: bigint } | null> }; nonce: number }> =
     (async () => {
-      const tx = await contract.transfer(opts.toAddress, amountRaw, overrides);
+      const tx = opts.mint
+        ? await contract.mintWrapped(opts.toAddress, amountRaw, opts.iskTxid ?? "", overrides)
+        : await contract.transfer(opts.toAddress, amountRaw, overrides);
       return { tx, nonce: Number(tx.nonce) };
     })();
   const timer = new Promise<never>((_, reject) =>
