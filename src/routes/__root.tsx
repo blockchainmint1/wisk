@@ -114,7 +114,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         children: JSON.stringify({
           "@context": "https://schema.org",
           "@type": "Organization",
-          name: "swapISK",
+          name: "wISK Wrap",
           url: "https://wisk.iskandercoin.com/",
           sameAs: ["https://iskandercoin.com", "https://help.mineisk.com"],
         }),
