@@ -157,6 +157,7 @@ function HomePage() {
           </div>
         </section>
 
+        <ProofOfReservesSection />
         <RecentSwapsSection />
         <HoldersSection />
         <UniswapSection />
