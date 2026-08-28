@@ -22,10 +22,10 @@ const WISK = "0xFB38867D064Df981F159b886007F1273a346b0BB"; // 8 decimals
 const FACTORY = "0x1F98431c8aD98523631AE4a59f267346ea31F984";
 const NPM = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88";
 
-const FEE = 500; // 0.05%
-const TICK_SPACING = 10;
-const MIN_TICK = -887270; // -887272 rounded up to a multiple of 10
-const MAX_TICK = 887270;
+const FEE = 3000; // 0.3%
+const TICK_SPACING = 60;
+const MIN_TICK = -887220; // -887272 rounded up to a multiple of 60
+const MAX_TICK = 887220;
 
 const USDC_AMOUNT = parseUnits("10000", 6);
 const WISK_AMOUNT = parseUnits("100000", 8);
