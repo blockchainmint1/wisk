@@ -13,6 +13,8 @@ const ERC20_ABI = [
   "function balanceOf(address) view returns (uint256)",
   "function transfer(address to, uint256 amount) returns (bool)",
   "function decimals() view returns (uint8)",
+  "function mintWrapped(address to, uint256 amount, string iskTxid)",
+  "function burnUnwrapped(uint256 amount, string iskAddress)",
 ];
 
 let cachedProvider: JsonRpcProvider | null = null;
@@ -86,6 +88,23 @@ export async function sendWisk(opts: {
  * Sign + broadcast a wISK ERC-20 transfer from any HD-derived index.
  * The sender must hold enough ETH for gas.
  */
+/**
+ * Mint brand-new wISK straight to the customer (wrap payouts). The operator
+ * wallet holds MINTER_ROLE; supply is created on demand — no inventory.
+ * Same broadcast/nonce/onSubmitted semantics as sendWisk.
+ */
+export async function mintWisk(opts: {
+  toAddress: string;
+  amountWisk: number;
+  /** ISK deposit txid, recorded on-chain in the mint event. */
+  iskTxid?: string | null;
+  onSubmitted?: (info: { txHash: string; nonce: number }) => Promise<void> | void;
+  timeoutMs?: number;
+  nonce?: number;
+}): Promise<WiskSendResult> {
+  return serialize(() => sendWiskInner({ ...opts, fromIndex: 0, mint: true }));
+}
+
 export async function sendWiskFrom(opts: {
   fromIndex: number;
   toAddress: string;
@@ -175,6 +194,8 @@ async function sendWiskInner(opts: {
   timeoutMs?: number;
   waitForReceipt?: boolean;
   nonce?: number;
+  mint?: boolean;
+  iskTxid?: string | null;
 }): Promise<WiskSendResult> {
   if (!/^0x[a-fA-F0-9]{40}$/.test(opts.toAddress)) {
     throw new Error(`Invalid wISK destination address: ${opts.toAddress}`);
@@ -192,9 +213,11 @@ async function sendWiskInner(opts: {
   // getFeeData / getTransactionCount) can silently run past the Cloudflare
   // Worker wall-clock limit and the isolate dies with no error thrown.
   const overrides = opts.nonce !== undefined ? { nonce: opts.nonce } : {};
-  const submitted: Promise<{ tx: Awaited<ReturnType<typeof contract.transfer>>; nonce: number }> =
+  const submitted: Promise<{ tx: { hash: string; nonce: bigint | number; wait: (confirms?: number) => Promise<{ gasUsed?: bigint } | null> }; nonce: number }> =
     (async () => {
-      const tx = await contract.transfer(opts.toAddress, amountRaw, overrides);
+      const tx = opts.mint
+        ? await contract.mintWrapped(opts.toAddress, amountRaw, opts.iskTxid ?? "", overrides)
+        : await contract.transfer(opts.toAddress, amountRaw, overrides);
       return { tx, nonce: Number(tx.nonce) };
     })();
   const timer = new Promise<never>((_, reject) =>

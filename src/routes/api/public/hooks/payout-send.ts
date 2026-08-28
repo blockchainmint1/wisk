@@ -16,7 +16,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { sendWisk, evmTxExists, getEvmNonce } from "@/lib/wisk.server";
+import { mintWisk, evmTxExists, getEvmNonce } from "@/lib/wisk.server";
 import { getOperatorEvmAddress } from "@/lib/bridge-wallet.server";
 import { logOrderEvent, notifyOrderEvent, sendAdminAlert } from "@/lib/telegram.server";
 
@@ -68,7 +68,7 @@ export const Route = createFileRoute("/api/public/hooks/payout-send")({
         // Load + guard: must be in `sending` state, wISK, and not already broadcast.
         const { data: o } = await supabaseAdmin
           .from("orders")
-          .select("id,public_id,status,dest_asset,dest_address,quoted_dest_out,dest_tx_hash")
+          .select("id,public_id,status,dest_asset,dest_address,quoted_dest_out,dest_tx_hash,paid_tx_hash")
           .eq("id", orderId)
           .maybeSingle();
         if (!o) {
@@ -133,9 +133,12 @@ export const Route = createFileRoute("/api/public/hooks/payout-send")({
             use: useNonce,
           });
 
-          const r = await sendWisk({
+          // Mint-on-demand: the operator never holds wISK inventory; each
+          // wrap payout creates fresh supply backed 1:1 by the ISK deposit.
+          const r = await mintWisk({
             toAddress: o.dest_address,
             amountWisk: Number(o.quoted_dest_out),
+            iskTxid: o.paid_tx_hash,
             nonce: useNonce,
             onSubmitted: async ({ txHash, nonce }) => {
               await supabaseAdmin
