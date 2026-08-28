@@ -88,6 +88,23 @@ export async function sendWisk(opts: {
  * Sign + broadcast a wISK ERC-20 transfer from any HD-derived index.
  * The sender must hold enough ETH for gas.
  */
+/**
+ * Mint brand-new wISK straight to the customer (wrap payouts). The operator
+ * wallet holds MINTER_ROLE; supply is created on demand — no inventory.
+ * Same broadcast/nonce/onSubmitted semantics as sendWisk.
+ */
+export async function mintWisk(opts: {
+  toAddress: string;
+  amountWisk: number;
+  /** ISK deposit txid, recorded on-chain in the mint event. */
+  iskTxid?: string | null;
+  onSubmitted?: (info: { txHash: string; nonce: number }) => Promise<void> | void;
+  timeoutMs?: number;
+  nonce?: number;
+}): Promise<WiskSendResult> {
+  return serialize(() => sendWiskInner({ ...opts, fromIndex: 0, mint: true }));
+}
+
 export async function sendWiskFrom(opts: {
   fromIndex: number;
   toAddress: string;
