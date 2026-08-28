@@ -11,6 +11,7 @@ export const WISK_CHAIN_ID = 1; // Ethereum mainnet
 
 const ERC20_ABI = [
   "function balanceOf(address) view returns (uint256)",
+  "function totalSupply() view returns (uint256)",
   "function transfer(address to, uint256 amount) returns (bool)",
   "function decimals() view returns (uint8)",
   "function mintWrapped(address to, uint256 amount, string iskTxid)",
@@ -103,6 +104,79 @@ export async function mintWisk(opts: {
   nonce?: number;
 }): Promise<WiskSendResult> {
   return serialize(() => sendWiskInner({ ...opts, fromIndex: 0, mint: true }));
+}
+
+/**
+ * Circulating wISK supply. With mint-on-wrap / burn-on-unwrap this number is
+ * the exact claim against the ISK reserve — nothing else backs it.
+ */
+export async function getWiskTotalSupply(): Promise<number> {
+  const provider = getProvider();
+  const c = new Contract(WISK_CONTRACT, ERC20_ABI, provider);
+  const raw: bigint = await c.totalSupply();
+  return Number(formatUnits(raw, WISK_DECIMALS));
+}
+
+export interface WiskBurnResult {
+  txid: string;
+  mined?: boolean;
+  fromAddress: string;
+  amountWisk: number;
+  feeSats: number;
+}
+
+/**
+ * Destroy wISK the operator holds after an unwrap, recording the native ISK
+ * address the reserve was released to in the on-chain `Unwrapped` event.
+ * Supply drops back to exactly the ISK we still custody.
+ */
+export async function burnWisk(opts: {
+  amountWisk: number;
+  iskAddress: string;
+  nonce?: number;
+  timeoutMs?: number;
+  onSubmitted?: (info: { txHash: string; nonce: number }) => Promise<void> | void;
+}): Promise<WiskBurnResult> {
+  return serialize(async () => {
+    if (!Number.isFinite(opts.amountWisk) || opts.amountWisk <= 0) {
+      throw new Error(`Invalid wISK burn amount: ${opts.amountWisk}`);
+    }
+    const timeoutMs = opts.timeoutMs ?? 22_000;
+    const provider = getProvider();
+    const wallet = deriveEvmWallet(0).connect(provider);
+    const contract = new Contract(WISK_CONTRACT, ERC20_ABI, wallet);
+    const amountRaw = parseUnits(opts.amountWisk.toFixed(WISK_DECIMALS), WISK_DECIMALS);
+    const overrides = opts.nonce !== undefined ? { nonce: opts.nonce } : {};
+
+    const submitted = (async () => {
+      const tx = await contract.burnUnwrapped(amountRaw, opts.iskAddress ?? "", overrides);
+      return { tx, nonce: Number(tx.nonce) };
+    })();
+    const timer = new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`burnWisk: broadcast timed out after ${timeoutMs}ms`)),
+        timeoutMs,
+      ),
+    );
+    const { tx, nonce } = await Promise.race([submitted, timer]);
+
+    if (opts.onSubmitted) {
+      try {
+        await opts.onSubmitted({ txHash: tx.hash, nonce });
+      } catch (e) {
+        console.error("[burnWisk] onSubmitted callback failed", e);
+      }
+    }
+
+    const receipt = await waitBounded<{ gasUsed?: bigint } | null>(tx.wait(1), 20_000);
+    return {
+      txid: tx.hash,
+      mined: receipt !== null,
+      fromAddress: wallet.address,
+      amountWisk: opts.amountWisk,
+      feeSats: Number(receipt?.gasUsed ?? 0n),
+    };
+  });
 }
 
 export async function sendWiskFrom(opts: {

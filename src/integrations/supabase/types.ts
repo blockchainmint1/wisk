@@ -411,6 +411,11 @@ export type Database = {
           bitmart_filled_dest: number | null
           bitmart_order_id: string | null
           bitmart_spot_price: number
+          burn_amount: number | null
+          burn_attempts: number
+          burn_sweep_tx_hash: string | null
+          burn_tx_hash: string | null
+          burned_at: string | null
           created_at: string
           deposit_address: string
           deposit_index: number
@@ -446,6 +451,11 @@ export type Database = {
           bitmart_filled_dest?: number | null
           bitmart_order_id?: string | null
           bitmart_spot_price: number
+          burn_amount?: number | null
+          burn_attempts?: number
+          burn_sweep_tx_hash?: string | null
+          burn_tx_hash?: string | null
+          burned_at?: string | null
           created_at?: string
           deposit_address: string
           deposit_index: number
@@ -481,6 +491,11 @@ export type Database = {
           bitmart_filled_dest?: number | null
           bitmart_order_id?: string | null
           bitmart_spot_price?: number
+          burn_amount?: number | null
+          burn_attempts?: number
+          burn_sweep_tx_hash?: string | null
+          burn_tx_hash?: string | null
+          burned_at?: string | null
           created_at?: string
           deposit_address?: string
           deposit_index?: number

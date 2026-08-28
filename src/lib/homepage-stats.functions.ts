@@ -174,3 +174,55 @@ export const getWiskHolders = createServerFn({ method: "GET" }).handler(
     };
   },
 );
+
+// --------------------------------------------------------------------------
+// Proof of reserves: circulating wISK supply vs native ISK the bridge holds.
+// Mint-on-wrap / burn-on-unwrap means these two numbers should always match;
+// publishing them makes the 1:1 claim checkable by anyone, not just trusted.
+// --------------------------------------------------------------------------
+
+export interface ProofOfReserves {
+  supply: number;
+  reserve: number;
+  /** reserve - supply. Negative = under-collateralised (should never happen). */
+  delta: number;
+  healthy: boolean;
+  contract: string;
+  fetchedAt: string;
+}
+
+let porCache: { at: number; value: ProofOfReserves } | null = null;
+const POR_TTL_MS = 2 * 60 * 1000;
+
+export const getProofOfReserves = createServerFn({ method: "GET" }).handler(
+  async (): Promise<ProofOfReserves | null> => {
+    if (porCache && Date.now() - porCache.at < POR_TTL_MS) return porCache.value;
+    try {
+      const [{ getWiskTotalSupply, WISK_CONTRACT: contract }, hdMod, signMod] =
+        await Promise.all([
+          import("@/lib/wisk.server"),
+          import("@/lib/isk-hd-balance.server"),
+          import("@/lib/isk-sign.server"),
+        ]);
+      const [supply, totals] = await Promise.all([
+        getWiskTotalSupply(),
+        hdMod.getIskHdTotal(signMod.getIskHotAddress()),
+      ]);
+      const reserve = Number(totals.totalConfirmed ?? 0);
+      const delta = reserve - supply;
+      const value: ProofOfReserves = {
+        supply,
+        reserve,
+        delta,
+        // Tiny dust tolerance for in-flight payouts / rounding.
+        healthy: delta >= -0.0001,
+        contract,
+        fetchedAt: new Date().toISOString(),
+      };
+      porCache = { at: Date.now(), value };
+      return value;
+    } catch {
+      return porCache?.value ?? null;
+    }
+  },
+);

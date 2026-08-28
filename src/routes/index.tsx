@@ -7,6 +7,7 @@ import { SiteFooter, SiteHeader } from "@/components/site-shell";
 import { SwapForm } from "@/components/swap-form";
 import { getPublicFees } from "@/lib/public-settings.functions";
 import {
+  getProofOfReserves,
   getRecentSwaps,
   getWiskHolders,
   type PublicSwapRow,
@@ -156,6 +157,7 @@ function HomePage() {
           </div>
         </section>
 
+        <ProofOfReservesSection />
         <RecentSwapsSection />
         <HoldersSection />
         <UniswapSection />
@@ -199,6 +201,67 @@ function SectionHeader({ eyebrow, title, right }: { eyebrow: string; title: stri
       </div>
       {right ? <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{right}</div> : null}
     </div>
+  );
+}
+
+function ProofOfReservesSection() {
+  const fetchFn = useServerFn(getProofOfReserves);
+  const { data } = useQuery({
+    queryKey: ["homepage", "proof-of-reserves"],
+    queryFn: () => fetchFn(),
+    refetchInterval: 120_000,
+    staleTime: 60_000,
+  });
+
+  const supply = data?.supply ?? null;
+  const reserve = data?.reserve ?? null;
+  const healthy = data?.healthy ?? true;
+  const ratio =
+    supply && supply > 0 && reserve !== null ? (reserve / supply) * 100 : null;
+
+  return (
+    <section className="mb-16">
+      <SectionHeader
+        eyebrow="Proof of reserves"
+        title="Every wISK is a real ISK"
+        right={data ? `updated ${new Date(data.fetchedAt).toLocaleTimeString()}` : ""}
+      />
+      <div className="grid gap-px bg-border border border-border sm:grid-cols-3">
+        <div className="bg-background p-5">
+          <div className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest mb-1">
+            Circulating wISK
+          </div>
+          <div className="font-mono text-xl">
+            {supply === null ? "—" : fmtAmount(supply)}
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">
+            Minted on wrap, burned on unwrap
+          </div>
+        </div>
+        <div className="bg-background p-5">
+          <div className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest mb-1">
+            ISK in reserve
+          </div>
+          <div className="font-mono text-xl">
+            {reserve === null ? "—" : fmtAmount(reserve)}
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">
+            Held across the bridge wallet
+          </div>
+        </div>
+        <div className="bg-background p-5">
+          <div className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest mb-1">
+            Backing
+          </div>
+          <div className={`font-mono text-xl ${healthy ? "text-accent" : "text-destructive"}`}>
+            {ratio === null ? (supply === 0 ? "1:1" : "—") : `${ratio.toFixed(2)}%`}
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">
+            {healthy ? "Fully backed" : "Shortfall detected"}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 

@@ -1017,6 +1017,58 @@ async function settleConfirmed() {
 
 // Identifies which deployment produced an alert, so a shared Telegram chat
 // makes it obvious where to look.
+/**
+ * Burn-on-unwrap. Every completed unwrap leaves the customer's wISK sitting
+ * in bridge custody; until it's destroyed, circulating supply overstates the
+ * ISK reserve backing it. This phase drives the dedicated burn endpoint
+ * (sweep → burn) for any completed unwrap that still has no burn tx.
+ *
+ * Each order gets its own Worker invocation for the same reason payouts do:
+ * an EVM broadcast needs a fresh CPU/wall-clock budget. The call is awaited —
+ * an un-awaited subrequest is cancelled the moment this handler responds.
+ */
+async function reconcileBurns() {
+  const { data: pending } = await supabaseAdmin
+    .from("orders")
+    .select("id,public_id,burn_attempts")
+    .eq("status", "completed")
+    .eq("dest_asset", "ISK")
+    .eq("source_token", "wISK")
+    .is("burn_tx_hash", null)
+    .lt("burn_attempts", 8)
+    .order("updated_at", { ascending: true })
+    .limit(3)
+    .returns<Array<{ id: string; public_id: string; burn_attempts: number | null }>>();
+  if (!pending?.length) return { burned: 0 };
+
+  let origin: string | null = null;
+  try {
+    origin = new URL(getRequest().url).origin;
+  } catch {
+    return { burned: 0 };
+  }
+
+  let burned = 0;
+  for (const o of pending) {
+    try {
+      const res = await fetch(`${origin}/api/public/hooks/burn-unwrapped`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          apikey: process.env.SUPABASE_PUBLISHABLE_KEY ?? "",
+        },
+        body: JSON.stringify({ orderId: o.id }),
+      });
+      if (res.ok) burned += 1;
+      else console.warn("[burns] burn-unwrapped returned", res.status, o.public_id);
+    } catch (err) {
+      console.warn("[burns] burn kick failed", o.public_id, err);
+    }
+  }
+  return { burned };
+}
+
+
 const SITE_LABEL = "wISK Wrap — wisk.iskandercoin.com";
 
 /**
@@ -1119,6 +1171,7 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           settle: { sent: 0 },
           balances: { isk: null as number | null, wisk: null as number | null },
           reconcile: { reconciled: 0, retried: 0 },
+          burns: { burned: 0 },
           ms: 0,
         };
         // Run each phase independently so one failure doesn't starve the
@@ -1142,6 +1195,7 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           result.watch = (await runPhase("watchDeposits", watchDeposits)) ?? result.watch;
           result.watchIsk = (await runPhase("watchIskDeposits", watchIskDeposits)) ?? result.watchIsk;
           result.settle = (await runPhase("settleConfirmed", settleConfirmed)) ?? result.settle;
+          result.burns = (await runPhase("reconcileBurns", reconcileBurns)) ?? result.burns;
           result.balances = (await runPhase("checkHotBalances", checkHotBalances)) ?? result.balances;
 
           // Fast mempool loop: pg_cron's minimum cadence is 1 minute, but ISK
