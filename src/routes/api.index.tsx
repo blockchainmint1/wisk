@@ -10,7 +10,7 @@ const TITLE = "wISK API — Public ISK Price & TWAP Endpoints";
 const DESCRIPTION =
   "Free, CORS-open JSON endpoints for the Iskander Coin (ISK) price: live spot from the wISK/USDC Uniswap V3 pool plus a manipulation-resistant TWAP.";
 
-export const Route = createFileRoute("/api")({
+export const Route = createFileRoute("/api/")({
   head: () => ({
     meta: [
       { title: TITLE },
