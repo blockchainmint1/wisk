@@ -20,7 +20,7 @@ export function SwapForm({ compact = false }: { compact?: boolean }) {
   const quoteFn = useServerFn(getQuote);
   const createFn = useServerFn(createOrder);
 
-  const [have, setHave] = useState<Side>("wISK");
+  const [have, setHave] = useState<Side>("ISK");
   const [amount, setAmount] = useState<string>("100");
   const [dest, setDest] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
