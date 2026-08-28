@@ -23,6 +23,7 @@ import { Route as SwapRouteImport } from './routes/swap'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SwapIndexRouteImport } from './routes/swap.index'
 import { Route as SwapOrderIdRouteImport } from './routes/swap.$orderId'
+import { Route as ApiPublicPriceRouteImport } from './routes/api/public/price'
 import { Route as ApiPublicHooksBurnUnwrappedRouteImport } from './routes/api/public/hooks/burn-unwrapped'
 import { Route as ApiPublicHooksPayoutSendRouteImport } from './routes/api/public/hooks/payout-send'
 import { Route as ApiPublicHooksSwapTickRouteImport } from './routes/api/public/hooks/swap-tick'
@@ -100,6 +101,11 @@ const SwapOrderIdRoute = SwapOrderIdRouteImport.update({
   path: '/$orderId',
   getParentRoute: () => SwapRoute,
 } as any)
+const ApiPublicPriceRoute = ApiPublicPriceRouteImport.update({
+  id: '/api/public/price',
+  path: '/api/public/price',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksBurnUnwrappedRoute =
   ApiPublicHooksBurnUnwrappedRouteImport.update({
     id: '/api/public/hooks/burn-unwrapped',
@@ -149,6 +155,7 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/swap/$orderId': typeof SwapOrderIdRoute
   '/swap/': typeof SwapIndexRoute
+  '/api/public/price': typeof ApiPublicPriceRoute
   '/api/public/hooks/burn-unwrapped': typeof ApiPublicHooksBurnUnwrappedRoute
   '/api/public/hooks/payout-send': typeof ApiPublicHooksPayoutSendRoute
   '/api/public/hooks/swap-tick': typeof ApiPublicHooksSwapTickRoute
@@ -170,6 +177,7 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/swap/$orderId': typeof SwapOrderIdRoute
   '/swap': typeof SwapIndexRoute
+  '/api/public/price': typeof ApiPublicPriceRoute
   '/api/public/hooks/burn-unwrapped': typeof ApiPublicHooksBurnUnwrappedRoute
   '/api/public/hooks/payout-send': typeof ApiPublicHooksPayoutSendRoute
   '/api/public/hooks/swap-tick': typeof ApiPublicHooksSwapTickRoute
@@ -193,6 +201,7 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/swap/$orderId': typeof SwapOrderIdRoute
   '/swap/': typeof SwapIndexRoute
+  '/api/public/price': typeof ApiPublicPriceRoute
   '/api/public/hooks/burn-unwrapped': typeof ApiPublicHooksBurnUnwrappedRoute
   '/api/public/hooks/payout-send': typeof ApiPublicHooksPayoutSendRoute
   '/api/public/hooks/swap-tick': typeof ApiPublicHooksSwapTickRoute
@@ -217,6 +226,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/swap/$orderId'
     | '/swap/'
+    | '/api/public/price'
     | '/api/public/hooks/burn-unwrapped'
     | '/api/public/hooks/payout-send'
     | '/api/public/hooks/swap-tick'
@@ -238,6 +248,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/swap/$orderId'
     | '/swap'
+    | '/api/public/price'
     | '/api/public/hooks/burn-unwrapped'
     | '/api/public/hooks/payout-send'
     | '/api/public/hooks/swap-tick'
@@ -260,6 +271,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/swap/$orderId'
     | '/swap/'
+    | '/api/public/price'
     | '/api/public/hooks/burn-unwrapped'
     | '/api/public/hooks/payout-send'
     | '/api/public/hooks/swap-tick'
@@ -281,6 +293,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SwapRoute: typeof SwapRouteWithChildren
   TermsRoute: typeof TermsRoute
+  ApiPublicPriceRoute: typeof ApiPublicPriceRoute
   ApiPublicHooksBurnUnwrappedRoute: typeof ApiPublicHooksBurnUnwrappedRoute
   ApiPublicHooksPayoutSendRoute: typeof ApiPublicHooksPayoutSendRoute
   ApiPublicHooksSwapTickRoute: typeof ApiPublicHooksSwapTickRoute
@@ -389,6 +402,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SwapOrderIdRouteImport
       parentRoute: typeof SwapRoute
     }
+    '/api/public/price': {
+      id: '/api/public/price'
+      path: '/api/public/price'
+      fullPath: '/api/public/price'
+      preLoaderRoute: typeof ApiPublicPriceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/burn-unwrapped': {
       id: '/api/public/hooks/burn-unwrapped'
       path: '/api/public/hooks/burn-unwrapped'
@@ -459,6 +479,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SwapRoute: SwapRouteWithChildren,
   TermsRoute: TermsRoute,
+  ApiPublicPriceRoute: ApiPublicPriceRoute,
   ApiPublicHooksBurnUnwrappedRoute: ApiPublicHooksBurnUnwrappedRoute,
   ApiPublicHooksPayoutSendRoute: ApiPublicHooksPayoutSendRoute,
   ApiPublicHooksSwapTickRoute: ApiPublicHooksSwapTickRoute,
