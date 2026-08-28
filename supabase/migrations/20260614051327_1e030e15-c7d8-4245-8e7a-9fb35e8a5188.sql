@@ -1,1 +1,0 @@
-ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS stuck_notified_at TIMESTAMPTZ NULL;

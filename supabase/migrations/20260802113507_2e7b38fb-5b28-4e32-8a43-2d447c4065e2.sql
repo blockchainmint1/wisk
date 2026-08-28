@@ -1,1 +1,0 @@
-UPDATE public.orders SET status='confirmed', error_message=NULL, send_attempts=0 WHERE public_id='TX-6D25FC27';

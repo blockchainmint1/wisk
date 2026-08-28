@@ -1,1 +1,0 @@
-ALTER TABLE public.orders ADD COLUMN dest_asset TEXT NOT NULL DEFAULT 'TXC';
