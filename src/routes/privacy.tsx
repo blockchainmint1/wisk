@@ -40,7 +40,7 @@ function PrivacyPage() {
         <div className="space-y-12 text-sm leading-relaxed text-muted-foreground">
           <Section title="1. Overview">
             <p>
-              This Privacy Policy describes how swapISK collects, uses, and protects your information when you use our stablecoin-to-native asset swap service. By using the protocol, you consent to the practices described herein.
+              This Privacy Policy describes how the wISK bridge collects, uses, and protects your information when you wrap native Iskander Coin (ISK) into wISK or unwrap it back. By using the protocol, you consent to the practices described herein.
             </p>
           </Section>
 
@@ -56,7 +56,7 @@ function PrivacyPage() {
 
           <Section title="3. How We Use Your Information">
             <ul className="list-disc list-inside space-y-2">
-              <li>To process and settle swap orders between stablecoins and native assets.</li>
+              <li>To process and settle wrap and unwrap orders between ISK and wISK.</li>
               <li>To communicate order status, confirmations, and important service updates.</li>
               <li>To detect and prevent fraud, abuse, or unauthorized access.</li>
               <li>To comply with legal obligations and respond to lawful requests.</li>
@@ -66,8 +66,7 @@ function PrivacyPage() {
           <Section title="4. Data Sharing & Disclosure">
             <p className="mb-4">We do not sell your personal data. We may share information only with:</p>
             <ul className="list-disc list-inside space-y-2">
-              <li><strong>Exchange partners:</strong> Bitmart (or other liquidity sources) for order execution — only swap-relevant wallet and transaction data.</li>
-              <li><strong>Service providers:</strong> Hosting, analytics, and notification services under strict confidentiality agreements.</li>
+              <li><strong>Infrastructure providers:</strong> Hosting, blockchain node providers, and notification services, limited to the data needed to run the bridge.</li>
               <li><strong>Legal authorities:</strong> When required by applicable law, regulation, or court order.</li>
             </ul>
           </Section>
