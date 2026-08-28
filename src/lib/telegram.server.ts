@@ -23,7 +23,6 @@ export type OrderNotifyEvent =
   | "created"
   | "payment_detected"
   | "payment_confirmed"
-  | "bitmart_filled"
   | "sending"
   | "completed"
   | "failed"
@@ -41,9 +40,6 @@ interface OrderSummary {
   dest_asset?: string | null;
   dest_address?: string | null;
   quoted_dest_out?: number | null;
-  bitmart_order_id?: string | null;
-  bitmart_filled_dest?: number | null;
-  bitmart_avg_price?: number | null;
   paid_tx_hash?: string | null;
   dest_tx_hash?: string | null;
   dest_fee_sats?: number | null;
@@ -79,7 +75,6 @@ function header(event: OrderNotifyEvent): string {
     case "created": return "🆕 New order";
     case "payment_detected": return "👀 Deposit detected";
     case "payment_confirmed": return "✅ Deposit confirmed";
-    case "bitmart_filled": return "💱 Bitmart buy filled";
     case "sending": return "📤 Sending payout";
     case "completed": return "🎉 Order completed";
     case "failed": return "❌ Order failed";
@@ -109,24 +104,18 @@ function buildMessage(
   if (event === "payment_detected" || event === "payment_confirmed") {
     // Always show the actual on-chain source amount in its native token
     // (e.g. wISK on unwrap). Never derive from USD — that math is bogus
-    // for tokens Bitmart doesn't treat as $1.
     const received = o.paid_amount_source ?? null;
     if (received != null && srcToken) {
       lines.push(`Received: ${fmtAsset(received, srcToken)}`);
     }
     if (o.paid_tx_hash) lines.push(`Tx: <code>${escapeHtml(o.paid_tx_hash)}</code>`);
   }
-  if (event === "bitmart_filled") {
-    lines.push(`Filled: ${fmtAsset(o.bitmart_filled_dest, asset)}`);
-    if (o.bitmart_order_id) lines.push(`Bitmart: <code>${escapeHtml(o.bitmart_order_id)}</code>`);
-  }
-
   if (event === "sending") {
-    lines.push(`Sending: ${fmtAsset(o.bitmart_filled_dest ?? o.quoted_dest_out, asset)}`);
+    lines.push(`Sending: ${fmtAsset(o.quoted_dest_out, asset)}`);
     lines.push(`To: <code>${escapeHtml(o.dest_address)}</code>`);
   }
   if (event === "completed") {
-    lines.push(`Sent: ${fmtAsset(o.bitmart_filled_dest ?? o.quoted_dest_out, asset)} → <code>${escapeHtml(o.dest_address)}</code>`);
+    lines.push(`Sent: ${fmtAsset(o.quoted_dest_out, asset)} → <code>${escapeHtml(o.dest_address)}</code>`);
     if (o.dest_tx_hash) lines.push(`Tx: <code>${escapeHtml(o.dest_tx_hash)}</code>`);
     if (o.dest_fee_sats != null) {
       lines.push(`Fee: ${(o.dest_fee_sats / 1e8).toFixed(8)} ${asset}`);
@@ -181,7 +170,7 @@ async function getHotBalance(
       const confirmedIsk = confirmed / 1e8;
       const unconfirmedIsk = unconfirmed / 1e8;
       const expectedPayout = Number(
-        order.bitmart_filled_dest ?? order.quoted_dest_out ?? 0,
+        order.quoted_dest_out ?? 0,
       );
       const low = expectedPayout > 0 && confirmedIsk < expectedPayout * 2;
       return { asset: "ISK", address, confirmedIsk, unconfirmedIsk, low };
@@ -262,10 +251,10 @@ export async function notifyOrderEvent(
   }
 }
 
-/** Record an arbitrary order event (state transition, bitmart trade, payout). */
+/** Record an arbitrary order event (state transition, payout, note). */
 export async function logOrderEvent(
   orderId: string,
-  kind: "state" | "bitmart" | "payout" | "error" | "note",
+  kind: "state" | "payout" | "error" | "note",
   event: string,
   details: Record<string, unknown> = {},
 ): Promise<void> {

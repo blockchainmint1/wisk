@@ -71,11 +71,10 @@ function EmbedPage() {
 
   const { data: quote } = useQuery({
     queryKey: ["quote", destAsset],
-    queryFn: () => quoteFn({ data: { usdAmount: 100, destAsset } }),
+    queryFn: () => quoteFn({ data: { destAsset } }),
     refetchInterval: 15_000,
   });
 
-  const iskPriceUsd = quote?.ok ? quote.spotPriceUsd : null;
   const unwrapFeeBps = quote?.ok ? (quote.unwrapFeeBps ?? 100) : 100;
   const wrapFeeBps = quote?.ok ? (quote.wrapFeeBps ?? 0) : 0;
   const unwrapFeePct = unwrapFeeBps / 100;
@@ -87,14 +86,11 @@ function EmbedPage() {
     return haveAmount * (1 - wrapFeeBps / 10_000);
   }, [haveAmount, isUnwrap, unwrapFeeBps, wrapFeeBps]);
 
-  const usdAmount = useMemo(() => {
-    if (!iskPriceUsd || haveAmount <= 0) return 0;
-    return haveAmount * iskPriceUsd;
-  }, [haveAmount, iskPriceUsd]);
+
 
   const addressValid = destConfig.addressRegex.test(dest.trim());
   const formValid =
-    haveAmount > 0 && addressValid && quote?.ok === true && usdAmount >= 10;
+    haveAmount > 0 && addressValid && quote?.ok === true;
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -103,7 +99,7 @@ function EmbedPage() {
         data: {
           sourceChain: isWrap ? "isk" : "ethereum",
           sourceToken: isWrap ? "ISK" : "wISK",
-          usdAmount,
+          sourceAmount: haveAmount,
           destAsset,
           destAddress: dest.trim(),
         },
@@ -202,9 +198,7 @@ function EmbedPage() {
               <SidePill side={want} />
             </div>
             <div className="mt-2 text-[10px] font-mono text-muted-foreground">
-              {iskPriceUsd
-                ? `1 ISK ≈ $${iskPriceUsd.toFixed(6)}`
-                : "Fetching ISK price…"}
+              1 ISK = 1 wISK
               {isUnwrap ? (
                 <span className="ml-2 opacity-70">
                   · {unwrapFeePct.toFixed(unwrapFeePct % 1 === 0 ? 0 : 2)}% fee
@@ -271,13 +265,9 @@ function EmbedPage() {
               ? "Creating Order…"
               : haveAmount <= 0
                 ? "Enter an amount"
-                : usdAmount > 0 && usdAmount < 10
-                  ? "Minimum $10 equivalent"
-                  : !addressValid
-                    ? `Enter ${destConfig.label} address`
-                    : !quote?.ok
-                      ? "Waiting for quote…"
-                      : "Get started"}
+                : !addressValid
+                  ? `Enter ${destConfig.label} address`
+                  : "Get started"}
           </button>
 
           <p className="mt-3 text-center text-[10px] font-mono text-muted-foreground uppercase tracking-widest">

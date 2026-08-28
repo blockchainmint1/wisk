@@ -2,21 +2,12 @@
 // Customer flow (ISK and wISK):
 //   awaiting_payment → payment_detected → confirmed → sending → completed
 //   Payout is signed + broadcast locally from our hot/operator wallet using
-//   the quoted amount. Bitmart is NEVER on the critical path.
-// Treasury replenishment (background, decoupled):
-//   For completed on-ramp orders (stables/ETH → ISK or wISK), submit a
-//   market buy on Bitmart to refill the ISK hot wallet. For unwrap orders
-//   (wISK → ISK) we skip Bitmart entirely — the user gave us wISK which
-//   we already hold; re-wrapping ISK back to wISK is a manual admin op.
+//   the quoted amount. Fully DeFi — no exchange is involved anywhere.
 // Auth: route lives under /api/public/* which bypasses Lovable's site auth.
 
 import { createFileRoute } from "@tanstack/react-router";
 import { getRequest } from "@tanstack/react-start/server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import {
-  getOrderDetail,
-  submitMarketBuy,
-} from "@/lib/bitmart.server";
 import {
   chainStartScanBlock,
   getBlockNumber,
@@ -32,7 +23,6 @@ import { getSettings } from "@/lib/settings.server";
 import { sendIsk } from "@/lib/isk-sign.server";
 import { WISK_CONTRACT, WISK_DECIMALS, getEvmNonce } from "@/lib/wisk.server";
 import { getOperatorEvmAddress } from "@/lib/bridge-wallet.server";
-import { getSpotPrice } from "@/lib/bitmart.server";
 import { scanIskIncoming, getIskTipHeight } from "@/lib/isk-scan.server";
 
 
@@ -43,7 +33,7 @@ async function notifyById(
   const { data } = await supabaseAdmin
     .from("orders")
     .select(
-      "id,public_id,source_chain,source_token,source_amount_usd,paid_amount_usd,dest_asset,dest_address,quoted_dest_out,bitmart_order_id,bitmart_filled_dest,bitmart_avg_price,paid_tx_hash,dest_tx_hash,dest_fee_sats,dest_from_address,error_message",
+      "id,public_id,source_chain,source_token,source_amount_usd,paid_amount_usd,dest_asset,dest_address,quoted_dest_out,paid_tx_hash,dest_tx_hash,dest_fee_sats,dest_from_address,error_message",
     )
     .eq("id", orderId)
     .maybeSingle();
@@ -81,8 +71,6 @@ interface OrderRow {
   quoted_dest_per_usd: number;
   expires_at: string;
   paid_amount_usd: number | null;
-  bitmart_order_id: string | null;
-  bitmart_filled_dest: number | null;
   withdrawal_id: string | null;
   deposit_start_block: number | null;
 }
@@ -210,7 +198,7 @@ async function expireStale() {
 /**
  * Detect orders that are still mid-flight (not awaiting_payment, completed,
  * failed, or expired) past the expiry window + 5 min grace, and alert once.
- * These are payment_detected / confirmed / sending / buying_on_bitmart /
+ * These are payment_detected / confirmed / sending /
  * bought / withdrawing orders that should have finished and didn't.
  */
 async function detectStuck() {
@@ -420,7 +408,7 @@ async function watchDeposits() {
 
     .from("orders")
     .select(
-      "id,public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_address,dest_asset,premium_bps,quoted_dest_out,quoted_dest_per_usd,expires_at,paid_amount_usd,bitmart_order_id,bitmart_filled_dest,withdrawal_id,deposit_start_block",
+      "id,public_id,status,source_chain,source_token,source_amount_usd,deposit_address,dest_address,dest_asset,premium_bps,quoted_dest_out,quoted_dest_per_usd,expires_at,paid_amount_usd,withdrawal_id,deposit_start_block",
     )
     .in("status", ["awaiting_payment", "payment_detected"])
     .neq("source_chain", "isk")
@@ -467,16 +455,8 @@ async function watchDeposits() {
         });
         if (!transfers.length) continue;
 
-        // For native orders we need a live spot to convert wei → USD.
-        let nativeSpot = 0;
-        if (orderIsNative && orderToken.bitmartSymbol) {
-          try {
-            nativeSpot = await getSpotPrice(orderToken.bitmartSymbol);
-          } catch (e) {
-            console.error(`[watch] spot lookup failed`, e);
-            continue;
-          }
-        }
+        // No USD pricing anywhere — native amounts are reported as-is.
+        const nativeSpot = 0;
 
         for (const t of transfers) {
           let usd: number;
@@ -696,14 +676,9 @@ async function watchIskDeposits() {
     console.error("[watch-isk] tip failed", e);
     return { detected: 0 };
   }
-  // Spot price is only used for display USD accounting on the deposits row.
-  // Wrap payout math is pure 1:1 minus locked wrap fee — no spot involved.
-  let iskSpot = 0;
-  try {
-    iskSpot = await getSpotPrice("ISK_USDT");
-  } catch (e) {
-    console.warn("[watch-isk] spot lookup failed; USD display will be 0", e);
-  }
+  // No USD accounting anywhere — wrap payout math is pure 1:1 minus the
+  // locked wrap fee.
+  const iskSpot = 0;
 
   for (const order of orders) {
     try {
@@ -890,8 +865,7 @@ async function watchIskDeposits() {
 /**
  * For confirmed orders, pay the customer IMMEDIATELY using local signing.
  * Both ISK and wISK now sign + broadcast directly from our hot wallet.
- * Bitmart is NEVER on the critical path — treasury replenishment runs
- * in the background after the customer is paid.
+ * No exchange is involved — this is a pure 1:1 wrap/unwrap bridge.
  */
 async function settleConfirmed() {
   // Kill-switch: admin-controlled freeze halts ALL outbound customer payouts.
@@ -902,7 +876,7 @@ async function settleConfirmed() {
       "[settle] payouts frozen — skipping",
       settings.payouts_frozen_reason ?? "(no reason set)",
     );
-    return { sent: 0, queuedForBitmart: 0, frozen: true as const };
+    return { sent: 0, frozen: true as const };
   }
 
   const { data: orders } = await supabaseAdmin
@@ -921,10 +895,9 @@ async function settleConfirmed() {
         send_attempts: number | null;
       }>
     >();
-  if (!orders?.length) return { sent: 0, queuedForBitmart: 0 };
+  if (!orders?.length) return { sent: 0 };
 
   let sent = 0;
-  const queuedForBitmart = 0;
 
   // Same-origin base URL for firing off the dedicated payout endpoint. The
   // request context is guaranteed to exist here because settleConfirmed is
@@ -1038,128 +1011,7 @@ async function settleConfirmed() {
     }
 
   }
-  return { sent, queuedForBitmart };
-}
-
-
-/**
- * Treasury replenishment — runs AFTER the customer is paid.
- * For each completed ISK or wISK order that has not yet had a Bitmart buy
- * submitted, submit a market buy to refill our hot wallet. This is
- * best-effort: failures here do NOT affect the customer order, they just
- * log and retry next tick.
- */
-async function replenishTreasury() {
-  const { data: orders } = await supabaseAdmin
-    .from("orders")
-    .select("id,public_id,paid_amount_usd,dest_asset,source_chain,source_token")
-    .eq("status", "completed")
-    .is("bitmart_order_id", null)
-    .not("paid_amount_usd", "is", null)
-    .limit(10)
-    .returns<
-      Array<{
-        id: string;
-        public_id: string;
-        paid_amount_usd: number;
-        dest_asset: string;
-        source_chain: string;
-        source_token: string;
-      }>
-    >();
-  if (!orders?.length) return { submitted: 0 };
-
-  let submitted = 0;
-  for (const o of orders) {
-    try {
-      // Skip both bridge directions (they never touch stables):
-      //   • unwrap (wISK → ISK): user gave us wISK, we paid ISK out.
-      //   • wrap   (ISK  → wISK): user gave us native ISK, we paid wISK.
-      if (o.source_chain === "isk") continue;
-      if (isWiskSource(o.source_chain as ChainKey, o.source_token)) continue;
-      const dest = getDestination(o.dest_asset);
-      // For wISK on-ramp, buy ISK on Bitmart (we'll re-wrap manually).
-      const buySymbol = dest.key === "wISK" ? "ISK_USDT" : dest.bitmartSymbol;
-      const buyNotional = +(Number(o.paid_amount_usd) / 1.05).toFixed(2);
-      if (buyNotional <= 0) continue;
-      const { order_id } = await submitMarketBuy({
-        symbol: buySymbol,
-        notionalUsdt: buyNotional,
-      });
-      await supabaseAdmin
-        .from("orders")
-        .update({ bitmart_order_id: order_id })
-        .eq("id", o.id);
-      await logOrderEvent(o.id, "bitmart", "replenish_submitted", {
-        bitmart_order_id: order_id,
-        notional: buyNotional,
-      });
-      submitted += 1;
-    } catch (e) {
-      // Non-fatal: customer is already paid. Log and continue.
-      console.error("[replenish]", o.public_id, e);
-      await logOrderEvent(o.id, "bitmart", "replenish_error", {
-        message: e instanceof Error ? e.message : "submit failed",
-      });
-    }
-  }
-  return { submitted };
-}
-
-/**
- * Poll Bitmart fills for ANY order with a bitmart_order_id and no recorded
- * fill yet. Updates bookkeeping (bitmart_filled_dest, bitmart_avg_price) but
- * does NOT change customer-facing status for ISK orders (already completed).
- * For wISK orders still in buying_on_bitmart, advances to `bought` so the
- * withdrawal step picks them up.
- */
-async function pollBitmartFillsDecoupled() {
-  const { data: orders } = await supabaseAdmin
-    .from("orders")
-    .select("id,status,bitmart_order_id,bitmart_filled_dest,dest_asset")
-    .not("bitmart_order_id", "is", null)
-    .is("bitmart_filled_dest", null)
-    .limit(20)
-    .returns<
-      Array<{
-        id: string;
-        status: string;
-        bitmart_order_id: string;
-        bitmart_filled_dest: number | null;
-        dest_asset: string;
-      }>
-    >();
-  if (!orders?.length) return { filled: 0 };
-
-  let filled = 0;
-  for (const o of orders) {
-    try {
-      const detail = await getOrderDetail(o.bitmart_order_id);
-      if (detail.state === "filled") {
-        const iskAmount = Number.parseFloat(detail.filled_size);
-        const avgPrice = Number.parseFloat(detail.price_avg);
-        const update: {
-          bitmart_filled_dest: number;
-          bitmart_avg_price: number;
-        } = {
-          bitmart_filled_dest: iskAmount,
-          bitmart_avg_price: avgPrice,
-        };
-        await supabaseAdmin.from("orders").update(update).eq("id", o.id);
-        await logOrderEvent(o.id, "bitmart", "filled", {
-          filled: iskAmount,
-          avg_price: avgPrice,
-        });
-        filled += 1;
-      } else if (detail.state === "canceled") {
-        await logOrderEvent(o.id, "bitmart", "canceled", {});
-        // Treasury hiccup only; customer is already paid.
-      }
-    } catch (e) {
-      console.error("[poll-fill]", o.bitmart_order_id, e);
-    }
-  }
-  return { filled };
+  return { sent };
 }
 
 
@@ -1246,7 +1098,7 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        // Auth: this endpoint triggers real on-chain payouts, Bitmart orders,
+        // Auth: this endpoint triggers real on-chain payouts
         // and Alchemy quota usage. Only the pg_cron job (which sends the
         // project's publishable/anon key in the `apikey` header) may invoke it.
         const expected = process.env.SUPABASE_PUBLISHABLE_KEY;
@@ -1264,9 +1116,7 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           stuck: { stuck: 0 },
           watch: { detected: 0 },
           watchIsk: { detected: 0 },
-          fills: { filled: 0 },
-          settle: { sent: 0, queuedForBitmart: 0 },
-          replenish: { submitted: 0 },
+          settle: { sent: 0 },
           balances: { isk: null as number | null, wisk: null as number | null },
           reconcile: { reconciled: 0, retried: 0 },
           ms: 0,
@@ -1292,9 +1142,6 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           result.watch = (await runPhase("watchDeposits", watchDeposits)) ?? result.watch;
           result.watchIsk = (await runPhase("watchIskDeposits", watchIskDeposits)) ?? result.watchIsk;
           result.settle = (await runPhase("settleConfirmed", settleConfirmed)) ?? result.settle;
-
-          result.replenish = (await runPhase("replenishTreasury", replenishTreasury)) ?? result.replenish;
-          result.fills = (await runPhase("pollBitmartFillsDecoupled", pollBitmartFillsDecoupled)) ?? result.fills;
           result.balances = (await runPhase("checkHotBalances", checkHotBalances)) ?? result.balances;
 
           // Fast mempool loop: pg_cron's minimum cadence is 1 minute, but ISK
@@ -1310,10 +1157,7 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
             const w = await runPhase("watchIskDeposits", watchIskDeposits);
             if (w) result.watchIsk.detected += w.detected;
             const s = await runPhase("settleConfirmed", settleConfirmed);
-            if (s) {
-              result.settle.sent += s.sent;
-              result.settle.queuedForBitmart += s.queuedForBitmart;
-            }
+            if (s) result.settle.sent += s.sent;
           }
         } catch (e) {
           const msg = e instanceof Error ? `${e.message}\n${e.stack ?? ""}` : String(e);

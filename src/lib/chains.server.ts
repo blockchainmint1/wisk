@@ -19,7 +19,7 @@ export function invalidateChainsCache() {
 async function loadMerged(): Promise<Record<ChainKey, ChainConfig>> {
   const { data, error } = await supabaseAdmin
     .from("custom_tokens")
-    .select("chain,symbol,address,decimals,is_native,bitmart_symbol,enabled")
+    .select("chain,symbol,address,decimals,is_native,enabled")
     .eq("enabled", true);
   if (error) {
     console.error("[chains.server] custom_tokens load failed:", error.message);
@@ -41,7 +41,6 @@ async function loadMerged(): Promise<Record<ChainKey, ChainConfig>> {
         : String(row.address).toLowerCase(),
       decimals: row.decimals,
       isNative: row.is_native || undefined,
-      bitmartSymbol: row.bitmart_symbol ?? undefined,
     };
     // Last-write-wins if symbol overlaps a static entry (lets admins override).
     const existingIdx = merged[chainKey].tokens.findIndex(

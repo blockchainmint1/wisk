@@ -39,7 +39,7 @@ export function SwapForm({ compact = false }: { compact?: boolean }) {
 
   const { data: quote } = useQuery({
     queryKey: ["quote", destAsset],
-    queryFn: () => quoteFn({ data: { usdAmount: 100, destAsset } }),
+    queryFn: () => quoteFn({ data: { destAsset } }),
     refetchInterval: 15_000,
   });
 

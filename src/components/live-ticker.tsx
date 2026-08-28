@@ -2,35 +2,29 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getQuote } from "@/lib/quote.functions";
 
-function PricePill({ label, price }: { label: string; price: number | null }) {
-  return (
-    <span className="text-foreground">
-      {label}/USDT{" "}
-      <span className="text-accent font-bold tracking-normal">
-        {price !== null ? `$${price.toFixed(4)}` : "—"}
-      </span>
-    </span>
-  );
-}
-
 export function LiveTicker() {
   const fn = useServerFn(getQuote);
 
-  const isk = useQuery({
-    queryKey: ["spot-ticker", "ISK"],
-    queryFn: () => fn({ data: { usdAmount: 1, destAsset: "ISK" } }),
-    refetchInterval: 30_000,
-    staleTime: 15_000,
+  const quote = useQuery({
+    queryKey: ["bridge-quote", "ISK"],
+    queryFn: () => fn({ data: { destAsset: "ISK" } }),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
   });
 
-  const iskPrice = isk.data?.ok ? isk.data.spotPriceUsd : null;
+  const wrapPct = quote.data?.ok ? quote.data.wrapFeeBps / 100 : null;
+  const unwrapPct = quote.data?.ok ? quote.data.unwrapFeeBps / 100 : null;
+  const fmt = (n: number) => `${n % 1 === 0 ? n.toFixed(0) : n.toFixed(2)}%`;
 
   return (
     <>
-      <PricePill label="ISK" price={iskPrice} />
-      <PricePill label="wISK" price={iskPrice} />
-      <span className="text-muted-foreground">WRAP 5% · UNWRAP FREE</span>
+      <span className="text-foreground">
+        1 ISK <span className="text-accent font-bold tracking-normal">=</span> 1 wISK
+      </span>
+      <span className="text-muted-foreground">
+        WRAP {wrapPct !== null ? fmt(wrapPct) : "—"} · UNWRAP{" "}
+        {unwrapPct !== null ? (unwrapPct === 0 ? "FREE" : fmt(unwrapPct)) : "—"}
+      </span>
     </>
   );
 }
-

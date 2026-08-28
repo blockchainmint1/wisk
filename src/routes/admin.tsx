@@ -263,7 +263,7 @@ function OrdersTab() {
 
   const OPEN_STATUSES = new Set([
     "awaiting_payment", "pending", "paid", "confirmed",
-    "buying_on_bitmart", "paying_out", "withdrawing",
+    "sending", "paying_out", "withdrawing",
   ]);
   const FAILED_STATUSES = new Set(["failed", "expired", "refunded"]);
   const filteredOrders = (orders.data ?? []).filter((o) => {
@@ -311,7 +311,7 @@ function OrdersTab() {
             type="search"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search ID · address · tx hash · withdrawal · bitmart order · chain · status · error…"
+            placeholder="Search ID · address · tx hash · withdrawal · chain · status · error…"
             className="w-full bg-secondary/40 border border-border rounded px-3 py-2 pr-20 text-xs font-mono placeholder:text-muted-foreground focus:outline-none focus:border-foreground/60"
           />
           {searchInput ? (
@@ -466,7 +466,6 @@ type OrderRowData = {
   dest_asset: string | null;
   quoted_dest_out: number;
   created_at: string;
-  bitmart_filled_dest: number | null;
   dest_tx_hash: string | null;
   error_message: string | null;
 };
@@ -499,9 +498,7 @@ function OrderRow({
         <td className="p-3">{o.source_chain} · {o.source_token}</td>
         <td className="p-3 text-right">
           {(o.dest_asset ?? "ISK") === "ISK"
-            ? (o.bitmart_filled_dest != null
-                ? Number(o.bitmart_filled_dest).toFixed(4)
-                : Number(o.quoted_dest_out).toFixed(4))
+            ? Number(o.quoted_dest_out).toFixed(4)
             : <span className="text-muted-foreground">—</span>}
         </td>
         <td className="p-3 text-right">
@@ -652,9 +649,7 @@ function OrderDetail({ publicId }: { publicId: string }) {
         <KV
           k="Amount sent"
           v={
-            order.bitmart_filled_dest != null
-              ? `${Number(order.bitmart_filled_dest).toFixed(8)} ${asset}`
-              : order.dest_tx_hash
+            order.dest_tx_hash
                 ? `${Number(order.quoted_dest_out).toFixed(8)} ${asset}`
                 : "—"
           }
