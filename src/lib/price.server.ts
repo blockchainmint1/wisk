@@ -16,6 +16,8 @@ const POOL_ABI = [
   "function token0() view returns (address)",
   "function token1() view returns (address)",
   "function liquidity() view returns (uint128)",
+  "function observe(uint32[] secondsAgos) view returns (int56[] tickCumulatives, uint160[] secondsPerLiquidityCumulativeX128)",
+  "function increaseObservationCardinalityNext(uint16 observationCardinalityNext)",
 ];
 
 let provider: JsonRpcProvider | null = null;
@@ -76,4 +78,84 @@ export async function getIskPrice(): Promise<IskPrice> {
 
   cache = { value, expires: now + TTL_MS };
   return value;
+}
+
+/** Convert a Uniswap V3 tick into USD-per-wISK, honouring token ordering. */
+function tickToUsd(tick: number, wiskIsToken0: boolean): number {
+  // 1.0001^tick = raw price of token0 denominated in token1.
+  const raw = Math.pow(1.0001, tick);
+  return wiskIsToken0
+    ? raw * 10 ** (WISK_DECIMALS - USDC_DECIMALS)
+    : 1 / (raw * 10 ** (USDC_DECIMALS - WISK_DECIMALS));
+}
+
+export interface IskTwap extends IskPrice {
+  /** Seconds actually covered by the average (may be shorter than requested). */
+  windowSeconds: number;
+  requestedSeconds: number;
+  /** True when the pool's oracle history was too short for the full window. */
+  truncated: boolean;
+  spotUsd: number;
+}
+
+const twapCache = new Map<number, { value: IskTwap; expires: number }>();
+
+/**
+ * Time-weighted average price over the requested window, read from the pool's
+ * built-in observation oracle. Manipulation-resistant: moving a TWAP requires
+ * holding the price off-market for the whole window, not one block.
+ */
+export async function getIskTwap(seconds: number): Promise<IskTwap> {
+  const want = Math.max(60, Math.min(86_400, Math.floor(seconds)));
+  const now = Date.now();
+  const hit = twapCache.get(want);
+  if (hit && hit.expires > now) return hit.value;
+
+  const pool = new Contract(WISK_USDC_POOL, POOL_ABI, getProvider());
+  const [slot0, token0, liquidity] = await Promise.all([
+    pool.slot0(),
+    pool.token0(),
+    pool.liquidity(),
+  ]);
+  const wiskIsToken0 = String(token0).toLowerCase() === WISK_CONTRACT.toLowerCase();
+  const spotUsd = tickToUsd(Number(slot0[1]), wiskIsToken0);
+
+  // Walk the window down until the oracle has enough history ("OLD" revert).
+  let windowSeconds = want;
+  let avgTick: number | null = null;
+  for (const candidate of [want, 3600, 1800, 600, 300, 60]) {
+    if (candidate > want) continue;
+    try {
+      const [tickCumulatives]: [bigint[]] = await pool.observe([candidate, 0]);
+      const delta = tickCumulatives[1] - tickCumulatives[0];
+      avgTick = Number(delta) / candidate;
+      windowSeconds = candidate;
+      break;
+    } catch {
+      // oracle history shorter than this window — try a shorter one
+    }
+  }
+
+  const value: IskTwap = {
+    usd: Number((avgTick === null ? spotUsd : tickToUsd(avgTick, wiskIsToken0)).toFixed(8)),
+    source: "uniswap-v3",
+    pool: WISK_USDC_POOL,
+    feeBps: POOL_FEE_BPS,
+    liquidity: String(liquidity),
+    timestamp: new Date().toISOString(),
+    windowSeconds: avgTick === null ? 0 : windowSeconds,
+    requestedSeconds: want,
+    truncated: avgTick === null || windowSeconds < want,
+    spotUsd: Number(spotUsd.toFixed(8)),
+  };
+
+  twapCache.set(want, { value, expires: now + 20_000 });
+  return value;
+}
+
+/** Current + next observation slots the pool oracle can store. */
+export async function getOracleCardinality() {
+  const pool = new Contract(WISK_USDC_POOL, POOL_ABI, getProvider());
+  const slot0 = await pool.slot0();
+  return { cardinality: Number(slot0[3]), cardinalityNext: Number(slot0[4]) };
 }
