@@ -16,6 +16,7 @@ import { Route as EmbedRouteImport } from './routes/embed'
 import { Route as EmbedBuilderRouteImport } from './routes/embed-builder'
 import { Route as ExchangeRouteImport } from './routes/exchange'
 import { Route as FaqRouteImport } from './routes/faq'
+import { Route as ManifestoRouteImport } from './routes/manifesto'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SwapRouteImport } from './routes/swap'
@@ -61,6 +62,11 @@ const ExchangeRoute = ExchangeRouteImport.update({
 const FaqRoute = FaqRouteImport.update({
   id: '/faq',
   path: '/faq',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ManifestoRoute = ManifestoRouteImport.update({
+  id: '/manifesto',
+  path: '/manifesto',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -129,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/embed-builder': typeof EmbedBuilderRoute
   '/exchange': typeof ExchangeRoute
   '/faq': typeof FaqRoute
+  '/manifesto': typeof ManifestoRoute
   '/privacy': typeof PrivacyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/swap': typeof SwapRouteWithChildren
@@ -149,6 +156,7 @@ export interface FileRoutesByTo {
   '/embed-builder': typeof EmbedBuilderRoute
   '/exchange': typeof ExchangeRoute
   '/faq': typeof FaqRoute
+  '/manifesto': typeof ManifestoRoute
   '/privacy': typeof PrivacyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
@@ -169,6 +177,7 @@ export interface FileRoutesById {
   '/embed-builder': typeof EmbedBuilderRoute
   '/exchange': typeof ExchangeRoute
   '/faq': typeof FaqRoute
+  '/manifesto': typeof ManifestoRoute
   '/privacy': typeof PrivacyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/swap': typeof SwapRouteWithChildren
@@ -191,6 +200,7 @@ export interface FileRouteTypes {
     | '/embed-builder'
     | '/exchange'
     | '/faq'
+    | '/manifesto'
     | '/privacy'
     | '/sitemap.xml'
     | '/swap'
@@ -211,6 +221,7 @@ export interface FileRouteTypes {
     | '/embed-builder'
     | '/exchange'
     | '/faq'
+    | '/manifesto'
     | '/privacy'
     | '/sitemap.xml'
     | '/terms'
@@ -230,6 +241,7 @@ export interface FileRouteTypes {
     | '/embed-builder'
     | '/exchange'
     | '/faq'
+    | '/manifesto'
     | '/privacy'
     | '/sitemap.xml'
     | '/swap'
@@ -251,6 +263,7 @@ export interface RootRouteChildren {
   EmbedBuilderRoute: typeof EmbedBuilderRoute
   ExchangeRoute: typeof ExchangeRoute
   FaqRoute: typeof FaqRoute
+  ManifestoRoute: typeof ManifestoRoute
   PrivacyRoute: typeof PrivacyRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SwapRoute: typeof SwapRouteWithChildren
@@ -311,6 +324,13 @@ declare module '@tanstack/react-router' {
       path: '/faq'
       fullPath: '/faq'
       preLoaderRoute: typeof FaqRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/manifesto': {
+      id: '/manifesto'
+      path: '/manifesto'
+      fullPath: '/manifesto'
+      preLoaderRoute: typeof ManifestoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -413,6 +433,7 @@ const rootRouteChildren: RootRouteChildren = {
   EmbedBuilderRoute: EmbedBuilderRoute,
   ExchangeRoute: ExchangeRoute,
   FaqRoute: FaqRoute,
+  ManifestoRoute: ManifestoRoute,
   PrivacyRoute: PrivacyRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SwapRoute: SwapRouteWithChildren,

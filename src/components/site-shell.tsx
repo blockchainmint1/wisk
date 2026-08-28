@@ -87,6 +87,7 @@ export function SiteFooter() {
 
           <div className="space-y-2">
             <p className="font-bold text-foreground">Project</p>
+            <Link to="/manifesto" className="block hover:text-accent">Manifesto</Link>
             <Link to="/change-log" className="block hover:text-accent">Change Log</Link>
             <Link to="/privacy" className="block hover:text-accent">Privacy Policy</Link>
             <Link to="/terms" className="block hover:text-accent">Terms of Use</Link>
