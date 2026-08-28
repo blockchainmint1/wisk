@@ -131,19 +131,20 @@ function HomePage() {
           <div className="grid md:grid-cols-2 gap-10">
             <Principle
               n="01"
-              title="One custodian, no smart-contract magic."
+              title="Minted on deposit. Burned on unwrap."
               body={
                 <>
-                  ISK you send is held 1:1 in the operator wallet.{" "}
+                  There is no pre-mined float. ISK you send is held 1:1 in the operator wallet and{" "}
                   <a
                     href="https://iskandercoin.com/wisk"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-foreground underline hover:text-accent transition-colors"
                   >
-                    wISK (0x9FC6…bb88)
+                    wISK (0xFB38…b0BB)
                   </a>{" "}
-                  is issued against it. Low-tech, auditable, boring on purpose.
+                  is minted against it — so total supply is always a live proof-of-reserves number.
+                  Unwrap and it's burned. Boring on purpose.
                 </>
               }
             />
