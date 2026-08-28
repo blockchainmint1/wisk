@@ -2,45 +2,46 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { SiteFooter, SiteHeader } from "@/components/site-shell";
 
-const CONTRACT = "0x9FC65df3997073B8551Ffd617154B5102fACbb88";
+const CONTRACT = "0xFB38867D064Df981F159b886007F1273a346b0BB";
 
 const FAQS: Array<{ q: string; a: ReactNode }> = [
   {
     q: "What is this?",
     a: (
       <>
-        A custodial bridge between native TEXITcoin (TXC) and its ERC-20 twin on Ethereum,{" "}
+        A custodial bridge between native Iskander Coin (ISK) and its ERC-20 twin on Ethereum,{" "}
         <a
-          href="https://texitcoin.org/wtxc"
+          href="https://iskandercoin.com/wisk"
           target="_blank"
           rel="noopener noreferrer"
           className="text-foreground underline underline-offset-2 hover:text-accent"
         >
-          wTXC ({CONTRACT})
+          wISK ({CONTRACT})
         </a>
-        . One operator wallet holds real TXC 1:1 against every wTXC in circulation.
+        . wISK is minted when you wrap and burned when you unwrap, so total supply always equals
+        the ISK held in the bridge reserve — 1:1, verifiable on both chains.
       </>
     ),
   },
   {
     q: "How much does it cost?",
-    a: "Wrap (TXC → wTXC) is 5%. Unwrap (wTXC → TXC) is free. Fees are set by the operator and shown live on the swap form before you confirm.",
+    a: "Wrap (ISK → wISK) is 5%. Unwrap (wISK → ISK) is free. Fees are set by the operator and shown live on the swap form before you confirm.",
   },
   {
     q: "Why custodial and not a smart contract?",
-    a: "By choice. A one-operator hot wallet with a public reconciliation dashboard is simpler, cheaper to run, and easier to audit than a contract we'd have to trust ourselves to secure. TXC held by the bridge matches wTXC in circulation — publicly checkable at any time.",
+    a: "The ISK side has no smart contracts — it's a Bitcoin-derived chain — so somebody has to custody the native coin. We keep that side deliberately simple: one operator wallet, and a wISK contract that only mints against a confirmed ISK deposit and only burns on unwrap. There is no pre-mined float sitting around, so wISK total supply is a live proof-of-reserves number anyone can check.",
   },
   {
     q: "Which networks and tokens can I send from?",
-    a: "Native TXC on the TEXITcoin network, or wTXC on Ethereum. We do not offer stablecoin or ETH on-ramp swaps.",
+    a: "Native ISK on the Iskander Coin network, or wISK on Ethereum. We do not offer stablecoin or ETH on-ramp swaps.",
   },
   {
     q: "Which assets can I receive?",
-    a: "Native TXC (paid to any TXC address — legacy T… or SegWit txc1q…) or wTXC (paid to any Ethereum 0x… address).",
+    a: "Native ISK (paid to any ISK address — legacy K… or SegWit isk1q…) or wISK (paid to any Ethereum 0x… address).",
   },
   {
     q: "How long does a swap take?",
-    a: "Around 5 minutes end-to-end. We wait for chain-specific confirmations on your deposit, then sign and broadcast the payout from the hot wallet. Slower chains (Ethereum mainnet) take longer than the TEXITcoin network.",
+    a: "Around 5 minutes end-to-end. We wait for chain-specific confirmations on your deposit, then sign and broadcast the payout from the hot wallet. Slower chains (Ethereum mainnet) take longer than the Iskander Coin network.",
   },
   {
     q: "What if I send the wrong token or wrong chain?",
@@ -56,7 +57,7 @@ const FAQS: Array<{ q: string; a: ReactNode }> = [
   },
   {
     q: "Do you take custody of my funds?",
-    a: "Yes — that's the model. The bridge is custodial by design. TXC backing wTXC lives in the operator wallet full-time while the wTXC is in circulation.",
+    a: "Yes — that's the model. The bridge is custodial by design. The ISK backing wISK stays in the operator wallet for as long as that wISK is in circulation, and is released the moment it's burned on unwrap.",
   },
   {
     q: "Where can I track my swap?",
@@ -69,16 +70,16 @@ const FAQS: Array<{ q: string; a: ReactNode }> = [
 ];
 
 const SCHEMA_TEXTS = [
-  `A custodial bridge between native TEXITcoin (TXC) and its ERC-20 twin on Ethereum, wTXC (${CONTRACT}). One operator wallet holds real TXC 1:1 against every wTXC in circulation.`,
-  "Wrap (TXC → wTXC) is 5%. Unwrap (wTXC → TXC) is free. Fees are set by the operator and shown live on the swap form before you confirm.",
-  "By choice. A one-operator hot wallet with a public reconciliation dashboard is simpler, cheaper to run, and easier to audit than a contract we'd have to trust ourselves to secure. TXC held by the bridge matches wTXC in circulation — publicly checkable at any time.",
-  "Native TXC on the TEXITcoin network, or wTXC on Ethereum. We do not offer stablecoin or ETH on-ramp swaps.",
-  "Native TXC (paid to any TXC address — legacy T… or SegWit txc1q…) or wTXC (paid to any Ethereum 0x… address).",
-  "Around 5 minutes end-to-end. We wait for chain-specific confirmations on your deposit, then sign and broadcast the payout from the hot wallet. Slower chains (Ethereum mainnet) take longer than the TEXITcoin network.",
+  `A custodial bridge between native Iskander Coin (ISK) and its ERC-20 twin on Ethereum, wISK (${CONTRACT}). wISK is minted when you wrap and burned when you unwrap, so total supply always equals the ISK held in the bridge reserve — 1:1, verifiable on both chains.`,
+  "Wrap (ISK → wISK) is 5%. Unwrap (wISK → ISK) is free. Fees are set by the operator and shown live on the swap form before you confirm.",
+  "The ISK side has no smart contracts — it's a Bitcoin-derived chain — so somebody has to custody the native coin. We keep that side deliberately simple: one operator wallet, and a wISK contract that only mints against a confirmed ISK deposit and only burns on unwrap. There is no pre-mined float sitting around, so wISK total supply is a live proof-of-reserves number anyone can check.",
+  "Native ISK on the Iskander Coin network, or wISK on Ethereum. We do not offer stablecoin or ETH on-ramp swaps.",
+  "Native ISK (paid to any ISK address — legacy K… or SegWit isk1q…) or wISK (paid to any Ethereum 0x… address).",
+  "Around 5 minutes end-to-end. We wait for chain-specific confirmations on your deposit, then sign and broadcast the payout from the hot wallet. Slower chains (Ethereum mainnet) take longer than the Iskander Coin network.",
   "Funds sent on an unsupported chain or with an unsupported token aren't picked up automatically. Contact the Help Center with your order ID and deposit tx hash — manual recovery may be possible.",
   "We can only send to the address you provided at order creation. Double-check before confirming — payouts can't be reversed.",
   "Each quote is valid for the expiry window shown on the order page (15 minutes by default). Late deposits are held for manual reconciliation — contact support with your order ID.",
-  "Yes — that's the model. The bridge is custodial by design. TXC backing wTXC lives in the operator wallet full-time while the wTXC is in circulation.",
+  "Yes — that's the model. The bridge is custodial by design. The ISK backing wISK stays in the operator wallet for as long as that wISK is in circulation, and is released the moment it's burned on unwrap.",
   "After creating an order you're redirected to a live status page that auto-refreshes through every stage. Your browser also keeps a local history of recent swaps on /swap.",
   "Minimums and maximums are shown live on the swap form and enforced at order creation. They can change based on hot-wallet liquidity and operator limits.",
 ];
@@ -86,21 +87,21 @@ const SCHEMA_TEXTS = [
 export const Route = createFileRoute("/faq")({
   head: () => ({
     meta: [
-      { title: "FAQ — SWAP" },
+      { title: "wISK Bridge FAQ — Fees, Timing & Supported Networks" },
       {
         name: "description",
         content:
-          "Common questions about the TXC ↔ wTXC bridge — fees, timing, supported networks, and recovery.",
+          "Common questions about the ISK ↔ wISK bridge — wrap and unwrap fees, how long a swap takes, supported networks, and what to do if something goes wrong.",
       },
-      { property: "og:title", content: "FAQ — SWAP" },
+      { property: "og:title", content: "wISK Bridge FAQ — Fees, Timing & Supported Networks" },
       {
         property: "og:description",
         content:
-          "Common questions about the TXC ↔ wTXC bridge.",
+          "Common questions about the ISK ↔ wISK bridge.",
       },
-      { property: "og:url", content: "https://swap.texitcoin.org/faq" },
+      { property: "og:url", content: "https://wisk.iskandercoin.com/faq" },
     ],
-    links: [{ rel: "canonical", href: "https://swap.texitcoin.org/faq" }],
+    links: [{ rel: "canonical", href: "https://wisk.iskandercoin.com/faq" }],
     scripts: [
       {
         type: "application/ld+json",

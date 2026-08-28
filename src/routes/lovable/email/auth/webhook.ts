@@ -31,7 +31,7 @@ const EMAIL_TEMPLATES: Record<string, React.ComponentType<any>> = {
 }
 
 // Configuration
-const SITE_NAME = "wtxc"
+const SITE_NAME = "wisk"
 const SENDER_DOMAIN = "notify.honest.money"
 const ROOT_DOMAIN = "honest.money"
 const FROM_DOMAIN = "notify.honest.money"

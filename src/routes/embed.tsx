@@ -17,7 +17,7 @@ import { getQuote } from "@/lib/quote.functions";
 
 const EmbedSearch = z.object({
   // Which side the user "has" by default. Flip button lets them swap.
-  have: z.enum(["wTXC", "TXC"]).optional(),
+  have: z.enum(["wISK", "ISK"]).optional(),
   amount: z.coerce.number().positive().optional(),
   theme: z.enum(["dark", "light"]).optional(),
   // Lock direction — hide the flip button if true.
@@ -28,31 +28,31 @@ export const Route = createFileRoute("/embed")({
   validateSearch: (s) => EmbedSearch.parse(s),
   head: () => ({
     meta: [
-      { title: "wTXC ↔ TXC bridge — embed" },
+      { title: "wISK ↔ ISK bridge — embed" },
       { name: "robots", content: "noindex" },
       {
         name: "description",
-        content: "Embeddable wTXC ↔ TXC bridge widget.",
+        content: "Embeddable wISK ↔ ISK bridge widget.",
       },
     ],
   }),
   component: EmbedPage,
 });
 
-type Side = "wTXC" | "TXC";
+type Side = "wISK" | "ISK";
 
 function EmbedPage() {
   const search = Route.useSearch();
   const quoteFn = useServerFn(getQuote);
   const createFn = useServerFn(createOrder);
 
-  const [have, setHave] = useState<Side>(search.have ?? "wTXC");
+  const [have, setHave] = useState<Side>(search.have ?? "wISK");
   const [amount, setAmount] = useState<string>(String(search.amount ?? 100));
   const [dest, setDest] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
-  const want: Side = have === "wTXC" ? "TXC" : "wTXC";
-  const isUnwrap = have === "wTXC" && want === "TXC";
+  const want: Side = have === "wISK" ? "ISK" : "wISK";
+  const isUnwrap = have === "wISK" && want === "ISK";
   const isWrap = !isUnwrap;
   const destAsset: DestAsset = want;
   const destConfig = DESTINATIONS[destAsset];
@@ -75,7 +75,7 @@ function EmbedPage() {
     refetchInterval: 15_000,
   });
 
-  const txcPriceUsd = quote?.ok ? quote.spotPriceUsd : null;
+  const iskPriceUsd = quote?.ok ? quote.spotPriceUsd : null;
   const unwrapFeeBps = quote?.ok ? (quote.unwrapFeeBps ?? 100) : 100;
   const wrapFeeBps = quote?.ok ? (quote.wrapFeeBps ?? 0) : 0;
   const unwrapFeePct = unwrapFeeBps / 100;
@@ -88,9 +88,9 @@ function EmbedPage() {
   }, [haveAmount, isUnwrap, unwrapFeeBps, wrapFeeBps]);
 
   const usdAmount = useMemo(() => {
-    if (!txcPriceUsd || haveAmount <= 0) return 0;
-    return haveAmount * txcPriceUsd;
-  }, [haveAmount, txcPriceUsd]);
+    if (!iskPriceUsd || haveAmount <= 0) return 0;
+    return haveAmount * iskPriceUsd;
+  }, [haveAmount, iskPriceUsd]);
 
   const addressValid = destConfig.addressRegex.test(dest.trim());
   const formValid =
@@ -101,8 +101,8 @@ function EmbedPage() {
       setError(null);
       return createFn({
         data: {
-          sourceChain: isWrap ? "txc" : "ethereum",
-          sourceToken: isWrap ? "TXC" : "wTXC",
+          sourceChain: isWrap ? "isk" : "ethereum",
+          sourceToken: isWrap ? "ISK" : "wISK",
           usdAmount,
           destAsset,
           destAddress: dest.trim(),
@@ -120,7 +120,7 @@ function EmbedPage() {
           {
             type: "swap-embed:order-created",
             orderId: id,
-            url: `https://swap.texitcoin.org/swap/${id}`,
+            url: `https://wisk.iskandercoin.com/swap/${id}`,
           },
           "*",
         );
@@ -132,7 +132,7 @@ function EmbedPage() {
 
   function flip() {
     if (search.lock) return;
-    setHave((h) => (h === "wTXC" ? "TXC" : "wTXC"));
+    setHave((h) => (h === "wISK" ? "ISK" : "wISK"));
     setDest("");
   }
 
@@ -142,15 +142,15 @@ function EmbedPage() {
       <div className="max-w-xl mx-auto">
         <div className="flex items-center justify-between mb-3">
           <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
-            {isUnwrap ? "Unwrap wTXC → TXC" : "Wrap TXC → wTXC"}
+            {isUnwrap ? "Unwrap wISK → ISK" : "Wrap ISK → wISK"}
           </div>
           <a
-            href="https://swap.texitcoin.org/swap"
+            href="https://wisk.iskandercoin.com/swap"
             target="_blank"
             rel="noopener noreferrer"
             className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground hover:text-accent"
           >
-            swap.texitcoin.org ↗
+            wisk.iskandercoin.com ↗
           </a>
         </div>
 
@@ -202,9 +202,9 @@ function EmbedPage() {
               <SidePill side={want} />
             </div>
             <div className="mt-2 text-[10px] font-mono text-muted-foreground">
-              {txcPriceUsd
-                ? `1 TXC ≈ $${txcPriceUsd.toFixed(6)}`
-                : "Fetching TXC price…"}
+              {iskPriceUsd
+                ? `1 ISK ≈ $${iskPriceUsd.toFixed(6)}`
+                : "Fetching ISK price…"}
               {isUnwrap ? (
                 <span className="ml-2 opacity-70">
                   · {unwrapFeePct.toFixed(unwrapFeePct % 1 === 0 ? 0 : 2)}% fee
@@ -281,7 +281,7 @@ function EmbedPage() {
           </button>
 
           <p className="mt-3 text-center text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
-            Powered by swap.texitcoin.org · quote locks 15 min
+            Powered by wisk.iskandercoin.com · quote locks 15 min
           </p>
         </div>
       </div>

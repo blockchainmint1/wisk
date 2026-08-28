@@ -4,16 +4,20 @@ import { SiteFooter, SiteHeader } from "@/components/site-shell";
 export const Route = createFileRoute("/terms")({
   head: () => ({
     meta: [
-      { title: "Terms of Use — swapTXC" },
+      { title: "Terms of Use — wISK Bridge" },
       {
         name: "description",
-        content: "Terms of use for swapTXC stablecoin-to-native swap protocol.",
+        content:
+          "Terms of use for the wISK bridge: eligibility, custodial model, fees, risks, and liability for wrapping ISK into wISK and back.",
       },
-      { property: "og:title", content: "Terms of Use — swapTXC" },
+      { property: "og:title", content: "Terms of Use — wISK Bridge" },
       {
         property: "og:description",
-        content: "Terms of use for swapTXC stablecoin-to-native swap protocol.",
+        content:
+          "Terms of use for the ISK ↔ wISK custodial bridge — eligibility, fees, risks, and liability.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: TermsPage,
@@ -37,13 +41,13 @@ function TermsPage() {
         <div className="space-y-12 text-sm leading-relaxed text-muted-foreground">
           <Section title="1. Acceptance of Terms">
             <p>
-              By accessing or using swapTXC ("the Protocol"), you agree to be bound by these Terms of Use. If you do not agree, do not use the Protocol. These terms constitute a legally binding agreement between you and the Protocol operators.
+              By accessing or using the wISK bridge ("the Protocol"), you agree to be bound by these Terms of Use. If you do not agree, do not use the Protocol. These terms constitute a legally binding agreement between you and the Protocol operators.
             </p>
           </Section>
 
           <Section title="2. Service Description">
             <p>
-              SWAP operates a custodial bridge between native TEXITcoin (TXC) and its ERC-20 representation on Ethereum, wTXC (contract 0x9FC65df3997073B8551Ffd617154B5102fACbb88), plus a stablecoin and ETH on-ramp into either asset. TXC held by the operator wallet backs wTXC in circulation 1:1. The on-ramp sources liquidity from Bitmart and applies a fixed 5% protocol premium above the live spot price.
+              The Protocol operates a custodial bridge between native Iskander Coin (ISK) and its ERC-20 representation on Ethereum, wISK (contract 0xFB38867D064Df981F159b886007F1273a346b0BB). Wrapping mints new wISK against a confirmed ISK deposit held in the operator wallet; unwrapping burns wISK and releases the corresponding ISK. wISK total supply therefore equals the ISK reserve at all times. Swaps are one-for-one on quantity, less the applicable protocol fee. The Protocol does not operate a stablecoin or fiat on-ramp and does not price swaps against any currency.
             </p>
           </Section>
 
@@ -59,17 +63,16 @@ function TermsPage() {
 
           <Section title="4. Custodial Nature">
             <p>
-              SWAP is custodial by design. TXC backing wTXC in circulation is held in an operator wallet. On-ramp deposits are held for the brief window between confirmation and payout. You retain sole control of your own wallets and are solely responsible for the accuracy of destination addresses you provide.
+              The Protocol is custodial by design. ISK backing wISK in circulation is held in an operator wallet for as long as that wISK exists. Deposits are held for the window between confirmation and payout. You retain sole control of your own wallets and are solely responsible for the accuracy of destination addresses you provide.
             </p>
           </Section>
 
-          <Section title="5. Fees & Pricing">
+          <Section title="5. Fees">
             <ul className="list-disc list-inside space-y-2">
-              <li>Wrapping (TXC → wTXC) is free.</li>
-              <li>Unwrapping (wTXC → TXC) costs 1% of the amount unwrapped.</li>
-              <li>On-ramp swaps (stablecoins or ETH → TXC or wTXC) carry a 5.00% protocol premium above the live Bitmart spot price.</li>
-              <li>Network gas fees for deposit transactions are borne by the user and are separate from the protocol fee.</li>
-              <li>Quotes are valid for a limited time window and are locked at the moment of confirmation.</li>
+              <li>Swaps are one-for-one on quantity. A protocol fee is deducted from the amount you receive.</li>
+              <li>The current wrap and unwrap fees are displayed on the swap form and in the site footer before you confirm an order, and are the fees that apply to that order.</li>
+              <li>Fees may be changed by the operator at any time; a change never affects an order already created.</li>
+              <li>Network transaction fees for your deposit are borne by you and are separate from the protocol fee.</li>
               <li>All fees are non-refundable once a swap has been initiated and confirmed on-chain.</li>
             </ul>
           </Section>
@@ -89,9 +92,9 @@ function TermsPage() {
             <p className="mb-4">You acknowledge and accept the following risks inherent in using the Protocol:</p>
             <ul className="list-disc list-inside space-y-2">
               <li><strong>Blockchain risk:</strong> Transactions are irreversible. Incorrect addresses may result in permanent loss of funds.</li>
-              <li><strong>Price volatility:</strong> Market prices can fluctuate between quote and settlement.</li>
-              <li><strong>Smart contract risk:</strong> While the Protocol minimizes on-chain exposure, interacting with any blockchain carries technical risks.</li>
-              <li><strong>Third-party risk:</strong> Liquidity sourcing depends on Bitmart and other exchange partners.</li>
+              <li><strong>Custodial risk:</strong> ISK backing wISK is held by the operator. Loss, compromise, or seizure of the operator wallet could affect your ability to unwrap.</li>
+              <li><strong>Smart contract risk:</strong> The wISK contract governs minting and burning on Ethereum. Interacting with any contract carries technical risk.</li>
+              <li><strong>Availability risk:</strong> Bridge operations depend on both the Iskander Coin and Ethereum networks and on third-party node providers, any of which may be unavailable or delayed.</li>
               <li><strong>Regulatory risk:</strong> Cryptocurrency regulations may change and affect your use of the Protocol.</li>
             </ul>
           </Section>
@@ -123,7 +126,7 @@ function TermsPage() {
           <Section title="12. Contact">
             <p>
               For questions about these Terms of Use, contact us at{" "}
-              <a href="mailto:support@texitcoin.org" className="text-accent underline">support@texitcoin.org</a>.
+              <a href="mailto:support@iskandercoin.com" className="text-accent underline">support@iskandercoin.com</a>.
             </p>
           </Section>
         </div>

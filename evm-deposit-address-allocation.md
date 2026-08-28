@@ -12,8 +12,8 @@ All EVM deposit addresses are derived from one mnemonic using the standard Ether
 m/44'/60'/0'/0/{index}
 ```
 
-- **Index `0`** — Operator / treasury wallet. This is the hot wallet that holds wTXC + ETH for gas and pays out unwraps.
-- **Index `≥ 1`** — Per-order customer deposit addresses. A customer sends stables, ETH, or wTXC here.
+- **Index `0`** — Operator / treasury wallet. This is the hot wallet that holds wISK + ETH for gas and pays out unwraps.
+- **Index `≥ 1`** — Per-order customer deposit addresses. A customer sends stables, ETH, or wISK here.
 
 In code (ethers / viem):
 
@@ -96,7 +96,7 @@ After the hour, the slot goes back into the pool. This matches the order expiry 
 | Benefit | Why it matters |
 |--------|----------------|
 | **Dense address set** | Wallet scans / block filters only watch a small, contiguous range. |
-| **Cheap sweeps** | Fewer addresses means fewer inputs to consolidate when sweeping wTXC. |
+| **Cheap sweeps** | Fewer addresses means fewer inputs to consolidate when sweeping wISK. |
 | **Human-friendly** | Admin UIs and alerts can refer to “slot #1, #2, #3…”. |
 | **Predictable load** | No unbounded growth of per-order addresses in the DB or scanner. |
 | **Race-safe** | The counter bump uses `UPDATE … RETURNING`, so two callers cannot claim the same fresh index. |

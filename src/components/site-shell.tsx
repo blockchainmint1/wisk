@@ -62,7 +62,7 @@ export function SiteFooter() {
     <footer className="border-t border-border py-12 mt-24">
       <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between gap-8 opacity-70">
         <div className="text-[10px] font-mono uppercase tracking-widest space-y-4">
-          <p className="font-bold text-foreground">TXC ↔ wTXC Bridge</p>
+          <p className="font-bold text-foreground">ISK ↔ wISK Bridge</p>
           <p className="max-w-xs leading-relaxed">
             Wrap {wrapPct}. Unwrap {unwrapLabel}. No stablecoin on-ramp.
           </p>
@@ -75,8 +75,8 @@ export function SiteFooter() {
             <p className="font-bold text-foreground">Resources</p>
             <Link to="/faq" className="block hover:text-accent">FAQ</Link>
             <Link to="/embed-builder" className="block hover:text-accent">Embed Widget</Link>
-            <a href="https://texitcoin.org" className="block hover:text-accent">texitcoin.org</a>
-            <a href="https://texitcoin.org/build" className="block hover:text-accent">Developers</a>
+            <a href="https://iskandercoin.com" className="block hover:text-accent">iskandercoin.com</a>
+            <a href="https://iskandercoin.com/build" className="block hover:text-accent">Developers</a>
             <a href="https://help.honest.money" className="block hover:text-accent">Help Center</a>
           </div>
           <div className="space-y-2">
@@ -87,6 +87,7 @@ export function SiteFooter() {
 
           <div className="space-y-2">
             <p className="font-bold text-foreground">Project</p>
+            <Link to="/manifesto" className="block hover:text-accent">Manifesto</Link>
             <Link to="/change-log" className="block hover:text-accent">Change Log</Link>
             <Link to="/privacy" className="block hover:text-accent">Privacy Policy</Link>
             <Link to="/terms" className="block hover:text-accent">Terms of Use</Link>

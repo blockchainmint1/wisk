@@ -1,6 +1,6 @@
 # wISK Wrap
 
-Another tool we have to build is the swap site - swap from USDC/any stable on EVM to TXC or wTXC
+Another tool we have to build is the swap site - swap from USDC/any stable on EVM to ISK or wISK
 
 * we charge a 5% premium for the swap
 

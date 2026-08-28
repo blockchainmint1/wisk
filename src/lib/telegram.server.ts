@@ -52,10 +52,10 @@ interface OrderSummary {
 }
 
 interface HotBalanceInfo {
-  asset: string; // 'TXC' | 'ISK$'
+  asset: string; // 'ISK' | 'ISK$'
   address: string;
-  confirmedTxc: number;
-  unconfirmedTxc: number;
+  confirmedIsk: number;
+  unconfirmedIsk: number;
   low: boolean; // flagged if balance < 2× expected payout
 }
 
@@ -93,9 +93,9 @@ function buildMessage(
   o: OrderSummary,
   balance: HotBalanceInfo | null,
 ): string {
-  const asset = o.dest_asset || "TXC";
+  const asset = o.dest_asset || "ISK";
   const lines: string[] = [];
-  lines.push(`<b>wTXC Wrap</b>`);
+  lines.push(`<b>wISK Wrap</b>`);
   lines.push(`${header(event)}`);
   lines.push(`<code>${escapeHtml(o.public_id)}</code> · ${escapeHtml(asset)}`);
   if (o.source_chain || o.source_token) {
@@ -108,7 +108,7 @@ function buildMessage(
   }
   if (event === "payment_detected" || event === "payment_confirmed") {
     // Always show the actual on-chain source amount in its native token
-    // (e.g. wTXC on unwrap). Never derive from USD — that math is bogus
+    // (e.g. wISK on unwrap). Never derive from USD — that math is bogus
     // for tokens Bitmart doesn't treat as $1.
     const received = o.paid_amount_source ?? null;
     if (received != null && srcToken) {
@@ -139,8 +139,8 @@ function buildMessage(
   if (balance) {
     const flag = balance.low ? " ⚠️ LOW" : "";
     lines.push(
-      `Hot ${escapeHtml(balance.asset)}: ${balance.confirmedTxc.toFixed(4)}${
-        balance.unconfirmedTxc ? ` (+${balance.unconfirmedTxc.toFixed(4)} pending)` : ""
+      `Hot ${escapeHtml(balance.asset)}: ${balance.confirmedIsk.toFixed(4)}${
+        balance.unconfirmedIsk ? ` (+${balance.unconfirmedIsk.toFixed(4)} pending)` : ""
       }${flag}`,
     );
   }
@@ -170,30 +170,30 @@ async function recordEvent(
 async function getHotBalance(
   order: OrderSummary,
 ): Promise<HotBalanceInfo | null> {
-  const asset = order.dest_asset ?? "TXC";
+  const asset = order.dest_asset ?? "ISK";
   try {
-    if (asset === "TXC") {
-      const { getTxcHotAddress, getTxcAddressBalanceSats } = await import(
-        "./txc-sign.server"
+    if (asset === "ISK") {
+      const { getIskHotAddress, getIskAddressBalanceSats } = await import(
+        "./isk-sign.server"
       );
-      const address = getTxcHotAddress();
-      const { confirmed, unconfirmed } = await getTxcAddressBalanceSats(address);
-      const confirmedTxc = confirmed / 1e8;
-      const unconfirmedTxc = unconfirmed / 1e8;
+      const address = getIskHotAddress();
+      const { confirmed, unconfirmed } = await getIskAddressBalanceSats(address);
+      const confirmedIsk = confirmed / 1e8;
+      const unconfirmedIsk = unconfirmed / 1e8;
       const expectedPayout = Number(
         order.bitmart_filled_dest ?? order.quoted_dest_out ?? 0,
       );
-      const low = expectedPayout > 0 && confirmedTxc < expectedPayout * 2;
-      return { asset: "TXC", address, confirmedTxc, unconfirmedTxc, low };
+      const low = expectedPayout > 0 && confirmedIsk < expectedPayout * 2;
+      return { asset: "ISK", address, confirmedIsk, unconfirmedIsk, low };
     }
-    if (asset === "wTXC") {
+    if (asset === "wISK") {
       const { getOperatorEvmAddress } = await import("./bridge-wallet.server");
-      const { getWtxcBalance } = await import("./wtxc.server");
+      const { getWiskBalance } = await import("./wisk.server");
       const address = getOperatorEvmAddress();
-      const balance = await getWtxcBalance(address);
+      const balance = await getWiskBalance(address);
       const expectedPayout = Number(order.quoted_dest_out ?? 0);
       const low = expectedPayout > 0 && balance < expectedPayout * 2;
-      return { asset: "wTXC", address, confirmedTxc: balance, unconfirmedTxc: 0, low };
+      return { asset: "wISK", address, confirmedIsk: balance, unconfirmedIsk: 0, low };
     }
     return null;
   } catch (err) {

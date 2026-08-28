@@ -1,0 +1,10 @@
+{
+  "chainId": 1,
+  "address": "0xFB38867D064Df981F159b886007F1273a346b0BB",
+  "deployer": "0xE5F54a4777Fe9844519AF03a60a9e8f98143958B",
+  "txHash": "0x8d8139db963c37307ee9783dcec6c8b5fab4ffc9c227a171ce71bbb0a53096b6",
+  "constructorArgs": [
+    "0xE5F54a4777Fe9844519AF03a60a9e8f98143958B"
+  ],
+  "deployedAt": "2026-08-28T09:49:40.292Z"
+}

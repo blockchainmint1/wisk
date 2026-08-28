@@ -12,7 +12,7 @@ import { DESTINATIONS, type DestAsset } from "@/lib/destinations";
 import { createOrder } from "@/lib/orders.functions";
 import { getQuote } from "@/lib/quote.functions";
 
-type Side = "wTXC" | "TXC";
+type Side = "wISK" | "ISK";
 
 const PRESETS = [100, 1000, 10000] as const;
 
@@ -20,14 +20,14 @@ export function SwapForm({ compact = false }: { compact?: boolean }) {
   const quoteFn = useServerFn(getQuote);
   const createFn = useServerFn(createOrder);
 
-  const [have, setHave] = useState<Side>("wTXC");
+  const [have, setHave] = useState<Side>("wISK");
   const [amount, setAmount] = useState<string>("100");
   const [dest, setDest] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
-  const want: Side = have === "wTXC" ? "TXC" : "wTXC";
-  const isUnwrap = have === "wTXC" && want === "TXC";
-  const isWrap = have === "TXC" && want === "wTXC";
+  const want: Side = have === "wISK" ? "ISK" : "wISK";
+  const isUnwrap = have === "wISK" && want === "ISK";
+  const isWrap = have === "ISK" && want === "wISK";
 
   const destAsset: DestAsset = want;
   const destConfig = DESTINATIONS[destAsset];
@@ -62,8 +62,8 @@ export function SwapForm({ compact = false }: { compact?: boolean }) {
       setError(null);
       return createFn({
         data: {
-          sourceChain: isWrap ? "txc" : "ethereum",
-          sourceToken: isWrap ? "TXC" : "wTXC",
+          sourceChain: isWrap ? "isk" : "ethereum",
+          sourceToken: isWrap ? "ISK" : "wISK",
           sourceAmount: haveAmount,
           destAsset,
           destAddress: dest.trim(),
@@ -86,7 +86,7 @@ export function SwapForm({ compact = false }: { compact?: boolean }) {
 
 
   function flip() {
-    setHave((h) => (h === "wTXC" ? "TXC" : "wTXC"));
+    setHave((h) => (h === "wISK" ? "ISK" : "wISK"));
   }
 
   const amountTextSize = compact ? "text-3xl md:text-4xl" : "text-4xl md:text-5xl";

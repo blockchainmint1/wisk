@@ -5,10 +5,10 @@ import changelogMd from "../../CHANGELOG.md?raw";
 export const Route = createFileRoute("/change-log")({
   head: () => ({
     meta: [
-      { title: "Changelog — TEXIT Runner" },
+      { title: "Changelog — wISK Wrap" },
       {
         name: "description",
-        content: "A running log of changes, fixes, and new features for the TEXIT Runner swap platform.",
+        content: "A running log of changes, fixes, and new features for the wISK Wrap swap platform.",
       },
     ],
   }),

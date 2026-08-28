@@ -2,7 +2,7 @@
 //
 // Preferred: BRIDGE_MNEMONIC (full seed) → derives per-order deposit
 // addresses AND the operator wallet (index 0). This lets us later sweep
-// wTXC that customers send to their per-order deposit addresses in the
+// wISK that customers send to their per-order deposit addresses in the
 // unwrap direction, since we hold the private key.
 //
 // Fallback: EVM_XPUB (extended pubkey, no signing) for backwards compat
@@ -11,7 +11,7 @@
 import { HDKey } from "@scure/bip32";
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak256 } from "viem";
-import { deriveEvmAddress, deriveTxcAddress } from "./bridge-wallet.server";
+import { deriveEvmAddress, deriveIskAddress } from "./bridge-wallet.server";
 
 let cachedXpubRoot: HDKey | null = null;
 const BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]+$/;
@@ -30,12 +30,12 @@ function tryGetXpubRoot(): HDKey | null {
   }
 }
 
-export type DepositKind = "evm" | "txc";
+export type DepositKind = "evm" | "isk";
 
 /**
  * Derive a receive address at the given index. Index 0 = operator/treasury,
  * N ≥ 1 = per-order customer deposit addresses. `kind` selects EVM (default,
- * for stables/ETH/wTXC deposits) vs TXC (native chain, for wrap deposits).
+ * for stables/ETH/wISK deposits) vs ISK (native chain, for wrap deposits).
  */
 export function deriveDepositAddress(
   index: number,
@@ -44,11 +44,11 @@ export function deriveDepositAddress(
   if (!Number.isInteger(index) || index < 0) {
     throw new Error(`Invalid HD index: ${index}`);
   }
-  if (kind === "txc") {
+  if (kind === "isk") {
     if (!process.env.BRIDGE_MNEMONIC?.trim()) {
-      throw new Error("TXC deposit derivation requires BRIDGE_MNEMONIC");
+      throw new Error("ISK deposit derivation requires BRIDGE_MNEMONIC");
     }
-    return deriveTxcAddress(index);
+    return deriveIskAddress(index);
   }
   // EVM path
   if (process.env.BRIDGE_MNEMONIC?.trim()) {

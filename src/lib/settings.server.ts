@@ -12,8 +12,8 @@ export interface AppSettings {
   notify_min_usd_created: number;
   wrap_fee_bps: number;
   unwrap_fee_bps: number;
-  low_txc_threshold: number;
-  low_wtxc_threshold: number;
+  low_isk_threshold: number;
+  low_wisk_threshold: number;
   payouts_frozen: boolean;
   payouts_frozen_reason: string | null;
   telegram_chat_id: string | null;
@@ -30,8 +30,8 @@ const DEFAULTS: AppSettings = {
   notify_min_usd_created: 0,
   wrap_fee_bps: 500,
   unwrap_fee_bps: 0,
-  low_txc_threshold: 10_000,
-  low_wtxc_threshold: 10_000,
+  low_isk_threshold: 10_000,
+  low_wisk_threshold: 10_000,
   payouts_frozen: false,
   payouts_frozen_reason: null,
   telegram_chat_id: null,
@@ -48,7 +48,7 @@ export async function getSettings(): Promise<AppSettings> {
   const { data, error } = await supabaseAdmin
     .from("app_settings")
     .select(
-      "premium_bps,expiry_minutes,min_usd,max_usd,paused,paused_reason,notify_min_usd_created,wrap_fee_bps,unwrap_fee_bps,low_txc_threshold,low_wtxc_threshold,payouts_frozen,payouts_frozen_reason,telegram_chat_id,updated_at",
+      "premium_bps,expiry_minutes,min_usd,max_usd,paused,paused_reason,notify_min_usd_created,wrap_fee_bps,unwrap_fee_bps,low_isk_threshold,low_wisk_threshold,payouts_frozen,payouts_frozen_reason,telegram_chat_id,updated_at",
     )
     .eq("id", 1)
     .maybeSingle();
@@ -69,8 +69,8 @@ export async function getSettings(): Promise<AppSettings> {
     notify_min_usd_created: number | string;
     wrap_fee_bps?: number | null;
     unwrap_fee_bps?: number | null;
-    low_txc_threshold?: number | string | null;
-    low_wtxc_threshold?: number | string | null;
+    low_isk_threshold?: number | string | null;
+    low_wisk_threshold?: number | string | null;
     payouts_frozen?: boolean | null;
     payouts_frozen_reason?: string | null;
     telegram_chat_id?: string | null;
@@ -86,8 +86,8 @@ export async function getSettings(): Promise<AppSettings> {
     notify_min_usd_created: Number(row.notify_min_usd_created),
     wrap_fee_bps: row.wrap_fee_bps ?? 500,
     unwrap_fee_bps: row.unwrap_fee_bps ?? 0,
-    low_txc_threshold: row.low_txc_threshold != null ? Number(row.low_txc_threshold) : 10_000,
-    low_wtxc_threshold: row.low_wtxc_threshold != null ? Number(row.low_wtxc_threshold) : 10_000,
+    low_isk_threshold: row.low_isk_threshold != null ? Number(row.low_isk_threshold) : 10_000,
+    low_wisk_threshold: row.low_wisk_threshold != null ? Number(row.low_wisk_threshold) : 10_000,
     payouts_frozen: row.payouts_frozen ?? false,
     payouts_frozen_reason: row.payouts_frozen_reason ?? null,
     telegram_chat_id: row.telegram_chat_id ?? null,

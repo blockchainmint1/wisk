@@ -1,5 +1,5 @@
 // Public quote endpoint: current Bitmart spot price + configurable premium.
-// Bridge unwrap (source = wTXC → dest = TXC) applies a fixed fee instead
+// Bridge unwrap (source = wISK → dest = ISK) applies a fixed fee instead
 // of the Bitmart premium; that quote is computed at order-creation time
 // inside orders.functions.ts. This endpoint stays a simple USD→dest quote
 // used by the live rate display on the swap form.
@@ -11,7 +11,7 @@ import { getSettings } from "./settings.server";
 
 const QuoteInput = z.object({
   usdAmount: z.number().positive().max(1_000_000),
-  destAsset: z.enum(DEST_ASSETS as [DestAsset, ...DestAsset[]]).default("TXC"),
+  destAsset: z.enum(DEST_ASSETS as [DestAsset, ...DestAsset[]]).default("ISK"),
 });
 
 export const getQuote = createServerFn({ method: "POST" })

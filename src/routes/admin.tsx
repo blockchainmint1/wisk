@@ -13,7 +13,7 @@ import {
   adminForceComplete,
   adminForceFail,
   adminFundEthGas,
-  adminFundWtxc,
+  adminFundWisk,
   adminGetSettings,
   adminHotWalletBalances,
   adminInviteAdmin,
@@ -26,10 +26,10 @@ import {
   adminOrderDetail,
   adminRetryOrder,
   adminRevokeAdmin,
-  adminSweepWtxc,
+  adminSweepWisk,
   adminTelegramTest,
-  adminTxcBalanceHistory,
-  adminTxcTxHistory,
+  adminIskBalanceHistory,
+  adminIskTxHistory,
   adminUpdateSettings,
   adminWalletScan,
 } from "@/lib/admin.functions";
@@ -38,7 +38,7 @@ import {
 export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
-      { title: "Admin — TEXIT Runner" },
+      { title: "Admin — wISK Wrap" },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -156,7 +156,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
   const [tab, setTab] = useState<Tab>("orders");
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: "orders", label: "Orders" },
-    { id: "treasury", label: "TXC Wallet" },
+    { id: "treasury", label: "ISK Wallet" },
     { id: "wallet", label: "ETH Wallet" },
     { id: "settings", label: "Settings" },
     { id: "admins", label: "Admins" },
@@ -195,7 +195,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
       </div>
 
       {tab === "orders" && <OrdersTab />}
-      {tab === "treasury" && <TxcWalletTab />}
+      {tab === "treasury" && <IskWalletTab />}
       {tab === "wallet" && <EthWalletTab />}
       {tab === "settings" && <SettingsTab />}
       {tab === "admins" && <AdminsTab />}
@@ -283,23 +283,23 @@ function OrdersTab() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <BalanceCard
-            label="TXC"
+            label="ISK"
             value={
-              hot.data?.txc.ok
-                ? `${hot.data.txc.totalConfirmed.toFixed(4)}${
-                    hot.data.txc.totalUnconfirmed
-                      ? ` (+${hot.data.txc.totalUnconfirmed.toFixed(4)})`
+              hot.data?.isk.ok
+                ? `${hot.data.isk.totalConfirmed.toFixed(4)}${
+                    hot.data.isk.totalUnconfirmed
+                      ? ` (+${hot.data.isk.totalUnconfirmed.toFixed(4)})`
                       : ""
                   }`
 
                 : null
             }
-            error={hot.data?.txc.ok === false ? hot.data.txc.error : null}
+            error={hot.data?.isk.ok === false ? hot.data.isk.error : null}
           />
           <BalanceCard
-            label="wTXC"
-            value={hot.data?.wtxc.ok ? hot.data.wtxc.balance.toFixed(4) : null}
-            error={hot.data?.wtxc.ok === false ? hot.data.wtxc.error : null}
+            label="wISK"
+            value={hot.data?.wisk.ok ? hot.data.wisk.balance.toFixed(4) : null}
+            error={hot.data?.wisk.ok === false ? hot.data.wisk.error : null}
           />
         </div>
       </div>
@@ -362,8 +362,8 @@ function OrdersTab() {
               <th className="text-left p-3">Order</th>
               <th className="text-left p-3">Status</th>
               <th className="text-left p-3">Source</th>
-              <th className="text-right p-3">TXC</th>
-              <th className="text-right p-3">wTXC</th>
+              <th className="text-right p-3">ISK</th>
+              <th className="text-right p-3">wISK</th>
               <th className="text-left p-3">Dest</th>
               <th className="text-left p-3">Created</th>
               <th className="text-right p-3">Action</th>
@@ -498,14 +498,14 @@ function OrderRow({
         </td>
         <td className="p-3">{o.source_chain} · {o.source_token}</td>
         <td className="p-3 text-right">
-          {(o.dest_asset ?? "TXC") === "TXC"
+          {(o.dest_asset ?? "ISK") === "ISK"
             ? (o.bitmart_filled_dest != null
                 ? Number(o.bitmart_filled_dest).toFixed(4)
                 : Number(o.quoted_dest_out).toFixed(4))
             : <span className="text-muted-foreground">—</span>}
         </td>
         <td className="p-3 text-right">
-          {(o.dest_asset ?? "TXC") === "wTXC"
+          {(o.dest_asset ?? "ISK") === "wISK"
             ? Number(o.quoted_dest_out).toFixed(4)
             : <span className="text-muted-foreground">—</span>}
         </td>
@@ -571,18 +571,18 @@ function OrderDetail({ publicId }: { publicId: string }) {
   if (!q.data) return null;
 
   const { order, deposits, events, audit, hotBalance } = q.data;
-  const asset = order.dest_asset ?? "TXC";
+  const asset = order.dest_asset ?? "ISK";
   const explorer = (txid: string) =>
-    asset === "wTXC"
+    asset === "wISK"
       ? `https://etherscan.io/tx/${txid}`
-      : `https://mempool.texitcoin.org/tx/${txid}`;
+      : `https://mempool.iskandercoin.com/tx/${txid}`;
 
   const srcToken = (order.source_token ?? "").toUpperCase();
-  const dstAsset = (order.dest_asset ?? "TXC").toUpperCase();
+  const dstAsset = (order.dest_asset ?? "ISK").toUpperCase();
   const service =
-    srcToken === "TXC" && dstAsset === "WTXC"
+    srcToken === "ISK" && dstAsset === "WISK"
       ? "Wrap"
-      : srcToken === "WTXC" && dstAsset === "TXC"
+      : srcToken === "WISK" && dstAsset === "ISK"
         ? "Unwrap"
         : "Swap";
   const firstDeposit = deposits[0];
@@ -670,9 +670,9 @@ function OrderDetail({ publicId }: { publicId: string }) {
         {hotBalance ? (
           <KV
             k="Hot balance"
-            v={`${hotBalance.confirmedTxc.toFixed(4)} ${asset}${
-              hotBalance.unconfirmedTxc
-                ? ` (+${hotBalance.unconfirmedTxc.toFixed(4)} pending)`
+            v={`${hotBalance.confirmedIsk.toFixed(4)} ${asset}${
+              hotBalance.unconfirmedIsk
+                ? ` (+${hotBalance.unconfirmedIsk.toFixed(4)} pending)`
                 : ""
             }`}
           />
@@ -756,11 +756,11 @@ function KV({ k, v, mono }: { k: string; v: React.ReactNode; mono?: boolean }) {
   );
 }
 
-// ===== TXC Wallet Tab =====
-function TxcWalletTab() {
+// ===== ISK Wallet Tab =====
+function IskWalletTab() {
   const hotFn = useServerFn(adminHotWalletBalances);
-  const txHistFn = useServerFn(adminTxcTxHistory);
-  const balHistFn = useServerFn(adminTxcBalanceHistory);
+  const txHistFn = useServerFn(adminIskTxHistory);
+  const balHistFn = useServerFn(adminIskBalanceHistory);
 
   const hot = useQuery({
     queryKey: ["admin", "hot-wallet-balances"],
@@ -768,27 +768,27 @@ function TxcWalletTab() {
     refetchInterval: 60_000,
   });
   const txs = useQuery({
-    queryKey: ["admin", "txc-tx-history"],
+    queryKey: ["admin", "isk-tx-history"],
     queryFn: () => txHistFn({ data: { limit: 25 } }),
     refetchInterval: 60_000,
   });
   const hist = useQuery({
-    queryKey: ["admin", "txc-balance-history"],
+    queryKey: ["admin", "isk-balance-history"],
     queryFn: () => balHistFn({ data: { hours: 168 } }),
     refetchInterval: 5 * 60_000,
   });
 
-  const txc = hot.data?.txc;
+  const isk = hot.data?.isk;
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-end flex-wrap gap-3">
         <div>
           <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-            TXC Wallet
+            ISK Wallet
           </div>
           <p className="text-xs font-mono text-muted-foreground mt-2 max-w-xl leading-relaxed">
-            The TXC hot wallet holds native TXC used to pay unwrap orders.
+            The ISK hot wallet holds native ISK used to pay unwrap orders.
             Balance snapshots record whenever this page refreshes.
           </p>
         </div>
@@ -800,32 +800,32 @@ function TxcWalletTab() {
         </button>
       </div>
 
-      {!txc ? (
-        <div className="text-[10px] font-mono text-muted-foreground">Loading TXC wallet…</div>
-      ) : txc.ok === false ? (
-        <div className="text-xs font-mono text-accent">TXC hot wallet: {txc.error}</div>
+      {!isk ? (
+        <div className="text-[10px] font-mono text-muted-foreground">Loading ISK wallet…</div>
+      ) : isk.ok === false ? (
+        <div className="text-xs font-mono text-accent">ISK hot wallet: {isk.error}</div>
       ) : (
         <div className="border border-accent/40 bg-accent/5 rounded-xl p-5 space-y-4">
           <div className="flex justify-between items-start gap-3 flex-wrap">
             <div className="min-w-0">
               <div className="text-[10px] font-mono uppercase tracking-widest text-accent">
-                TXC hot wallet address
+                ISK hot wallet address
               </div>
-              <div className="font-mono text-sm mt-2 break-all">{txc.address}</div>
+              <div className="font-mono text-sm mt-2 break-all">{isk.address}</div>
               <div className="flex gap-2 mt-3 flex-wrap">
                 <button
-                  onClick={() => navigator.clipboard.writeText(txc.address)}
+                  onClick={() => navigator.clipboard.writeText(isk.address)}
                   className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-1.5 rounded hover:bg-foreground hover:text-background"
                 >
                   Copy
                 </button>
                 <a
-                  href={`https://mempool.texitcoin.org/address/${txc.address}`}
+                  href={`https://mempool.iskandercoin.com/address/${isk.address}`}
                   target="_blank"
                   rel="noreferrer"
                   className="text-[10px] font-mono uppercase tracking-widest border border-border px-3 py-1.5 rounded hover:bg-foreground hover:text-background"
                 >
-                  View on mempool.texitcoin.org ↗
+                  View on mempool.iskandercoin.com ↗
                 </a>
               </div>
             </div>
@@ -834,16 +834,16 @@ function TxcWalletTab() {
                 HD wallet total
               </div>
               <div className="font-mono text-2xl mt-1">
-                {txc.totalConfirmed.toFixed(4)} <span className="text-sm">TXC</span>
+                {isk.totalConfirmed.toFixed(4)} <span className="text-sm">ISK</span>
               </div>
-              {txc.totalUnconfirmed ? (
+              {isk.totalUnconfirmed ? (
                 <div className="text-[10px] font-mono text-muted-foreground">
-                  +{txc.totalUnconfirmed.toFixed(4)} pending
+                  +{isk.totalUnconfirmed.toFixed(4)} pending
                 </div>
               ) : null}
               <div className="text-[10px] font-mono text-muted-foreground mt-2">
-                hot {txc.confirmed.toFixed(4)} · deposits {txc.derivedConfirmed.toFixed(4)} (
-                {txc.derivedScanned} addrs)
+                hot {isk.confirmed.toFixed(4)} · deposits {isk.derivedConfirmed.toFixed(4)} (
+                {isk.derivedScanned} addrs)
               </div>
             </div>
 
@@ -897,13 +897,13 @@ function TxcWalletTab() {
                         {t.direction === "in" ? "IN" : "OUT"}
                       </span>
                     </td>
-                    <td className="p-3 text-right">{t.amountTxc.toFixed(4)} TXC</td>
+                    <td className="p-3 text-right">{t.amountIsk.toFixed(4)} ISK</td>
                     <td className="p-3 truncate max-w-[20ch] text-muted-foreground">
                       {t.counterparty ?? "—"}
                     </td>
                     <td className="p-3">
                       <a
-                        href={`https://mempool.texitcoin.org/tx/${t.txid}`}
+                        href={`https://mempool.iskandercoin.com/tx/${t.txid}`}
                         target="_blank"
                         rel="noreferrer"
                         className="text-muted-foreground hover:text-foreground underline underline-offset-2"
@@ -955,7 +955,7 @@ function BalanceSparkline({ points }: { points: Array<{ balance: number; takenAt
       </svg>
       <div className="flex justify-between text-[10px] font-mono text-muted-foreground mt-1">
         <span>{new Date(points[0].takenAt).toLocaleDateString()}</span>
-        <span>min {min.toFixed(2)} · max {max.toFixed(2)} · now {last.balance.toFixed(2)} TXC</span>
+        <span>min {min.toFixed(2)} · max {max.toFixed(2)} · now {last.balance.toFixed(2)} ISK</span>
         <span>{new Date(last.takenAt).toLocaleDateString()}</span>
       </div>
     </div>
@@ -966,8 +966,8 @@ function BalanceSparkline({ points }: { points: Array<{ balance: number; takenAt
 function EthWalletTab() {
   const scanFn = useServerFn(adminWalletScan);
   const derivedFn = useServerFn(adminEthDerivedBalances);
-  const sweepFn = useServerFn(adminSweepWtxc);
-  const fundWtxcFn = useServerFn(adminFundWtxc);
+  const sweepFn = useServerFn(adminSweepWisk);
+  const fundWiskFn = useServerFn(adminFundWisk);
   const fundGasFn = useServerFn(adminFundEthGas);
   const qc = useQueryClient();
   const ALL_CHAINS = ["ethereum", "bsc", "base", "arbitrum", "polygon"] as const;
@@ -990,10 +990,10 @@ function EthWalletTab() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "eth-derived"] }),
   });
 
-  const [fundTarget, setFundTarget] = useState<{ index: number; kind: "wtxc" | "gas" } | null>(null);
+  const [fundTarget, setFundTarget] = useState<{ index: number; kind: "wisk" | "gas" } | null>(null);
   const [fundAmount, setFundAmount] = useState("");
-  const fundWtxc = useMutation({
-    mutationFn: (v: { toIndex: number; amountWtxc: number }) => fundWtxcFn({ data: v }),
+  const fundWisk = useMutation({
+    mutationFn: (v: { toIndex: number; amountWisk: number }) => fundWiskFn({ data: v }),
     onSuccess: () => {
       setFundTarget(null);
       setFundAmount("");
@@ -1021,7 +1021,7 @@ function EthWalletTab() {
           </div>
           <p className="text-xs font-mono text-muted-foreground mt-2 max-w-xl leading-relaxed">
             HD-derived EVM addresses. Index <span className="text-foreground">#0</span> is the
-            operator (holds wTXC + ETH gas, signs payouts). Indices #1+ are per-order
+            operator (holds wISK + ETH gas, signs payouts). Indices #1+ are per-order
             deposit slots — sweep them back to #0 after use.
           </p>
         </div>
@@ -1057,7 +1057,7 @@ function EthWalletTab() {
       <div>
         <div className="flex justify-between items-end flex-wrap gap-3 mb-2">
           <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-            Derived addresses (wTXC + ETH)
+            Derived addresses (wISK + ETH)
           </div>
           <div className="flex gap-2">
             <button
@@ -1086,7 +1086,7 @@ function EthWalletTab() {
                   <th className="text-left p-3">#</th>
                   <th className="text-left p-3">Address</th>
                   <th className="text-right p-3">ETH</th>
-                  <th className="text-right p-3">wTXC</th>
+                  <th className="text-right p-3">wISK</th>
                   <th className="text-right p-3">Actions</th>
                 </tr>
               </thead>
@@ -1113,7 +1113,7 @@ function EthWalletTab() {
                       {r.eth > 0 ? r.eth.toFixed(6) : "—"}
                     </td>
                     <td className="p-3 text-right">
-                      {r.wtxc > 0 ? r.wtxc.toFixed(4) : "—"}
+                      {r.wisk > 0 ? r.wisk.toFixed(4) : "—"}
                     </td>
                     <td className="p-3 text-right">
                       {r.index === 0 ? (
@@ -1121,10 +1121,10 @@ function EthWalletTab() {
                       ) : (
                         <div className="flex gap-1 justify-end flex-wrap">
                           <button
-                            onClick={() => { setFundTarget({ index: r.index, kind: "wtxc" }); setFundAmount(""); }}
+                            onClick={() => { setFundTarget({ index: r.index, kind: "wisk" }); setFundAmount(""); }}
                             className="text-[9px] font-mono uppercase tracking-widest border border-border px-2 py-1 rounded hover:bg-foreground hover:text-background"
                           >
-                            Fund wTXC
+                            Fund wISK
                           </button>
                           <button
                             onClick={() => { setFundTarget({ index: r.index, kind: "gas" }); setFundAmount(""); }}
@@ -1133,15 +1133,15 @@ function EthWalletTab() {
                             Fund gas
                           </button>
                           <button
-                            disabled={r.wtxc <= 0 || sweep.isPending}
+                            disabled={r.wisk <= 0 || sweep.isPending}
                             onClick={() => {
-                              if (confirm(`Sweep ${r.wtxc.toFixed(4)} wTXC from #${r.index} → operator?`)) {
+                              if (confirm(`Sweep ${r.wisk.toFixed(4)} wISK from #${r.index} → operator?`)) {
                                 sweep.mutate(r.index);
                               }
                             }}
                             className="text-[9px] font-mono uppercase tracking-widest border border-accent bg-accent/10 text-accent px-2 py-1 rounded hover:bg-accent hover:text-background disabled:opacity-30"
                           >
-                            Sweep wTXC
+                            Sweep wISK
                           </button>
                         </div>
                       )}
@@ -1157,7 +1157,7 @@ function EthWalletTab() {
 
         {sweep.data ? (
           <div className="text-[11px] font-mono mt-2">
-            ✓ Swept {sweep.data.amountWtxc.toFixed(4)} wTXC ·{" "}
+            ✓ Swept {sweep.data.amountWisk.toFixed(4)} wISK ·{" "}
             <a
               href={`https://etherscan.io/tx/${sweep.data.txid}`}
               target="_blank"
@@ -1185,14 +1185,14 @@ function EthWalletTab() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-              Fund {fundTarget.kind === "wtxc" ? "wTXC" : "ETH gas"} → index #{fundTarget.index}
+              Fund {fundTarget.kind === "wisk" ? "wISK" : "ETH gas"} → index #{fundTarget.index}
             </div>
             <input
               autoFocus
               type="number"
               step="any"
               min={0}
-              placeholder={fundTarget.kind === "wtxc" ? "wTXC amount" : "ETH amount"}
+              placeholder={fundTarget.kind === "wisk" ? "wISK amount" : "ETH amount"}
               value={fundAmount}
               onChange={(e) => setFundAmount(e.target.value)}
               className="w-full px-3 py-2 bg-secondary/40 border border-border rounded font-mono text-sm"
@@ -1205,24 +1205,24 @@ function EthWalletTab() {
                 Cancel
               </button>
               <button
-                disabled={fundWtxc.isPending || fundGas.isPending}
+                disabled={fundWisk.isPending || fundGas.isPending}
                 onClick={() => {
                   const n = parseFloat(fundAmount);
                   if (!Number.isFinite(n) || n <= 0) return;
-                  if (fundTarget.kind === "wtxc") {
-                    fundWtxc.mutate({ toIndex: fundTarget.index, amountWtxc: n });
+                  if (fundTarget.kind === "wisk") {
+                    fundWisk.mutate({ toIndex: fundTarget.index, amountWisk: n });
                   } else {
                     fundGas.mutate({ toIndex: fundTarget.index, amountEth: n });
                   }
                 }}
                 className="text-[10px] font-mono uppercase tracking-widest border border-accent bg-accent/10 text-accent px-4 py-2 rounded hover:bg-accent hover:text-background disabled:opacity-50"
               >
-                {fundWtxc.isPending || fundGas.isPending ? "Sending…" : "Send"}
+                {fundWisk.isPending || fundGas.isPending ? "Sending…" : "Send"}
               </button>
             </div>
-            {(fundWtxc.error || fundGas.error) ? (
+            {(fundWisk.error || fundGas.error) ? (
               <div className="text-[11px] font-mono text-accent">
-                ✗ {((fundWtxc.error ?? fundGas.error) as Error).message}
+                ✗ {((fundWisk.error ?? fundGas.error) as Error).message}
               </div>
             ) : null}
           </div>
@@ -1261,8 +1261,8 @@ function SettingsTab() {
     notify_min_usd_created: number;
     wrap_fee_bps: number;
     unwrap_fee_bps: number;
-    low_txc_threshold: number;
-    low_wtxc_threshold: number;
+    low_isk_threshold: number;
+    low_wisk_threshold: number;
     payouts_frozen: boolean;
     payouts_frozen_reason: string;
     telegram_chat_id: string;
@@ -1280,8 +1280,8 @@ function SettingsTab() {
         notify_min_usd_created: Number(settings.data.notify_min_usd_created),
         wrap_fee_bps: Number(settings.data.wrap_fee_bps ?? 500),
         unwrap_fee_bps: Number(settings.data.unwrap_fee_bps ?? 0),
-        low_txc_threshold: Number(settings.data.low_txc_threshold ?? 10_000),
-        low_wtxc_threshold: Number(settings.data.low_wtxc_threshold ?? 10_000),
+        low_isk_threshold: Number(settings.data.low_isk_threshold ?? 10_000),
+        low_wisk_threshold: Number(settings.data.low_wisk_threshold ?? 10_000),
         payouts_frozen: Boolean((settings.data as { payouts_frozen?: boolean }).payouts_frozen),
         payouts_frozen_reason:
           (settings.data as { payouts_frozen_reason?: string | null }).payouts_frozen_reason ?? "",
@@ -1329,19 +1329,19 @@ function SettingsTab() {
         </Field>
         <Field label="Wrap fee (basis points, 100 = 1%)">
           <NumberInput value={form.wrap_fee_bps} onChange={(v) => set("wrap_fee_bps", Math.round(v))} />
-          <Hint>{(form.wrap_fee_bps / 100).toFixed(2)}% charged on TXC → wTXC (shown on homepage)</Hint>
+          <Hint>{(form.wrap_fee_bps / 100).toFixed(2)}% charged on ISK → wISK (shown on homepage)</Hint>
         </Field>
         <Field label="Unwrap fee (basis points, 100 = 1%)">
           <NumberInput value={form.unwrap_fee_bps} onChange={(v) => set("unwrap_fee_bps", Math.round(v))} />
-          <Hint>{(form.unwrap_fee_bps / 100).toFixed(2)}% charged on wTXC → TXC (shown on homepage)</Hint>
+          <Hint>{(form.unwrap_fee_bps / 100).toFixed(2)}% charged on wISK → ISK (shown on homepage)</Hint>
         </Field>
-        <Field label="Low TXC alert threshold">
-          <NumberInput value={form.low_txc_threshold} onChange={(v) => set("low_txc_threshold", v)} />
-          <Hint>Telegram alert fires when TXC hot wallet drops below this</Hint>
+        <Field label="Low ISK alert threshold">
+          <NumberInput value={form.low_isk_threshold} onChange={(v) => set("low_isk_threshold", v)} />
+          <Hint>Telegram alert fires when ISK hot wallet drops below this</Hint>
         </Field>
-        <Field label="Low wTXC alert threshold">
-          <NumberInput value={form.low_wtxc_threshold} onChange={(v) => set("low_wtxc_threshold", v)} />
-          <Hint>Telegram alert fires when wTXC operator wallet drops below this</Hint>
+        <Field label="Low wISK alert threshold">
+          <NumberInput value={form.low_wisk_threshold} onChange={(v) => set("low_wisk_threshold", v)} />
+          <Hint>Telegram alert fires when wISK operator wallet drops below this</Hint>
         </Field>
         <Field label="Kill switch (block new orders)">
           <label className="flex items-center gap-2 mt-2">
@@ -1697,7 +1697,7 @@ function BlocklistTab() {
           type="text"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
-          placeholder="0x… or txc1q…"
+          placeholder="0x… or isk1q…"
           className="w-full bg-background border border-border rounded p-2 font-mono text-xs focus:outline-none focus:border-accent"
         />
         <input

@@ -36,7 +36,7 @@
   --ease-terminal: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* TEXIT Sovereign Terminal palette — dark by default, light theme opt-in. */
+/* Iskander Sovereign Terminal palette — dark by default, light theme opt-in. */
 :root {
   --radius: 0.625rem;
   --background: oklch(0.985 0 0);

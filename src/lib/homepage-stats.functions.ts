@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
 // --------------------------------------------------------------------------
-// Public homepage stats: recent completed swaps + top wTXC holders.
+// Public homepage stats: recent completed swaps + top wISK holders.
 // Data is admin-only in Postgres, so we read via supabaseAdmin and only
 // return the anonymized subset of fields we're willing to show publicly.
 // --------------------------------------------------------------------------
@@ -10,7 +10,7 @@ export interface PublicSwapRow {
   publicId: string;
   kind: "wrap" | "unwrap";
   amount: number;
-  asset: "TXC" | "wTXC";
+  asset: "ISK" | "wISK";
   destShort: string;
   completedAt: string; // ISO
 }
@@ -36,8 +36,8 @@ export const getRecentSwaps = createServerFn({ method: "GET" }).handler(
     };
 
     return data.map((o) => {
-      const kind: "wrap" | "unwrap" = o.source_chain === "txc" ? "wrap" : "unwrap";
-      const asset = (o.dest_asset ?? (kind === "wrap" ? "wTXC" : "TXC")) as "TXC" | "wTXC";
+      const kind: "wrap" | "unwrap" = o.source_chain === "isk" ? "wrap" : "unwrap";
+      const asset = (o.dest_asset ?? (kind === "wrap" ? "wISK" : "ISK")) as "ISK" | "wISK";
       return {
         publicId: o.public_id,
         kind,
@@ -51,7 +51,7 @@ export const getRecentSwaps = createServerFn({ method: "GET" }).handler(
 );
 
 // --------------------------------------------------------------------------
-// wTXC top holders — derived by tallying every ERC-20 Transfer since block 0
+// wISK top holders — derived by tallying every ERC-20 Transfer since block 0
 // via Alchemy's alchemy_getAssetTransfers, cached in-process for 5 minutes.
 // --------------------------------------------------------------------------
 
@@ -72,8 +72,8 @@ interface HolderCache {
 let holderCache: HolderCache | null = null;
 const HOLDER_TTL_MS = 5 * 60 * 1000;
 
-const WTXC_CONTRACT = "0x9FC65df3997073B8551Ffd617154B5102fACbb88";
-const WTXC_DECIMALS = 8;
+const WISK_CONTRACT = "0xFB38867D064Df981F159b886007F1273a346b0BB";
+const WISK_DECIMALS = 8;
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 
 async function alchemyRpc<T>(method: string, params: unknown[]): Promise<T> {
@@ -100,7 +100,7 @@ async function computeHolders(): Promise<HolderCache> {
     const params: Record<string, unknown> = {
       fromBlock: "0x0",
       toBlock: "latest",
-      contractAddresses: [WTXC_CONTRACT.toLowerCase()],
+      contractAddresses: [WISK_CONTRACT.toLowerCase()],
       category: ["erc20"],
       excludeZeroValue: true,
       withMetadata: false,
@@ -123,7 +123,7 @@ async function computeHolders(): Promise<HolderCache> {
     pages += 1;
   } while (pageKey && pages < MAX_PAGES);
 
-  const scale = 10n ** BigInt(WTXC_DECIMALS);
+  const scale = 10n ** BigInt(WISK_DECIMALS);
   const toNum = (v: bigint) => Number(v) / Number(scale);
 
   const bridgeAddr = process.env.BRIDGE_EVM_ADDRESS?.toLowerCase();
@@ -150,7 +150,7 @@ async function computeHolders(): Promise<HolderCache> {
   };
 }
 
-export const getWtxcHolders = createServerFn({ method: "GET" }).handler(
+export const getWiskHolders = createServerFn({ method: "GET" }).handler(
   async (): Promise<{
     rows: PublicHolderRow[];
     totalSupply: number;

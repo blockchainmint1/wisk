@@ -5,9 +5,9 @@ import { createHmac } from "crypto";
 const BASE = "https://api-cloud.bitmart.com";
 
 // Default destination symbol/network — kept for back-compat with any caller
-// that still uses TXC implicitly. Prefer passing symbol/network explicitly.
-export const TXC_SYMBOL = "TXC_USDT";
-export const TXC_NETWORK = "TXC";
+// that still uses ISK implicitly. Prefer passing symbol/network explicitly.
+export const ISK_SYMBOL = "ISK_USDT";
+export const ISK_NETWORK = "ISK";
 
 function creds() {
   const key = process.env.BITMART_API_KEY?.trim();
@@ -58,7 +58,7 @@ async function signedRequest<T = unknown>(opts: {
 }
 
 // ===== Public: spot ticker =====
-export async function getSpotPrice(symbol: string = TXC_SYMBOL): Promise<number> {
+export async function getSpotPrice(symbol: string = ISK_SYMBOL): Promise<number> {
   // v3 ticker endpoint: GET /spot/quotation/v3/ticker?symbol=XXX_USDT
   const res = await fetch(
     `${BASE}/spot/quotation/v3/ticker?symbol=${encodeURIComponent(symbol)}`,
@@ -79,7 +79,7 @@ export async function getSpotPrice(symbol: string = TXC_SYMBOL): Promise<number>
 }
 
 // Back-compat alias.
-export const getTxcSpotPrice = () => getSpotPrice(TXC_SYMBOL);
+export const getIskSpotPrice = () => getSpotPrice(ISK_SYMBOL);
 
 // ===== Trading =====
 export async function submitMarketBuy(opts: {
@@ -91,7 +91,7 @@ export async function submitMarketBuy(opts: {
     method: "POST",
     path: "/spot/v2/submit_order",
     body: {
-      symbol: opts.symbol ?? TXC_SYMBOL,
+      symbol: opts.symbol ?? ISK_SYMBOL,
       side: "buy",
       type: "market",
       notional: opts.notionalUsdt.toFixed(2),
@@ -143,12 +143,12 @@ export async function submitWithdrawal(opts: {
     method: "POST",
     path: "/account/v1/withdraw/apply",
     body: {
-      currency: opts.currency ?? "TXC",
+      currency: opts.currency ?? "ISK",
       amount: opts.amount.toFixed(8),
       destination: "To Digital Address",
       address: opts.address,
       address_memo: "",
-      chain: opts.network ?? TXC_NETWORK,
+      chain: opts.network ?? ISK_NETWORK,
     },
   });
 }

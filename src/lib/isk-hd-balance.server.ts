@@ -1,13 +1,13 @@
-// SERVER-ONLY: total TXC held across the whole HD wallet (hot address at
+// SERVER-ONLY: total ISK held across the whole HD wallet (hot address at
 // index 0 + every per-order deposit address we've ever handed out).
 // Used by the admin console and by the low-balance alert guard so we don't
 // page the admin when funds are merely sitting at derived deposit addresses.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { deriveTxcAddress } from "./bridge-wallet.server";
-import { getTxcAddressBalanceSats } from "./txc-sign.server";
+import { deriveIskAddress } from "./bridge-wallet.server";
+import { getIskAddressBalanceSats } from "./isk-sign.server";
 
-export interface TxcHdTotals {
+export interface IskHdTotals {
   hotAddress: string;
   hotConfirmed: number;
   derivedConfirmed: number;
@@ -15,8 +15,8 @@ export interface TxcHdTotals {
   totalConfirmed: number;
 }
 
-/** Collect every TXC address in the HD wallet (excluding the hot address). */
-export async function listTxcDerivedAddresses(hotAddress: string): Promise<string[]> {
+/** Collect every ISK address in the HD wallet (excluding the hot address). */
+export async function listIskDerivedAddresses(hotAddress: string): Promise<string[]> {
   const addresses = new Set<string>();
   const { data: counter } = await supabaseAdmin
     .from("hd_address_counter")
@@ -24,10 +24,10 @@ export async function listTxcDerivedAddresses(hotAddress: string): Promise<strin
     .eq("id", 1)
     .maybeSingle();
   const next = Number(counter?.next_index ?? 1);
-  for (let i = 1; i < next; i++) addresses.add(deriveTxcAddress(i));
+  for (let i = 1; i < next; i++) addresses.add(deriveIskAddress(i));
 
   // The counter has been reset before, so it is NOT a high-water mark: also
-  // include every TXC deposit address ever recorded on an order.
+  // include every ISK deposit address ever recorded on an order.
   const { data: rows } = await supabaseAdmin
     .from("orders")
     .select("deposit_address")
@@ -42,20 +42,20 @@ export async function listTxcDerivedAddresses(hotAddress: string): Promise<strin
 }
 
 /**
- * Sum confirmed TXC across the HD wallet. Best-effort: unreachable addresses
+ * Sum confirmed ISK across the HD wallet. Best-effort: unreachable addresses
  * are skipped rather than failing the whole read.
  */
-export async function getTxcHdTotal(hotAddress: string): Promise<TxcHdTotals> {
-  const { confirmed } = await getTxcAddressBalanceSats(hotAddress);
+export async function getIskHdTotal(hotAddress: string): Promise<IskHdTotals> {
+  const { confirmed } = await getIskAddressBalanceSats(hotAddress);
   let derivedConfirmed = 0;
   let derivedScanned = 0;
 
   try {
-    const list = await listTxcDerivedAddresses(hotAddress);
+    const list = await listIskDerivedAddresses(hotAddress);
     for (let i = 0; i < list.length; i += 10) {
       const batch = list.slice(i, i + 10);
       const results = await Promise.allSettled(
-        batch.map((addr) => getTxcAddressBalanceSats(addr)),
+        batch.map((addr) => getIskAddressBalanceSats(addr)),
       );
       for (const r of results) {
         if (r.status !== "fulfilled") continue;

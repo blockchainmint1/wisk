@@ -8,14 +8,14 @@ import { SwapForm } from "@/components/swap-form";
 import { getPublicFees } from "@/lib/public-settings.functions";
 import {
   getRecentSwaps,
-  getWtxcHolders,
+  getWiskHolders,
   type PublicSwapRow,
   type PublicHolderRow,
 } from "@/lib/homepage-stats.functions";
 
 const UNISWAP_URL =
-  "https://app.uniswap.org/#/swap?outputCurrency=0x9FC65df3997073B8551Ffd617154B5102fACbb88&theme=dark";
-const WTXC_CONTRACT = "0x9FC65df3997073B8551Ffd617154B5102fACbb88";
+  "https://app.uniswap.org/#/swap?outputCurrency=0xFB38867D064Df981F159b886007F1273a346b0BB&theme=dark";
+const WISK_CONTRACT = "0xFB38867D064Df981F159b886007F1273a346b0BB";
 
 const fmtAmount = (n: number) =>
   n >= 1
@@ -48,23 +48,23 @@ export const Route = createFileRoute("/")({
   },
   head: () => ({
     meta: [
-      { title: "SWAP — The TXC ↔ wTXC bridge" },
+      { title: "wISK Wrap — The ISK ↔ wISK Bridge" },
       {
         name: "description",
         content:
-          "Wrap native TXC into wTXC on Ethereum, or unwrap wTXC back to TXC. Custodial bridge, live Bitmart pricing, settled direct to your wallet.",
+          "Wrap native Iskander Coin into wISK on Ethereum, or unwrap it back to ISK. One for one, minted on deposit and burned on unwrap, settled straight to your wallet.",
       },
-      { property: "og:title", content: "SWAP — The TXC ↔ wTXC bridge" },
+      { property: "og:title", content: "wISK Wrap — The ISK ↔ wISK Bridge" },
       {
         property: "og:description",
         content:
-          "The custodial bridge for TEXITcoin — wrap TXC to wTXC and back.",
+          "Wrap native Iskander Coin into wISK on Ethereum and unwrap it back, one for one.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://swap.texitcoin.org/" },
+      { property: "og:url", content: "https://wisk.iskandercoin.com/" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
-    links: [{ rel: "canonical", href: "https://swap.texitcoin.org/" }],
+    links: [{ rel: "canonical", href: "https://wisk.iskandercoin.com/" }],
     scripts: [
       {
         type: "application/ld+json",
@@ -72,8 +72,8 @@ export const Route = createFileRoute("/")({
           "@context": "https://schema.org",
           "@type": "WebSite",
           name: "SWAP",
-          url: "https://swap.texitcoin.org/",
-          description: "TXC ↔ wTXC custodial bridge.",
+          url: "https://wisk.iskandercoin.com/",
+          description: "ISK ↔ wISK custodial bridge.",
         }),
       },
     ],
@@ -96,14 +96,14 @@ function HomePage() {
           <div className="space-y-8 animate-slide-up">
             <div className="inline-flex items-center gap-2 border border-border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.3em]">
               <span className="size-1.5 rounded-full bg-accent animate-pulse-dot" />
-              TXC ↔ wTXC bridge
+              ISK ↔ wISK bridge
             </div>
             <h1 className="text-6xl md:text-7xl font-extrabold tracking-tighter leading-none mb-6 text-balance">
               THE <span className="text-accent underline decoration-4 underline-offset-8">BRIDGE</span> <br />
-              FOR wTXC.
+              FOR wISK.
             </h1>
             <p className="text-lg text-muted-foreground max-w-[46ch] font-medium leading-relaxed text-balance">
-              Move native TXC onto Ethereum as wTXC, or bring it home again. Custodial, fast, and settled straight to your wallet.
+              Move native ISK onto Ethereum as wISK, or bring it home again. Custodial, fast, and settled straight to your wallet.
             </p>
             <div className="flex gap-4">
               <a
@@ -114,8 +114,8 @@ function HomePage() {
               </a>
             </div>
             <div className="grid grid-cols-2 gap-4 border-t border-border pt-8">
-              <Stat label="Wrap fee" value={wrapPct} sub="TXC → wTXC" />
-              <Stat label="Unwrap fee" value={unwrapPct} sub="wTXC → TXC" />
+              <Stat label="Wrap fee" value={wrapPct} sub="ISK → wISK" />
+              <Stat label="Unwrap fee" value={unwrapPct} sub="wISK → ISK" />
             </div>
           </div>
 
@@ -131,19 +131,20 @@ function HomePage() {
           <div className="grid md:grid-cols-2 gap-10">
             <Principle
               n="01"
-              title="One custodian, no smart-contract magic."
+              title="Minted on deposit. Burned on unwrap."
               body={
                 <>
-                  TXC you send is held 1:1 in the operator wallet.{" "}
+                  There is no pre-mined float. ISK you send is held 1:1 in the operator wallet and{" "}
                   <a
-                    href="https://texitcoin.org/wtxc"
+                    href="https://iskandercoin.com/wisk"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-foreground underline hover:text-accent transition-colors"
                   >
-                    wTXC (0x9FC6…bb88)
+                    wISK (0xFB38…b0BB)
                   </a>{" "}
-                  is issued against it. Low-tech, auditable, boring on purpose.
+                  is minted against it — so total supply is always a live proof-of-reserves number.
+                  Unwrap and it's burned. Boring on purpose.
                 </>
               }
             />
@@ -253,9 +254,9 @@ function RecentSwapsSection() {
 }
 
 function HoldersSection() {
-  const fetchFn = useServerFn(getWtxcHolders);
+  const fetchFn = useServerFn(getWiskHolders);
   const { data, isLoading } = useQuery({
-    queryKey: ["homepage", "wtxc-holders"],
+    queryKey: ["homepage", "wisk-holders"],
     queryFn: () => fetchFn(),
     refetchInterval: 5 * 60_000,
     staleTime: 60_000,
@@ -268,8 +269,8 @@ function HoldersSection() {
     <section className="mt-24 border-t border-border pt-16">
       <SectionHeader
         eyebrow="On-chain"
-        title="wTXC holders"
-        right={supply ? `${fmtAmount(supply)} wTXC · ${holderCount} holders` : ""}
+        title="wISK holders"
+        right={supply ? `${fmtAmount(supply)} wISK · ${holderCount} holders` : ""}
       />
       <div className="border border-border overflow-x-auto">
         <table className="w-full font-mono text-xs">
@@ -294,7 +295,7 @@ function HoldersSection() {
                     <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
                     <td className="px-4 py-3">
                       <a
-                        href={`https://etherscan.io/token/${WTXC_CONTRACT}?a=${h.address}`}
+                        href={`https://etherscan.io/token/${WISK_CONTRACT}?a=${h.address}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="hover:text-accent transition-colors"
@@ -323,11 +324,11 @@ function HoldersSection() {
 function UniswapSection() {
   return (
     <section className="mt-24 border-t border-border pt-16">
-      <SectionHeader eyebrow="DEX" title="Trade wTXC on Uniswap" />
+      <SectionHeader eyebrow="DEX" title="Trade wISK on Uniswap" />
       <div className="grid md:grid-cols-[1.2fr_1fr] gap-8 border border-border p-6">
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground leading-relaxed max-w-[52ch]">
-            Already holding ETH, USDC, or USDT on Ethereum? Swap straight into wTXC on
+            Already holding ETH, USDC, or USDT on Ethereum? Swap straight into wISK on
             Uniswap. Verify the contract address before you accept the token — copycats
             reuse the ticker.
           </p>
@@ -341,7 +342,7 @@ function UniswapSection() {
               Open on Uniswap →
             </a>
             <a
-              href="https://texitcoin.org/wtxc"
+              href="https://iskandercoin.com/wisk"
               target="_blank"
               rel="noopener noreferrer"
               className="px-6 py-3 border border-border font-mono text-xs uppercase tracking-widest hover:bg-foreground hover:text-background transition-colors"
@@ -351,23 +352,23 @@ function UniswapSection() {
           </div>
         </div>
         <div className="space-y-3 font-mono text-xs">
-          <DetailRow label="Token" value="wTXC — Wrapped TEXITcoin" />
+          <DetailRow label="Token" value="wISK — Wrapped Iskander Coin" />
           <DetailRow
             label="Contract"
             value={
               <a
-                href={`https://etherscan.io/token/${WTXC_CONTRACT}`}
+                href={`https://etherscan.io/token/${WISK_CONTRACT}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-accent transition-colors break-all"
               >
-                {WTXC_CONTRACT}
+                {WISK_CONTRACT}
               </a>
             }
           />
           <DetailRow label="Network" value="Ethereum mainnet" />
           <DetailRow label="Decimals" value="8" />
-          <DetailRow label="Backing" value="1:1 native TXC in custody" />
+          <DetailRow label="Backing" value="1:1 native ISK in custody" />
         </div>
       </div>
     </section>

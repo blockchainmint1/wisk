@@ -7,16 +7,16 @@ import { SwapHistory } from "@/components/swap-history";
 export const Route = createFileRoute("/swap/")({
   head: () => ({
     meta: [
-      { title: "Swap — wTXC ↔ TXC Bridge" },
+      { title: "Swap — wISK ↔ ISK Bridge" },
       {
         name: "description",
         content:
-          "Swap wTXC ↔ TXC 1:1. Locked quote, direct payout to the address you choose.",
+          "Swap wISK ↔ ISK 1:1. Locked quote, direct payout to the address you choose.",
       },
-      { property: "og:title", content: "Swap — wTXC ↔ TXC Bridge" },
+      { property: "og:title", content: "Swap — wISK ↔ ISK Bridge" },
       {
         property: "og:description",
-        content: "Bidirectional wTXC ↔ TXC bridge.",
+        content: "Bidirectional wISK ↔ ISK bridge.",
       },
     ],
   }),
@@ -30,7 +30,7 @@ function SwapPage() {
       <main className="max-w-xl mx-auto px-4 py-12 md:py-20">
         <div className="mb-10 text-center">
           <h1 className="text-4xl md:text-6xl font-extrabold tracking-tighter leading-none">
-            Swap <span className="text-accent">wTXC ↔ TXC</span>
+            Swap <span className="text-accent">wISK ↔ ISK</span>
           </h1>
         </div>
 

@@ -1,7 +1,7 @@
-// TEXITcoin (TXC) local signing + broadcast.
-// We NEVER send the WIF to the TXC RPC node. UTXOs, fees and broadcasts go
-// through the public Esplora-compatible endpoint at mempool.texitcoin.org.
-// Chain params confirmed from texitcoin.org/build → Chain Params tab.
+// Iskander Coin (ISK) local signing + broadcast.
+// We NEVER send the WIF to the ISK RPC node. UTXOs, fees and broadcasts go
+// through the public Esplora-compatible endpoint at mempool.iskandercoin.com.
+// Chain params confirmed from iskandercoin.com/build → Chain Params tab.
 //
 // Server-only.
 
@@ -9,53 +9,53 @@ import * as bitcoin from "bitcoinjs-lib";
 import { ECPairFactory } from "ecpair";
 import * as ecc from "@bitcoinerlab/secp256k1";
 import {
-  deriveTxcAddress,
-  deriveTxcKeypair,
-  getTxcHotKeypair,
+  deriveIskAddress,
+  deriveIskKeypair,
+  getIskHotKeypair,
 } from "./bridge-wallet.server";
 
 bitcoin.initEccLib(ecc);
 const ECPair = ECPairFactory(ecc);
 
-// ===== Network params (TXC mainnet) =====
-// bech32 hrp is "txc" — segwit addresses look like txc1q…
-// Verified against live mempool.texitcoin.org v0_p2wpkh outputs.
-export const TXC_NETWORK: bitcoin.networks.Network = {
-  messagePrefix: "\x19Texitcoin Signed Message:\n",
-  bech32: "txc",
+// ===== Network params (ISK mainnet) =====
+// bech32 hrp is "isk" — segwit addresses look like isk1q…
+// Verified against live mempool.iskandercoin.com v0_p2wpkh outputs.
+export const ISK_NETWORK: bitcoin.networks.Network = {
+  messagePrefix: "\x19Iskander Signed Message:\n",
+  bech32: "isk",
   bip32: { public: 0x0488b21e, private: 0x0488ade4 },
-  pubKeyHash: 0x42, // base58 'T' prefix
-  scriptHash: 0x32,
-  wif: 0xc1,
+  pubKeyHash: 0x2d, // base58 'K' prefix
+  scriptHash: 0x2c,
+  wif: 0xad,
 };
 
-// API host is api.mempool.texitcoin.org — the bare mempool.texitcoin.org
+// API host is api.mempool.iskandercoin.com — the bare mempool.iskandercoin.com
 // is the explorer SPA (custom domain on this Lovable project) and returns
 // HTML for any /api path, which is what produced the earlier
 // "allUtxos.slice(...).sort is not a function" red herring. Override via env.
 const ESPLORA =
-  process.env.TXC_MEMPOOL_URL?.trim() ||
-  "https://api.mempool.texitcoin.org/api/v1";
+  process.env.ISK_MEMPOOL_URL?.trim() ||
+  "https://api.mempool.iskandercoin.com/api/v1";
 
 // ===== Hot-wallet keypair (lazy, server-only) =====
-// Preferred: BRIDGE_MNEMONIC → derived TXC keypair (m/44'/0'/0'/0/0).
-// Fallback: TXC_WIF for backwards compatibility.
+// Preferred: BRIDGE_MNEMONIC → derived ISK keypair (m/44'/0'/0'/0/0).
+// Fallback: ISK_WIF for backwards compatibility.
 function getKeyPair() {
   if (process.env.BRIDGE_MNEMONIC?.trim()) {
-    return getTxcHotKeypair();
+    return getIskHotKeypair();
   }
-  const wif = process.env.TXC_WIF?.trim();
-  if (!wif) throw new Error("Neither BRIDGE_MNEMONIC nor TXC_WIF is configured");
-  return ECPair.fromWIF(wif, TXC_NETWORK);
+  const wif = process.env.ISK_WIF?.trim();
+  if (!wif) throw new Error("Neither BRIDGE_MNEMONIC nor ISK_WIF is configured");
+  return ECPair.fromWIF(wif, ISK_NETWORK);
 }
 
-export function getTxcHotAddress(): string {
+export function getIskHotAddress(): string {
   const kp = getKeyPair();
   const { address } = bitcoin.payments.p2pkh({
     pubkey: Buffer.from(kp.publicKey),
-    network: TXC_NETWORK,
+    network: ISK_NETWORK,
   });
-  if (!address) throw new Error("Failed to derive TXC hot address");
+  if (!address) throw new Error("Failed to derive ISK hot address");
   return address;
 }
 
@@ -91,7 +91,7 @@ async function esplora<T>(path: string, init?: RequestInit): Promise<T> {
   }
 }
 
-export async function getTxcAddressBalanceSats(address: string): Promise<{
+export async function getIskAddressBalanceSats(address: string): Promise<{
   confirmed: number;
   unconfirmed: number;
 }> {
@@ -131,7 +131,7 @@ function buildHdAddressMap(): Map<string, number> {
   const map = new Map<string, number>();
   for (let i = 0; i <= MAX_HD_SCAN_INDEX; i++) {
     try {
-      map.set(deriveTxcAddress(i), i);
+      map.set(deriveIskAddress(i), i);
     } catch {
       break;
     }
@@ -141,13 +141,13 @@ function buildHdAddressMap(): Map<string, number> {
 
 /**
  * Pull UTXOs from derived (non-hot) HD addresses until we've gathered at
- * least `needSats`. Candidate addresses come from every TXC deposit address
+ * least `needSats`. Candidate addresses come from every ISK deposit address
  * ever recorded on an order, plus the current counter range.
  */
 async function getDerivedUtxos(needSats: number): Promise<HdUtxo[]> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const addrToIndex = buildHdAddressMap();
-  const hotAddress = deriveTxcAddress(0);
+  const hotAddress = deriveIskAddress(0);
 
   const candidates = new Set<string>();
   try {
@@ -171,7 +171,7 @@ async function getDerivedUtxos(needSats: number): Promise<HdUtxo[]> {
       .maybeSingle();
     const next = Number(counter?.next_index ?? 1);
     for (let i = 1; i < Math.min(next, MAX_HD_SCAN_INDEX); i++) {
-      candidates.add(deriveTxcAddress(i));
+      candidates.add(deriveIskAddress(i));
     }
   } catch {
     /* best effort */
@@ -186,7 +186,7 @@ async function getDerivedUtxos(needSats: number): Promise<HdUtxo[]> {
     const res = await Promise.allSettled(
       batch.map(async (addr) => ({
         address: addr,
-        ...(await getTxcAddressBalanceSats(addr)),
+        ...(await getIskAddressBalanceSats(addr)),
       })),
     );
     for (const r of res) {
@@ -239,12 +239,12 @@ async function getFeeRateSatsPerVb(): Promise<number> {
     );
     return rate;
   } catch {
-    return 2; // sub-cent on TXC
+    return 2; // sub-cent on ISK
   }
 }
 
 // ===== Send =====
-export interface TxcSendResult {
+export interface IskSendResult {
   txid: string;
   fromAddress: string;
   toAddress: string;
@@ -261,7 +261,7 @@ export interface TxcSendResult {
 // "txn-mempool-conflict"). We take a DB-backed lock keyed to the hot wallet
 // before selecting inputs, and only release it after a short delay so the
 // mempool has time to propagate our tx before the next tick fetches UTXOs.
-const LOCK_KEY = "txc_hot";
+const LOCK_KEY = "isk_hot";
 const LOCK_TTL_SECONDS = 90; // hard ceiling; auto-expires if we crash
 const POST_BROADCAST_HOLD_MS = 4_000;
 const LOCK_POLL_MS = 500;
@@ -269,7 +269,7 @@ const LOCK_MAX_WAIT_MS = 60_000;
 
 async function withWalletLock<T>(fn: () => Promise<T>): Promise<T> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const holder = `txc-sign-${crypto.randomUUID()}`;
+  const holder = `isk-sign-${crypto.randomUUID()}`;
   const deadline = Date.now() + LOCK_MAX_WAIT_MS;
 
   while (true) {
@@ -282,7 +282,7 @@ async function withWalletLock<T>(fn: () => Promise<T>): Promise<T> {
     if (data === true) break;
     if (Date.now() > deadline) {
       throw new Error(
-        "Timed out waiting for TXC hot-wallet lock (another payout is in flight)",
+        "Timed out waiting for ISK hot-wallet lock (another payout is in flight)",
       );
     }
     await new Promise((r) => setTimeout(r, LOCK_POLL_MS));
@@ -307,38 +307,38 @@ async function withWalletLock<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 /**
- * Build, sign and broadcast a TXC payment. Serialized via a DB-backed lock
+ * Build, sign and broadcast a ISK payment. Serialized via a DB-backed lock
  * so concurrent Worker invocations never spend the same UTXO. Fee is
- * deducted from the change output (recipient receives exactly `amountTxc`).
+ * deducted from the change output (recipient receives exactly `amountIsk`).
  */
-export async function sendTxc(opts: {
+export async function sendIsk(opts: {
   toAddress: string;
-  amountTxc: number; // whole TXC, will be converted to sats
-}): Promise<TxcSendResult> {
-  return withWalletLock(() => sendTxcInner(opts));
+  amountIsk: number; // whole ISK, will be converted to sats
+}): Promise<IskSendResult> {
+  return withWalletLock(() => sendIskInner(opts));
 }
 
-async function sendTxcInner(opts: {
+async function sendIskInner(opts: {
   toAddress: string;
-  amountTxc: number;
-}): Promise<TxcSendResult> {
+  amountIsk: number;
+}): Promise<IskSendResult> {
   const COIN = 100_000_000;
-  const amountSats = Math.round(opts.amountTxc * COIN);
+  const amountSats = Math.round(opts.amountIsk * COIN);
   if (!Number.isFinite(amountSats) || amountSats <= 0) {
-    throw new Error(`Invalid TXC amount: ${opts.amountTxc}`);
+    throw new Error(`Invalid ISK amount: ${opts.amountIsk}`);
   }
 
   // Validate destination address against our network
   try {
-    bitcoin.address.toOutputScript(opts.toAddress, TXC_NETWORK);
+    bitcoin.address.toOutputScript(opts.toAddress, ISK_NETWORK);
   } catch {
-    throw new Error(`Invalid TXC destination address: ${opts.toAddress}`);
+    throw new Error(`Invalid ISK destination address: ${opts.toAddress}`);
   }
 
   const kp = getKeyPair();
   const fromPayment = bitcoin.payments.p2pkh({
     pubkey: Buffer.from(kp.publicKey),
-    network: TXC_NETWORK,
+    network: ISK_NETWORK,
   });
   const fromAddress = fromPayment.address!;
   const fromScript = fromPayment.output!;
@@ -348,7 +348,7 @@ async function sendTxcInner(opts: {
   // (we're the only signer on this address) and required for back-to-back
   // sends. Largest first for fewer inputs.
   //
-  // TXC deposit addresses are never recycled, so most of the wallet's funds
+  // ISK deposit addresses are never recycled, so most of the wallet's funds
   // sit at derived indices, not at index 0. Spend the whole HD wallet:
   // start with the hot address, then pull in derived deposit UTXOs (which
   // also sweeps them, since change always returns to the hot address).
@@ -402,14 +402,14 @@ async function sendTxcInner(opts: {
 
   if (inputSum < amountSats + fee) {
     throw new Error(
-      `Insufficient TXC balance: have ${inputSum} sats, need ${amountSats + fee} (incl. fee ${fee})`,
+      `Insufficient ISK balance: have ${inputSum} sats, need ${amountSats + fee} (incl. fee ${fee})`,
     );
   }
 
   const change = needsChange ? inputSum - amountSats - fee : 0;
 
   // Build tx (legacy P2PKH inputs — need full prev tx hex)
-  const psbt = new bitcoin.Psbt({ network: TXC_NETWORK });
+  const psbt = new bitcoin.Psbt({ network: ISK_NETWORK });
 
   // Fetch all previous raw transactions in parallel
   const prevTxHexes = await Promise.all(
@@ -431,12 +431,12 @@ async function sendTxcInner(opts: {
   }
 
   // Sign each input with the key for the HD index that owns it.
-  const keyCache = new Map<number, ReturnType<typeof deriveTxcKeypair>>();
+  const keyCache = new Map<number, ReturnType<typeof deriveIskKeypair>>();
   const keyFor = (index: number) => {
     if (index === 0) return kp;
     let k = keyCache.get(index);
     if (!k) {
-      k = deriveTxcKeypair(index);
+      k = deriveIskKeypair(index);
       keyCache.set(index, k);
     }
     return k;

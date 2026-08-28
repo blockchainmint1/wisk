@@ -5,10 +5,10 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getBalances, getSpotPrice, submitMarketBuy } from "./bitmart.server";
 import { invalidateChainsCache } from "./chains.server";
-import { deriveEvmAddress, deriveTxcAddress, getOperatorEvmAddress } from "./bridge-wallet.server";
-import { getEthBalance, getWtxcBalance, sendEthFrom, sendWtxc, sendWtxcFrom } from "./wtxc.server";
+import { deriveEvmAddress, deriveIskAddress, getOperatorEvmAddress } from "./bridge-wallet.server";
+import { getEthBalance, getWiskBalance, sendEthFrom, sendWisk, sendWiskFrom } from "./wisk.server";
 import { getSettings, invalidateSettingsCache } from "./settings.server";
-import { getTxcHotAddress, getTxcAddressBalanceSats } from "./txc-sign.server";
+import { getIskHotAddress, getIskAddressBalanceSats } from "./isk-sign.server";
 import { scanHdWallet } from "./wallet-scan.server";
 
 
@@ -191,16 +191,16 @@ export const adminOrderDetail = createServerFn({ method: "POST" })
       }
     }
 
-    // Hot wallet balance (TXC + wTXC). Bounded with a hard timeout so a
+    // Hot wallet balance (ISK + wISK). Bounded with a hard timeout so a
     // slow/stalled chain RPC (Esplora, Alchemy) can never wedge the admin
     // detail panel — the panel just renders without the balance if the
     // lookup misses the deadline.
     let hotBalance: {
       address: string;
-      confirmedTxc: number;
-      unconfirmedTxc: number;
+      confirmedIsk: number;
+      unconfirmedIsk: number;
     } | null = null;
-    const destAsset = order.dest_asset ?? "TXC";
+    const destAsset = order.dest_asset ?? "ISK";
     const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
       Promise.race([
         p,
@@ -208,33 +208,33 @@ export const adminOrderDetail = createServerFn({ method: "POST" })
           setTimeout(() => rej(new Error(`hotBalance timeout after ${ms}ms`)), ms),
         ),
       ]);
-    if (destAsset === "TXC") {
+    if (destAsset === "ISK") {
       try {
-        const { getTxcHotAddress, getTxcAddressBalanceSats } = await import(
-          "./txc-sign.server"
+        const { getIskHotAddress, getIskAddressBalanceSats } = await import(
+          "./isk-sign.server"
         );
-        const address = getTxcHotAddress();
-        const bal = await withTimeout(getTxcAddressBalanceSats(address), 4000);
+        const address = getIskHotAddress();
+        const bal = await withTimeout(getIskAddressBalanceSats(address), 4000);
         hotBalance = {
           address,
-          confirmedTxc: bal.confirmed / 1e8,
-          unconfirmedTxc: bal.unconfirmed / 1e8,
+          confirmedIsk: bal.confirmed / 1e8,
+          unconfirmedIsk: bal.unconfirmed / 1e8,
         };
       } catch (e) {
-        console.warn("[adminOrderDetail] TXC hotBalance failed:", (e as Error)?.message);
+        console.warn("[adminOrderDetail] ISK hotBalance failed:", (e as Error)?.message);
         hotBalance = null;
       }
-    } else if (destAsset === "wTXC") {
+    } else if (destAsset === "wISK") {
       try {
         const address = getOperatorEvmAddress();
-        const bal = await withTimeout(getWtxcBalance(address), 4000);
+        const bal = await withTimeout(getWiskBalance(address), 4000);
         hotBalance = {
           address,
-          confirmedTxc: bal,
-          unconfirmedTxc: 0,
+          confirmedIsk: bal,
+          unconfirmedIsk: 0,
         };
       } catch (e) {
-        console.warn("[adminOrderDetail] wTXC hotBalance failed:", (e as Error)?.message);
+        console.warn("[adminOrderDetail] wISK hotBalance failed:", (e as Error)?.message);
         hotBalance = null;
       }
     }
@@ -348,7 +348,7 @@ export const adminForceFail = createServerFn({ method: "POST" })
 
 
 // ===== Bitmart balances =====
-const WATCHED_CURRENCIES = ["TXC", "USDT"] as const;
+const WATCHED_CURRENCIES = ["ISK", "USDT"] as const;
 export const adminBitmartBalances = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -368,18 +368,18 @@ export const adminBitmartBalances = createServerFn({ method: "POST" })
     }
   });
 
-// ===== Hot wallet balances (EVM stables + TXC + wTXC) =====
+// ===== Hot wallet balances (EVM stables + ISK + wISK) =====
 export const adminHotWalletBalances = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertAdmin(context.userId);
 
-    const [evmRes, txcRes, wtxcRes] = await Promise.allSettled([
+    const [evmRes, iskRes, wiskRes] = await Promise.allSettled([
       scanHdWallet({ maxAddresses: 1 }),
       (async () => {
-        const address = getTxcHotAddress();
-        const { confirmed, unconfirmed } = await getTxcAddressBalanceSats(address);
-        // Per-order TXC deposit addresses are never recycled, so unswept
+        const address = getIskHotAddress();
+        const { confirmed, unconfirmed } = await getIskAddressBalanceSats(address);
+        // Per-order ISK deposit addresses are never recycled, so unswept
         // deposits sit at derived indices 1..N. Sum them so the console
         // reports the whole HD wallet, not just the hot address.
         let derivedConfirmed = 0;
@@ -394,10 +394,10 @@ export const adminHotWalletBalances = createServerFn({ method: "POST" })
           const next = Number(counter?.next_index ?? 1);
 
           // The counter has been reset before, so it is NOT a high-water mark.
-          // Scan every TXC address we have ever handed out (from orders) plus
+          // Scan every ISK address we have ever handed out (from orders) plus
           // the current counter range, de-duplicated.
           const addresses = new Set<string>();
-          for (let i = 1; i < next; i++) addresses.add(deriveTxcAddress(i));
+          for (let i = 1; i < next; i++) addresses.add(deriveIskAddress(i));
 
           const { data: rows } = await supabaseAdmin
             .from("orders")
@@ -414,7 +414,7 @@ export const adminHotWalletBalances = createServerFn({ method: "POST" })
           for (let i = 0; i < list.length; i += 10) {
             const batch = list.slice(i, i + 10);
             const results = await Promise.allSettled(
-              batch.map(async (addr) => getTxcAddressBalanceSats(addr)),
+              batch.map(async (addr) => getIskAddressBalanceSats(addr)),
             );
             for (const r of results) {
               if (r.status !== "fulfilled") continue;
@@ -441,7 +441,7 @@ export const adminHotWalletBalances = createServerFn({ method: "POST" })
 
       (async () => {
         const address = getOperatorEvmAddress();
-        const balance = await getWtxcBalance(address);
+        const balance = await getWiskBalance(address);
         return { address, balance };
       })(),
     ]);
@@ -455,31 +455,31 @@ export const adminHotWalletBalances = createServerFn({ method: "POST" })
           }
         : { ok: false as const, error: (evmRes.reason as Error)?.message ?? "scan failed" };
 
-    const txc =
-      txcRes.status === "fulfilled"
-        ? { ok: true as const, ...txcRes.value }
-        : { ok: false as const, error: (txcRes.reason as Error)?.message ?? "rpc failed" };
+    const isk =
+      iskRes.status === "fulfilled"
+        ? { ok: true as const, ...iskRes.value }
+        : { ok: false as const, error: (iskRes.reason as Error)?.message ?? "rpc failed" };
 
-    const wtxc =
-      wtxcRes.status === "fulfilled"
-        ? { ok: true as const, ...wtxcRes.value }
-        : { ok: false as const, error: (wtxcRes.reason as Error)?.message ?? "rpc failed" };
+    const wisk =
+      wiskRes.status === "fulfilled"
+        ? { ok: true as const, ...wiskRes.value }
+        : { ok: false as const, error: (wiskRes.reason as Error)?.message ?? "rpc failed" };
 
-    // Fire-and-forget: record a TXC balance snapshot so we can chart history.
+    // Fire-and-forget: record a ISK balance snapshot so we can chart history.
     // Rate-limited to one row per ~10 minutes to keep the table small.
-    if (txc.ok) {
+    if (isk.ok) {
       void (async () => {
         try {
           const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
           const { data: recent } = await supabaseAdmin
-            .from("txc_balance_snapshots")
+            .from("isk_balance_snapshots")
             .select("id")
             .gt("taken_at", tenMinAgo)
             .limit(1);
           if (!recent || recent.length === 0) {
             await supabaseAdmin
-              .from("txc_balance_snapshots")
-              .insert({ balance_txc: txc.totalConfirmed });
+              .from("isk_balance_snapshots")
+              .insert({ balance_isk: isk.totalConfirmed });
           }
         } catch {
           // best-effort; never fail the balance read on snapshot write
@@ -487,7 +487,7 @@ export const adminHotWalletBalances = createServerFn({ method: "POST" })
       })();
     }
 
-    return { evm, txc, wtxc };
+    return { evm, isk, wisk };
   });
 
 
@@ -495,7 +495,7 @@ export const adminHotWalletBalances = createServerFn({ method: "POST" })
 // ===== Reconciliation =====
 // Compare what we *should* hold (USD in − USD spent on Bitmart buybacks)
 // against what we *actually* hold (EVM stables + Bitmart USDT), and surface
-// any unfilled asset debt (TXC + wTXC) at current spot price.
+// any unfilled asset debt (ISK + wISK) at current spot price.
 export const adminReconcile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -512,16 +512,16 @@ export const adminReconcile = createServerFn({ method: "POST" })
 
     let usdIn = 0;
     let usdSpentBuying = 0;
-    const byAsset: Record<"TXC" | "wTXC", { sold: number; bought: number; pendingBuys: number }> = {
-      TXC: { sold: 0, bought: 0, pendingBuys: 0 },
-      wTXC: { sold: 0, bought: 0, pendingBuys: 0 },
+    const byAsset: Record<"ISK" | "wISK", { sold: number; bought: number; pendingBuys: number }> = {
+      ISK: { sold: 0, bought: 0, pendingBuys: 0 },
+      wISK: { sold: 0, bought: 0, pendingBuys: 0 },
     };
     for (const r of rows ?? []) {
       usdIn += Number(r.paid_amount_usd ?? 0);
       const bought = Number(r.bitmart_filled_dest ?? 0);
       const avg = Number(r.bitmart_avg_price ?? 0);
       if (bought > 0 && avg > 0) usdSpentBuying += bought * avg;
-      const asset = (r.dest_asset ?? "TXC") as "TXC" | "wTXC";
+      const asset = (r.dest_asset ?? "ISK") as "ISK" | "wISK";
       if (byAsset[asset]) {
         byAsset[asset].sold += Number(r.quoted_dest_out ?? 0);
         byAsset[asset].bought += bought;
@@ -531,13 +531,13 @@ export const adminReconcile = createServerFn({ method: "POST" })
 
     const expectedStablesUsd = usdIn - usdSpentBuying;
 
-    // 2) Actual stables on hand: admin EVM + Bitmart USDT.  wTXC held in
-    // the operator wallet is counted as asset inventory at TXC spot.
-    const [evmRes, bitmartRes, txcSpot, wtxcBalRes] = await Promise.allSettled([
+    // 2) Actual stables on hand: admin EVM + Bitmart USDT.  wISK held in
+    // the operator wallet is counted as asset inventory at ISK spot.
+    const [evmRes, bitmartRes, iskSpot, wiskBalRes] = await Promise.allSettled([
       scanHdWallet({ maxAddresses: 1 }),
       getBalances(),
-      getSpotPrice("TXC_USDT"),
-      getWtxcBalance(getOperatorEvmAddress()),
+      getSpotPrice("ISK_USDT"),
+      getWiskBalance(getOperatorEvmAddress()),
     ]);
 
     const evmStablesUsd =
@@ -546,33 +546,33 @@ export const adminReconcile = createServerFn({ method: "POST" })
         : 0;
 
     let bitmartUsdt = 0;
-    let bitmartTxc = 0;
+    let bitmartIsk = 0;
     if (bitmartRes.status === "fulfilled") {
       for (const b of bitmartRes.value) {
         const c = b.currency.toUpperCase();
         const amt = Number(b.available);
         if (c === "USDT") bitmartUsdt += amt;
-        else if (c === "TXC") bitmartTxc += amt;
+        else if (c === "ISK") bitmartIsk += amt;
       }
     }
 
-    const txcPrice = txcSpot.status === "fulfilled" ? txcSpot.value : 0;
-    const operatorWtxc = wtxcBalRes.status === "fulfilled" ? wtxcBalRes.value : 0;
+    const iskPrice = iskSpot.status === "fulfilled" ? iskSpot.value : 0;
+    const operatorWisk = wiskBalRes.status === "fulfilled" ? wiskBalRes.value : 0;
 
     const actualStablesUsd = evmStablesUsd + bitmartUsdt;
     const stablesDiff = actualStablesUsd - expectedStablesUsd;
 
-    const txcDebt = Math.max(0, byAsset.TXC.sold - byAsset.TXC.bought);
-    const wtxcDebt = Math.max(0, byAsset.wTXC.sold - byAsset.wTXC.bought);
-    const txcDebtUsd = txcDebt * txcPrice;
-    const wtxcDebtUsd = wtxcDebt * txcPrice;
+    const iskDebt = Math.max(0, byAsset.ISK.sold - byAsset.ISK.bought);
+    const wiskDebt = Math.max(0, byAsset.wISK.sold - byAsset.wISK.bought);
+    const iskDebtUsd = iskDebt * iskPrice;
+    const wiskDebtUsd = wiskDebt * iskPrice;
 
-    // Net position: stables we hold + bitmart TXC inventory + operator wTXC
+    // Net position: stables we hold + bitmart ISK inventory + operator wISK
     // − the still-owed asset debt at current spot.
-    const bitmartTxcUsd = bitmartTxc * txcPrice;
-    const operatorWtxcUsd = operatorWtxc * txcPrice;
+    const bitmartIskUsd = bitmartIsk * iskPrice;
+    const operatorWiskUsd = operatorWisk * iskPrice;
     const netPositionUsd =
-      actualStablesUsd + bitmartTxcUsd + operatorWtxcUsd - txcDebtUsd - wtxcDebtUsd;
+      actualStablesUsd + bitmartIskUsd + operatorWiskUsd - iskDebtUsd - wiskDebtUsd;
 
     return {
       usdIn: +usdIn.toFixed(2),
@@ -582,19 +582,19 @@ export const adminReconcile = createServerFn({ method: "POST" })
       stablesDiff: +stablesDiff.toFixed(2),
       evmStablesUsd: +evmStablesUsd.toFixed(2),
       bitmartUsdt: +bitmartUsdt.toFixed(2),
-      bitmartTxc: +bitmartTxc.toFixed(4),
-      operatorWtxc: +operatorWtxc.toFixed(4),
-      bitmartTxcUsd: +bitmartTxcUsd.toFixed(2),
-      operatorWtxcUsd: +operatorWtxcUsd.toFixed(2),
-      txcDebt: +txcDebt.toFixed(4),
-      wtxcDebt: +wtxcDebt.toFixed(4),
-      txcDebtUsd: +txcDebtUsd.toFixed(2),
-      wtxcDebtUsd: +wtxcDebtUsd.toFixed(2),
-      txcPrice,
+      bitmartIsk: +bitmartIsk.toFixed(4),
+      operatorWisk: +operatorWisk.toFixed(4),
+      bitmartIskUsd: +bitmartIskUsd.toFixed(2),
+      operatorWiskUsd: +operatorWiskUsd.toFixed(2),
+      iskDebt: +iskDebt.toFixed(4),
+      wiskDebt: +wiskDebt.toFixed(4),
+      iskDebtUsd: +iskDebtUsd.toFixed(2),
+      wiskDebtUsd: +wiskDebtUsd.toFixed(2),
+      iskPrice,
       netPositionUsd: +netPositionUsd.toFixed(2),
       orderCount: rows?.length ?? 0,
-      pendingTxcBuys: byAsset.TXC.pendingBuys,
-      pendingWtxcBuys: byAsset.wTXC.pendingBuys,
+      pendingIskBuys: byAsset.ISK.pendingBuys,
+      pendingWiskBuys: byAsset.wISK.pendingBuys,
       bitmartError:
         bitmartRes.status === "rejected"
           ? (bitmartRes.reason as Error)?.message ?? "bitmart failed"
@@ -628,8 +628,8 @@ const UpdateSettingsInput = z.object({
   notify_min_usd_created: z.number().min(0).max(1_000_000),
   wrap_fee_bps: z.number().int().min(0).max(10_000),
   unwrap_fee_bps: z.number().int().min(0).max(10_000),
-  low_txc_threshold: z.number().min(0).max(10_000_000),
-  low_wtxc_threshold: z.number().min(0).max(10_000_000),
+  low_isk_threshold: z.number().min(0).max(10_000_000),
+  low_wisk_threshold: z.number().min(0).max(10_000_000),
   payouts_frozen: z.boolean(),
   payouts_frozen_reason: z.string().trim().max(280).nullable(),
   telegram_chat_id: z.string().trim().max(64).nullable(),
@@ -825,7 +825,7 @@ export const adminTelegramTest = createServerFn({ method: "POST" })
         },
         body: JSON.stringify({
           chat_id: chatId,
-          text: `🧪 <b>wTXC Swap</b> test ping at ${new Date().toISOString()}`,
+          text: `🧪 <b>wISK Swap</b> test ping at ${new Date().toISOString()}`,
           parse_mode: "HTML",
         }),
       });
@@ -838,9 +838,9 @@ export const adminTelegramTest = createServerFn({ method: "POST" })
     }
   });
 
-// ===== Treasury debt (TXC sold vs TXC re-bought on Bitmart) =====
-// Tracks the running gap between TXC we've paid out to customers from the hot
-// wallet and TXC we've actually replenished via Bitmart. Small market buys can
+// ===== Treasury debt (ISK sold vs ISK re-bought on Bitmart) =====
+// Tracks the running gap between ISK we've paid out to customers from the hot
+// wallet and ISK we've actually replenished via Bitmart. Small market buys can
 // be partially canceled when the unfilled remainder drops under Bitmart's
 // min notional (~5 USDT) — those tiny gaps accumulate here so we can square
 // up in one bulk buy at our convenience.
@@ -849,17 +849,17 @@ export const adminTreasuryDebt = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     await assertAdmin(context.userId);
 
-    // All TXC orders that went to the customer (completed) — the hot wallet
+    // All ISK orders that went to the customer (completed) — the hot wallet
     // already sent quoted_dest_out; bitmart_filled_dest is what we re-bought.
     const { data: rows, error } = await supabaseAdmin
       .from("orders")
       .select("public_id,quoted_dest_out,bitmart_filled_dest,bitmart_avg_price,paid_amount_usd,created_at,status,bitmart_order_id")
-      .eq("dest_asset", "TXC")
+      .eq("dest_asset", "ISK")
       .eq("status", "completed");
     if (error) throw new Error(error.message);
 
-    let txcSold = 0;
-    let txcBought = 0;
+    let iskSold = 0;
+    let iskBought = 0;
     let usdtSpent = 0;
     let usdtTakenIn = 0;
     let pendingBuys = 0;
@@ -875,8 +875,8 @@ export const adminTreasuryDebt = createServerFn({ method: "POST" })
       const sold = Number(r.quoted_dest_out ?? 0);
       const bought = Number(r.bitmart_filled_dest ?? 0);
       const avg = Number(r.bitmart_avg_price ?? 0);
-      txcSold += sold;
-      txcBought += bought;
+      iskSold += sold;
+      iskBought += bought;
       if (bought > 0 && avg > 0) usdtSpent += bought * avg;
       usdtTakenIn += Number(r.paid_amount_usd ?? 0);
       if (r.bitmart_order_id && r.bitmart_filled_dest == null) pendingBuys += 1;
@@ -893,19 +893,19 @@ export const adminTreasuryDebt = createServerFn({ method: "POST" })
     }
     shortfalls.sort((a, b) => b.shortfall - a.shortfall);
 
-    const txcDebt = Math.max(0, txcSold - txcBought);
+    const iskDebt = Math.max(0, iskSold - iskBought);
     let spotPrice = 0;
     try {
-      spotPrice = await getSpotPrice("TXC_USDT");
+      spotPrice = await getSpotPrice("ISK_USDT");
     } catch {
       spotPrice = 0;
     }
-    const estUsdtToSquareUp = spotPrice > 0 ? +(txcDebt * spotPrice * 1.01).toFixed(2) : 0;
+    const estUsdtToSquareUp = spotPrice > 0 ? +(iskDebt * spotPrice * 1.01).toFixed(2) : 0;
 
     return {
-      txcSold: +txcSold.toFixed(6),
-      txcBought: +txcBought.toFixed(6),
-      txcDebt: +txcDebt.toFixed(6),
+      iskSold: +iskSold.toFixed(6),
+      iskBought: +iskBought.toFixed(6),
+      iskDebt: +iskDebt.toFixed(6),
       usdtSpent: +usdtSpent.toFixed(2),
       usdtTakenIn: +usdtTakenIn.toFixed(2),
       orderCount: rows?.length ?? 0,
@@ -1132,20 +1132,20 @@ export const adminRemoveBlockedAddress = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
-// ===== TXC Wallet =====
+// ===== ISK Wallet =====
 
-// Recent transactions for the TXC hot wallet (Esplora API).
-export const adminTxcTxHistory = createServerFn({ method: "POST" })
+// Recent transactions for the ISK hot wallet (Esplora API).
+export const adminIskTxHistory = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z.object({ limit: z.number().int().min(1).max(50).default(25) }).parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
-    const address = getTxcHotAddress();
+    const address = getIskHotAddress();
     const ESPLORA =
-      process.env.TXC_MEMPOOL_URL?.trim() ||
-      "https://api.mempool.texitcoin.org/api/v1";
+      process.env.ISK_MEMPOOL_URL?.trim() ||
+      "https://api.mempool.iskandercoin.com/api/v1";
     const res = await fetch(`${ESPLORA}/address/${address}/txs`);
     if (!res.ok) {
       throw new Error(`Esplora ${res.status}: ${(await res.text()).slice(0, 200)}`);
@@ -1172,7 +1172,7 @@ export const adminTxcTxHistory = createServerFn({ method: "POST" })
       return {
         txid: tx.txid,
         direction: netSats >= 0 ? ("in" as const) : ("out" as const),
-        amountTxc: Math.abs(netSats) / 1e8,
+        amountIsk: Math.abs(netSats) / 1e8,
         counterparty,
         confirmed: tx.status.confirmed,
         blockHeight: tx.status.block_height ?? null,
@@ -1183,7 +1183,7 @@ export const adminTxcTxHistory = createServerFn({ method: "POST" })
   });
 
 // Balance history snapshots for chart.
-export const adminTxcBalanceHistory = createServerFn({ method: "POST" })
+export const adminIskBalanceHistory = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z.object({ hours: z.number().int().min(1).max(720).default(168) }).parse(input ?? {}),
@@ -1192,19 +1192,19 @@ export const adminTxcBalanceHistory = createServerFn({ method: "POST" })
     await assertAdmin(context.userId);
     const since = new Date(Date.now() - data.hours * 3600 * 1000).toISOString();
     const { data: rows, error } = await supabaseAdmin
-      .from("txc_balance_snapshots")
-      .select("balance_txc,taken_at")
+      .from("isk_balance_snapshots")
+      .select("balance_isk,taken_at")
       .gt("taken_at", since)
       .order("taken_at", { ascending: true })
       .limit(2000);
     if (error) throw new Error(error.message);
     return (rows ?? []).map((r) => ({
-      balance: Number(r.balance_txc),
+      balance: Number(r.balance_isk),
       takenAt: r.taken_at,
     }));
   });
 
-// ===== ETH Wallet: derived-address balances (native + wTXC) =====
+// ===== ETH Wallet: derived-address balances (native + wISK) =====
 
 export const adminEthDerivedBalances = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -1217,20 +1217,20 @@ export const adminEthDerivedBalances = createServerFn({ method: "POST" })
     const rows = await Promise.all(
       indices.map(async (i) => {
         const address = deriveEvmAddress(i);
-        const [ethRes, wtxcRes] = await Promise.allSettled([
+        const [ethRes, wiskRes] = await Promise.allSettled([
           getEthBalance(address),
-          getWtxcBalance(address),
+          getWiskBalance(address),
         ]);
         return {
           index: i,
           address,
           eth: ethRes.status === "fulfilled" ? ethRes.value.eth : 0,
-          wtxc: wtxcRes.status === "fulfilled" ? wtxcRes.value : 0,
+          wisk: wiskRes.status === "fulfilled" ? wiskRes.value : 0,
           error:
             ethRes.status === "rejected"
               ? (ethRes.reason as Error).message
-              : wtxcRes.status === "rejected"
-                ? (wtxcRes.reason as Error).message
+              : wiskRes.status === "rejected"
+                ? (wiskRes.reason as Error).message
                 : null,
         };
       }),
@@ -1238,8 +1238,8 @@ export const adminEthDerivedBalances = createServerFn({ method: "POST" })
     return { operator: getOperatorEvmAddress(), rows };
   });
 
-// Sweep the entire wTXC balance from a derived index → operator (index 0).
-export const adminSweepWtxc = createServerFn({ method: "POST" })
+// Sweep the entire wISK balance from a derived index → operator (index 0).
+export const adminSweepWisk = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z.object({ fromIndex: z.number().int().min(1).max(1000) }).parse(input),
@@ -1248,54 +1248,54 @@ export const adminSweepWtxc = createServerFn({ method: "POST" })
     await assertAdmin(context.userId);
     const fromAddress = deriveEvmAddress(data.fromIndex);
     const toAddress = getOperatorEvmAddress();
-    const balance = await getWtxcBalance(fromAddress);
-    if (balance <= 0) throw new Error(`Index #${data.fromIndex} has no wTXC to sweep`);
+    const balance = await getWiskBalance(fromAddress);
+    if (balance <= 0) throw new Error(`Index #${data.fromIndex} has no wISK to sweep`);
     // Truncate to token precision (8 decimals) to avoid parseUnits rounding above balance.
     const amount = Math.floor(balance * 1e8) / 1e8;
-    const result = await sendWtxcFrom({
+    const result = await sendWiskFrom({
       fromIndex: data.fromIndex,
       toAddress,
-      amountWtxc: amount,
+      amountWisk: amount,
       // Return as soon as it's broadcast — waiting on a receipt routinely
       // outran the serverless wall-clock and left the sweep "stuck".
       waitForReceipt: false,
     });
-    await audit(context.userId, "wtxc_sweep", {
+    await audit(context.userId, "wisk_sweep", {
       fromIndex: data.fromIndex,
       fromAddress,
       toAddress,
-      amountWtxc: amount,
+      amountWisk: amount,
       txid: result.txid,
     });
     return { ok: true as const, ...result };
   });
 
-// Fund a derived index with wTXC from the operator (index 0).
-export const adminFundWtxc = createServerFn({ method: "POST" })
+// Fund a derived index with wISK from the operator (index 0).
+export const adminFundWisk = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
         toIndex: z.number().int().min(1).max(1000),
-        amountWtxc: z.number().positive().max(1_000_000_000),
+        amountWisk: z.number().positive().max(1_000_000_000),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context.userId);
     const toAddress = deriveEvmAddress(data.toIndex);
-    const result = await sendWtxc({ toAddress, amountWtxc: data.amountWtxc });
-    await audit(context.userId, "wtxc_fund", {
+    const result = await sendWisk({ toAddress, amountWisk: data.amountWisk });
+    await audit(context.userId, "wisk_fund", {
       toIndex: data.toIndex,
       toAddress,
-      amountWtxc: data.amountWtxc,
+      amountWisk: data.amountWisk,
       txid: result.txid,
     });
     return { ok: true as const, ...result };
   });
 
 // Send ETH gas from the operator to a derived index (needed before
-// sweeping wTXC out of that derived index).
+// sweeping wISK out of that derived index).
 export const adminFundEthGas = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
