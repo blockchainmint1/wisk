@@ -272,6 +272,25 @@ export async function getEthBalance(address: string): Promise<{ wei: bigint; eth
  * loser gets dropped and returns null here — the only reliable way to tell a
  * successful broadcast from a silently-replaced one.
  */
+/**
+ * Settlement state of a broadcast: "mined" (receipt exists), "pending" (node
+ * still knows it, no receipt yet) or "missing" (dropped/replaced — the tx will
+ * never land and the payout must be re-sent).
+ */
+export async function evmTxState(
+  txHash: string,
+): Promise<"mined" | "pending" | "missing"> {
+  const provider = getProvider();
+  try {
+    const receipt = await provider.getTransactionReceipt(txHash);
+    if (receipt) return "mined";
+    const tx = await provider.getTransaction(txHash);
+    return tx ? "pending" : "missing";
+  } catch {
+    return "pending";
+  }
+}
+
 export async function evmTxExists(txHash: string): Promise<boolean> {
   const provider = getProvider();
   try {
