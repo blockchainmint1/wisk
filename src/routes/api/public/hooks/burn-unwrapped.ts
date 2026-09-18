@@ -20,7 +20,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   burnWisk,
   getEthBalance,
-  getEvmNonce,
+  nextOperatorNonce,
   getWiskBalance,
   sendEthFrom,
   sendWiskFrom,
@@ -168,15 +168,18 @@ export const Route = createFileRoute("/api/public/hooks/burn-unwrapped")({
           }
 
           // ---- Step 2: burn ----
-          const nonce = await getEvmNonce(operator, "pending");
+          // Same shared nonce ledger the wrap payouts use. Reading only the
+          // node's pending count here is what let a burn re-use a mint's
+          // nonce and silently evict it (TX-DC525676).
+          const { use: nonce } = await nextOperatorNonce();
           const r = await burnWisk({
             amountWisk: amount,
             iskAddress: o.dest_address,
             nonce,
-            onSubmitted: async ({ txHash }) => {
+            onSubmitted: async ({ txHash, nonce: usedNonce }) => {
               await supabaseAdmin
                 .from("orders")
-                .update({ burn_tx_hash: txHash })
+                .update({ burn_tx_hash: txHash, burn_broadcast_nonce: usedNonce })
                 .eq("id", o.id);
               await logOrderEvent(o.id, "note", "burn_submitted", {
                 tx_hash: txHash,

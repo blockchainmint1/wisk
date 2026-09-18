@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1789756977977,
+      "tag": "0000_add_burn_nonce_and_payout_verification",
+      "breakpoints": true
+    }
+  ]
+}

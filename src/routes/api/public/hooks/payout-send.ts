@@ -16,8 +16,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { mintWisk, evmTxExists, getEvmNonce } from "@/lib/wisk.server";
-import { getOperatorEvmAddress } from "@/lib/bridge-wallet.server";
+import { mintWisk, evmTxExists, nextOperatorNonce } from "@/lib/wisk.server";
 import { logOrderEvent, notifyOrderEvent, sendAdminAlert } from "@/lib/telegram.server";
 
 const Body = z.object({ orderId: z.string().uuid() });
@@ -115,18 +114,8 @@ export const Route = createFileRoute("/api/public/hooks/payout-send")({
           // TX-67A8DFC4 / TX-95FC1AC4: both read pending 77 43s apart, and the
           // second silently replaced the first). Take the max of the node's
           // pending nonce and (highest nonce we've ever recorded + 1).
-          const nodeNonce = await getEvmNonce(getOperatorEvmAddress(), "pending");
-          const { data: lastNonceRow } = await supabaseAdmin
-            .from("orders")
-            .select("dest_broadcast_nonce")
-            .eq("dest_asset", "wISK")
-            .not("dest_tx_hash", "is", null)
-            .not("dest_broadcast_nonce", "is", null)
-            .order("dest_broadcast_nonce", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          const dbNext = (lastNonceRow?.dest_broadcast_nonce ?? -1) + 1;
-          const useNonce = Math.max(nodeNonce, dbNext);
+          // Shared across mints, burns and sweeps — see nextOperatorNonce.
+          const { use: useNonce, node: nodeNonce, db: dbNext } = await nextOperatorNonce();
           await logOrderEvent(o.id, "note", "nonce_selected", {
             node_pending: nodeNonce,
             db_next: dbNext,

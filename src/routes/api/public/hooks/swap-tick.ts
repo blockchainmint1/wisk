@@ -21,7 +21,7 @@ import { getDestination } from "@/lib/destinations";
 import { notifyOrderEvent, logOrderEvent, sendAdminAlert } from "@/lib/telegram.server";
 import { getSettings } from "@/lib/settings.server";
 import { sendIsk } from "@/lib/isk-sign.server";
-import { WISK_CONTRACT, WISK_DECIMALS, getEvmNonce } from "@/lib/wisk.server";
+import { WISK_CONTRACT, WISK_DECIMALS, getEvmNonce, evmTxState } from "@/lib/wisk.server";
 import { getOperatorEvmAddress } from "@/lib/bridge-wallet.server";
 import { scanIskIncoming, getIskTipHeight } from "@/lib/isk-scan.server";
 
@@ -1069,6 +1069,76 @@ async function reconcileBurns() {
 }
 
 
+/**
+ * A broadcast hash is NOT delivery. A tx can be accepted by the node, sit in
+ * the mempool with too small a tip, then be evicted or replaced by a later
+ * same-nonce tx — the customer never receives anything even though we marked
+ * the order `completed` (TX-DC525676). Re-check every completed wISK payout
+ * until a receipt proves it mined; if the tx has vanished, requeue it.
+ */
+async function verifyCompletedPayouts() {
+  const cutoff = new Date(Date.now() - 3 * 60_000).toISOString();
+  const { data: rows } = await supabaseAdmin
+    .from("orders")
+    .select("id,public_id,dest_tx_hash,quoted_dest_out,dest_address,updated_at")
+    .eq("status", "completed")
+    .eq("dest_asset", "wISK")
+    .is("dest_verified_at", null)
+    .not("dest_tx_hash", "is", null)
+    .lt("updated_at", cutoff)
+    .order("updated_at", { ascending: false })
+    .limit(10)
+    .returns<
+      Array<{
+        id: string;
+        public_id: string;
+        dest_tx_hash: string;
+        quoted_dest_out: number;
+        dest_address: string;
+        updated_at: string;
+      }>
+    >();
+  if (!rows?.length) return { verified: 0, requeued: 0 };
+
+  let verified = 0;
+  let requeued = 0;
+  for (const o of rows) {
+    let state: "mined" | "pending" | "missing";
+    try {
+      state = await evmTxState(o.dest_tx_hash);
+    } catch {
+      continue;
+    }
+    if (state === "mined") {
+      await supabaseAdmin
+        .from("orders")
+        .update({ dest_verified_at: new Date().toISOString() })
+        .eq("id", o.id);
+      verified += 1;
+      continue;
+    }
+    if (state === "pending") continue;
+
+    // Dropped or replaced — no tokens ever moved. Requeue for a fresh send.
+    await supabaseAdmin
+      .from("orders")
+      .update({ status: "confirmed", dest_tx_hash: null, dest_broadcast_nonce: null })
+      .eq("id", o.id);
+    await logOrderEvent(o.id, "error", "payout_vanished", {
+      tx_hash: o.dest_tx_hash,
+      reason: "no receipt and the node no longer knows the tx (dropped or nonce-replaced)",
+    });
+    void sendAdminAlert(
+      `Payout dropped, re-sending ${o.public_id}`,
+      `${o.quoted_dest_out} wISK to ${o.dest_address} never mined (${o.dest_tx_hash}). Order requeued.`,
+      `payout-vanished:${o.public_id}`,
+    );
+    requeued += 1;
+  }
+  return { verified, requeued };
+}
+
+
 const SITE_LABEL = "wISK Wrap — wisk.iskandercoin.com";
 
 /**
@@ -1172,6 +1242,7 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           balances: { isk: null as number | null, wisk: null as number | null },
           reconcile: { reconciled: 0, retried: 0 },
           burns: { burned: 0 },
+          verify: { verified: 0, requeued: 0 },
           ms: 0,
         };
         // Run each phase independently so one failure doesn't starve the
@@ -1195,6 +1266,8 @@ export const Route = createFileRoute("/api/public/hooks/swap-tick")({
           result.watch = (await runPhase("watchDeposits", watchDeposits)) ?? result.watch;
           result.watchIsk = (await runPhase("watchIskDeposits", watchIskDeposits)) ?? result.watchIsk;
           result.settle = (await runPhase("settleConfirmed", settleConfirmed)) ?? result.settle;
+          result.verify =
+            (await runPhase("verifyCompletedPayouts", verifyCompletedPayouts)) ?? result.verify;
           result.burns = (await runPhase("reconcileBurns", reconcileBurns)) ?? result.burns;
           result.balances = (await runPhase("checkHotBalances", checkHotBalances)) ?? result.balances;
 
