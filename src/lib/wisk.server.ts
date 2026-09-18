@@ -65,6 +65,65 @@ async function waitBounded<T>(p: Promise<T>, ms: number): Promise<T | null> {
   return Promise.race([p, new Promise<null>((r) => setTimeout(() => r(null), ms))]);
 }
 
+/**
+ * Gas policy. Alchemy's `getFeeData()` regularly returns a ZERO priority fee
+ * on mainnet; ethers then signs a type-2 tx whose effective miner tip is 0.
+ * Builders routinely skip those, so the tx loiters in the mempool until it is
+ * evicted — exactly how TX-DC525676's mint vanished. Always pay a real tip.
+ */
+async function feeOverrides(): Promise<{
+  maxFeePerGas: bigint;
+  maxPriorityFeePerGas: bigint;
+}> {
+  const provider = getProvider();
+  const [block, fd] = await Promise.all([provider.getBlock("latest"), provider.getFeeData()]);
+  const base = block?.baseFeePerGas ?? 0n;
+  const minTip = parseUnits(process.env.GAS_MIN_PRIORITY_GWEI?.trim() || "1", "gwei");
+  const nodeTip = fd.maxPriorityFeePerGas ?? 0n;
+  const maxPriorityFeePerGas = nodeTip > minTip ? nodeTip : minTip;
+  // 2x base headroom so a few busy blocks can't strand the tx either.
+  return { maxPriorityFeePerGas, maxFeePerGas: base * 2n + maxPriorityFeePerGas };
+}
+
+/**
+ * Next safe nonce for the operator wallet, shared by EVERY operator broadcast
+ * (wrap mints, unwrap burns, sweeps). The node's pending count alone is not
+ * enough: it lags a just-broadcast tx and it forgets an evicted one, so two
+ * different code paths can pick the same nonce and silently replace each
+ * other. Take the max of the node's view and every nonce we've ever recorded.
+ */
+export async function nextOperatorNonce(): Promise<{
+  use: number;
+  node: number;
+  db: number;
+}> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const operator = deriveEvmWallet(0).address;
+  const [node, payoutRow, burnRow] = await Promise.all([
+    getEvmNonce(operator, "pending"),
+    supabaseAdmin
+      .from("orders")
+      .select("dest_broadcast_nonce")
+      .not("dest_broadcast_nonce", "is", null)
+      .order("dest_broadcast_nonce", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("orders")
+      .select("burn_broadcast_nonce")
+      .not("burn_broadcast_nonce", "is", null)
+      .order("burn_broadcast_nonce", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  const db =
+    Math.max(
+      payoutRow.data?.dest_broadcast_nonce ?? -1,
+      burnRow.data?.burn_broadcast_nonce ?? -1,
+    ) + 1;
+  return { use: Math.max(node, db), node, db };
+}
+
 
 /**
  * Sign + broadcast a wISK ERC-20 transfer from the operator wallet (index 0).
