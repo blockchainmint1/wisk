@@ -205,7 +205,10 @@ export async function burnWisk(opts: {
     const wallet = deriveEvmWallet(0).connect(provider);
     const contract = new Contract(WISK_CONTRACT, ERC20_ABI, wallet);
     const amountRaw = parseUnits(opts.amountWisk.toFixed(WISK_DECIMALS), WISK_DECIMALS);
-    const overrides = opts.nonce !== undefined ? { nonce: opts.nonce } : {};
+    const overrides = {
+      ...(await feeOverrides()),
+      ...(opts.nonce !== undefined ? { nonce: opts.nonce } : {}),
+    };
 
     const submitted = (async () => {
       const tx = await contract.burnUnwrapped(amountRaw, opts.iskAddress ?? "", overrides);
@@ -307,7 +310,11 @@ export async function sendEthFrom(opts: {
     const provider = getProvider();
     const wallet = deriveEvmWallet(opts.fromIndex).connect(provider);
     const value = parseUnits(opts.amountEth.toFixed(18), 18);
-    const tx = await wallet.sendTransaction({ to: opts.toAddress, value });
+    const tx = await wallet.sendTransaction({
+      to: opts.toAddress,
+      value,
+      ...(await feeOverrides()),
+    });
     // Bounded: broadcast is what matters; a slow receipt must not hang the isolate.
     await waitBounded(tx.wait(1), 20_000);
     return {
@@ -345,7 +352,10 @@ async function sendWiskInner(opts: {
   // Hard timeout: without this, a stalled Alchemy pre-flight (estimateGas /
   // getFeeData / getTransactionCount) can silently run past the Cloudflare
   // Worker wall-clock limit and the isolate dies with no error thrown.
-  const overrides = opts.nonce !== undefined ? { nonce: opts.nonce } : {};
+  const overrides = {
+    ...(await feeOverrides()),
+    ...(opts.nonce !== undefined ? { nonce: opts.nonce } : {}),
+  };
   const submitted: Promise<{ tx: { hash: string; nonce: bigint | number; wait: (confirms?: number) => Promise<{ gasUsed?: bigint } | null> }; nonce: number }> =
     (async () => {
       const tx = opts.mint
