@@ -413,6 +413,7 @@ export type Database = {
           bitmart_spot_price: number
           burn_amount: number | null
           burn_attempts: number
+          burn_broadcast_nonce: number | null
           burn_sweep_tx_hash: string | null
           burn_tx_hash: string | null
           burned_at: string | null
@@ -426,6 +427,7 @@ export type Database = {
           dest_fee_sats: number | null
           dest_from_address: string | null
           dest_tx_hash: string | null
+          dest_verified_at: string | null
           error_message: string | null
           expires_at: string
           id: string
@@ -453,6 +455,7 @@ export type Database = {
           bitmart_spot_price: number
           burn_amount?: number | null
           burn_attempts?: number
+          burn_broadcast_nonce?: number | null
           burn_sweep_tx_hash?: string | null
           burn_tx_hash?: string | null
           burned_at?: string | null
@@ -466,6 +469,7 @@ export type Database = {
           dest_fee_sats?: number | null
           dest_from_address?: string | null
           dest_tx_hash?: string | null
+          dest_verified_at?: string | null
           error_message?: string | null
           expires_at?: string
           id?: string
@@ -493,6 +497,7 @@ export type Database = {
           bitmart_spot_price?: number
           burn_amount?: number | null
           burn_attempts?: number
+          burn_broadcast_nonce?: number | null
           burn_sweep_tx_hash?: string | null
           burn_tx_hash?: string | null
           burned_at?: string | null
@@ -506,6 +511,7 @@ export type Database = {
           dest_fee_sats?: number | null
           dest_from_address?: string | null
           dest_tx_hash?: string | null
+          dest_verified_at?: string | null
           error_message?: string | null
           expires_at?: string
           id?: string
