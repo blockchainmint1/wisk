@@ -304,8 +304,35 @@ async function reconcileStuckSending() {
       const dest = o.dest_address.toLowerCase();
       const expectedRaw = BigInt(Math.round(Number(o.quoted_dest_out) * 10 ** WISK_DECIMALS));
 
+      // Check a recorded submission directly before relying on the rolling
+      // transfer scan. This remains reliable even when an order has been stuck
+      // longer than the scan window.
+      let submittedMissing = false;
+      if (o.dest_tx_hash) {
+        const state = await evmTxState(o.dest_tx_hash);
+        if (state === "mined") {
+          await supabaseAdmin
+            .from("orders")
+            .update({
+              status: "completed",
+              dest_verified_at: new Date().toISOString(),
+              error_message: null,
+            })
+            .eq("id", o.id);
+          await logOrderEvent(o.id, "payout", "reconciled", {
+            tx_hash: o.dest_tx_hash,
+            source: "submitted_hash_receipt",
+          });
+          await notifyById("completed", o.id);
+          reconciled += 1;
+          continue;
+        }
+        if (state === "pending") continue;
+        submittedMissing = true;
+      }
+
       // 1) Prefer matching by the tx hash we recorded at broadcast_submitted.
-      let match = o.dest_tx_hash
+      let match = o.dest_tx_hash && !submittedMissing
         ? transfers.find((t) => t.txHash.toLowerCase() === o.dest_tx_hash!.toLowerCase())
         : undefined;
 
@@ -364,13 +391,14 @@ async function reconcileStuckSending() {
         currentPendingNonce !== null &&
         currentLatestNonce !== null &&
         currentPendingNonce === currentLatestNonce;
-      const safeToRetry = !o.dest_tx_hash && noPendingInFlight && attempts < MAX_ATTEMPTS;
+      const safeToRetry =
+        (!o.dest_tx_hash || submittedMissing) && noPendingInFlight && attempts < MAX_ATTEMPTS;
 
       if (safeToRetry) {
         // Roll back to `confirmed` so settleConfirmed picks it up next tick.
         await supabaseAdmin
           .from("orders")
-          .update({ status: "confirmed" })
+          .update({ status: "confirmed", dest_tx_hash: null, dest_broadcast_nonce: null })
           .eq("id", o.id);
         await logOrderEvent(o.id, "note", "retry_scheduled", {
           reason: "no_broadcast_detected",
