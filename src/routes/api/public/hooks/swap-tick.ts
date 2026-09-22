@@ -388,11 +388,21 @@ async function reconcileStuckSending() {
       // or exceeded retry cap. Alert admin once via existing stuck watchdog;
       // do not double-alert here.
       if (attempts >= MAX_ATTEMPTS) {
-        void sendAdminAlert(
-          `Payout retry cap for ${o.public_id}`,
-          `Order ${o.public_id} has reached ${attempts} send attempts with no on-chain match. Investigate manually.`,
-          `retry-cap-${o.public_id}`,
-        );
+        const { data: priorAlert } = await supabaseAdmin
+          .from("order_events")
+          .select("id")
+          .eq("order_id", o.id)
+          .eq("event", "retry_cap_alerted")
+          .limit(1)
+          .maybeSingle();
+        if (!priorAlert) {
+          await logOrderEvent(o.id, "note", "retry_cap_alerted", { attempts });
+          void sendAdminAlert(
+            `Payout retry cap for ${o.public_id}`,
+            `Order ${o.public_id} has reached ${attempts} send attempts with no on-chain match. Investigate manually.`,
+            `retry-cap-${o.public_id}`,
+          );
+        }
       }
     }
   } catch (e) {
