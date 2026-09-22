@@ -90,7 +90,10 @@ async function feeOverrides(): Promise<{
  * (wrap mints, unwrap burns, sweeps). The node's pending count alone is not
  * enough: it lags a just-broadcast tx and it forgets an evicted one, so two
  * different code paths can pick the same nonce and silently replace each
- * other. Take the max of the node's view and every nonce we've ever recorded.
+ * other. The caller must hold the database-wide `evm_operator` lock, then use
+ * the node's pending nonce. Recorded nonces are diagnostic only: a broadcast
+ * can be dropped, and treating its old nonce as permanently consumed creates
+ * an unfillable gap that prevents every later transaction from mining.
  */
 export async function nextOperatorNonce(): Promise<{
   use: number;
@@ -121,7 +124,7 @@ export async function nextOperatorNonce(): Promise<{
       payoutRow.data?.dest_broadcast_nonce ?? -1,
       burnRow.data?.burn_broadcast_nonce ?? -1,
     ) + 1;
-  return { use: Math.max(node, db), node, db };
+  return { use: node, node, db };
 }
 
 

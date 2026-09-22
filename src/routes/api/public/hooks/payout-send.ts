@@ -16,7 +16,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { mintWisk, evmTxExists, nextOperatorNonce } from "@/lib/wisk.server";
+import { mintWisk, evmTxState, nextOperatorNonce } from "@/lib/wisk.server";
 import { logOrderEvent, notifyOrderEvent, sendAdminAlert } from "@/lib/telegram.server";
 
 const Body = z.object({ orderId: z.string().uuid() });
@@ -141,15 +141,14 @@ export const Route = createFileRoute("/api/public/hooks/payout-send")({
             },
           });
 
-          // A returned hash is NOT proof of delivery: a same-nonce collision
-          // drops our tx and `eth_getTransactionByHash` returns null. Only
-          // flip to `completed` once the tx is mined or at least still known
-          // to the node; otherwise clear the hash and let the reconciler retry.
-          const landed = r.mined === true || (await evmTxExists(r.txid));
-          if (!landed) {
+          // A returned hash is NOT proof of delivery. Only a mined receipt may
+          // complete the order. Pending transactions stay in `sending` for the
+          // reconciler; missing transactions are safely requeued.
+          const txState = r.mined === true ? "mined" : await evmTxState(r.txid);
+          if (txState === "missing") {
             await supabaseAdmin
               .from("orders")
-              .update({ status: "confirmed", dest_tx_hash: null })
+              .update({ status: "confirmed", dest_tx_hash: null, dest_broadcast_nonce: null })
               .eq("id", o.id);
             await logOrderEvent(o.id, "error", "broadcast_dropped", {
               tx_hash: r.txid,
@@ -165,6 +164,12 @@ export const Route = createFileRoute("/api/public/hooks/payout-send")({
               { status: 202, headers: { "content-type": "application/json" } },
             );
           }
+          if (txState === "pending") {
+            return new Response(
+              JSON.stringify({ ok: true, pending: true, tx_hash: r.txid }),
+              { status: 202, headers: { "content-type": "application/json" } },
+            );
+          }
 
           await supabaseAdmin
             .from("orders")
@@ -173,6 +178,7 @@ export const Route = createFileRoute("/api/public/hooks/payout-send")({
               dest_tx_hash: r.txid,
               dest_fee_sats: r.feeSats,
               dest_from_address: r.fromAddress,
+              dest_verified_at: new Date().toISOString(),
             })
             .eq("id", o.id);
           await logOrderEvent(o.id, "payout", "sent", {
